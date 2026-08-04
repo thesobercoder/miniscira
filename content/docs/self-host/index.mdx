@@ -1,0 +1,302 @@
+---
+title: Before you deploy
+description: The two-process model, the environment matrix, and what each optional key buys you.
+---
+
+## The one thing that surprises everyone
+
+This is **two processes**, not one. Next.js serves the app; the eve agent server
+serves `/eve/v1/*`. `withEve()` inserts a rewrite between them.
+
+On Vercel that's invisible: both deploy as one project and the rewrite stays
+same-origin. **Everywhere else you have to start both yourself.**
+
+```text
+                  ┌──────────────────┐
+  Browser ──────▶ │  Next.js  :3000  │ ──────▶ Postgres
+                  └────────┬─────────┘
+                           │  /eve/v1/*  (rewrite)
+                           ▼
+                  ┌──────────────────┐
+                  │ eve agent :4274  │ ──────▶ Postgres
+                  └────────┬─────────┘
+                           └───────────────▶ AI Gateway
+```
+
+In production off-Vercel, `withEve` resolves the rewrite target in this order:
+
+<Steps>
+<Step>
+### `process.env.VERCEL` is set
+
+Same-origin. Nothing to configure.
+</Step>
+<Step>
+### `EVE_NEXT_PRODUCTION_ORIGIN` is set
+
+The rewrite points at that origin. Use this when the agent runs in a separate
+container or on another host.
+</Step>
+<Step>
+### Neither
+
+Falls back to `http://127.0.0.1:4274`. Override the port with
+`EVE_NEXT_PRODUCTION_PORT`.
+</Step>
+</Steps>
+
+<Callout type="error" title="Both halves need building">
+  `next build` does not build the agent. Off-Vercel you run `bunx eve build`
+  **and** `bun run build`, then `bunx eve start` **and** `bun run start`. Skip
+  the first and the app renders fine but every chat hangs on send.
+</Callout>
+
+## Environment variables
+
+### Required
+
+| Variable | Notes |
+| --- | --- |
+| `VERCEL_CLIENT_ID` + `VERCEL_CLIENT_SECRET` | Sign in with Vercel, the default login. Identity only — it does **not** supply a gateway credential, which every user pastes themselves. See [Who pays for a turn](#who-pays-for-a-turn). |
+| `AI_GATEWAY_API_KEY` | [Vercel AI Gateway](https://vercel.com/ai-gateway). Covers `cohere/rerank-v4-fast`, the one model call with no user behind it. Chat turns run on the *user's own key* unless `ALLOW_SHARED_GATEWAY_KEY` is set. |
+| `DATABASE_URL` | **Neon, or a Neon HTTP proxy.** `lib/db/index.ts` uses `drizzle-orm/neon-http`, which speaks SQL-over-HTTP rather than the Postgres wire protocol. A plain Postgres URL will not connect until you swap the driver for `drizzle-orm/node-postgres`. |
+| `BETTER_AUTH_SECRET` | `openssl rand -base64 32` |
+| `BETTER_AUTH_URL` | Your public origin. `http://localhost:3000` in dev. |
+| `NODE_ENV=production` | **On the agent process too.** `next start` sets it; `eve start` does not. See [the agent is only closed in production](#the-agent-is-only-closed-in-production). |
+
+### Strongly recommended
+
+| Variable | Without it |
+| --- | --- |
+| `BLOB_READ_WRITE_TOKEN` | Document upload fails. Vercel Blob works from any host, being an HTTPS API rather than a platform binding. |
+| `APP_URL` | Links in lookout emails fall back to `BETTER_AUTH_URL`, then `VERCEL_PROJECT_PRODUCTION_URL`, then `http://localhost:3000`. Since `BETTER_AUTH_URL` is required above, set this only when the two origins differ. |
+
+### Optional, and each degrades gracefully
+
+| Variable | Enables |
+| --- | --- |
+| `EXA_API_KEY` | `exa_search`, neural web search. |
+| `FIRECRAWL_API_KEY` | `firecrawl_search`, `firecrawl_scrape`, `firecrawl_map`. |
+| `XAI_API_KEY` | `x_search` (X/Twitter). |
+| `YOU_COM_API_KEY` | `reddit_search`. |
+| `VERCEL_TOKEN` + `VERCEL_TEAM_ID` + `VERCEL_PROJECT_ID` | `run_code`. Read the next section before you skip these. |
+| `RESEND_API_KEY` + `LOOKOUT_EMAIL_FROM` | Lookout result emails. |
+| `LOOKOUT_RUN_SECRET` | Headless lookout runs. `openssl rand -hex 32` |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google sign-in. |
+| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | GitHub sign-in. |
+| `RATE_LIMIT_PER_MINUTE` | Per-user request cap on `/api/*`. Off when unset. See [Rate limiting](#rate-limiting). |
+| `DEMO_MODE` | Serves a landing page instead of the app. Off when unset, which is what a self-host wants. See [Demo mode](#demo-mode). |
+
+<Callout>
+  A missing optional key doesn't crash a turn. Tools return
+  `{ error: "…is not configured." }`, which the model reads and routes around.
+  Deploy with the required set above and add the rest as you need them.
+</Callout>
+
+## Who pays for a turn
+
+By default, the signed-in user does. They paste their own AI Gateway key into
+Settings; it is sealed with AES-256-GCM (`lib/secret-box.ts`) and the plaintext
+is never returned, not even to them — the UI shows only the last four
+characters. `agent/agent.ts` builds the turn's model with it:
+
+```ts
+model: createGateway({ apiKey: credential.apiKey })(modelId)
+```
+
+The key is checked against the gateway before it is stored, so a typo surfaces
+at paste time rather than as a failed turn later.
+
+<Callout type="error" title="Signing in with Vercel does NOT supply the credential">
+  It is tempting to assume it would, and `@ai-sdk/gateway` describing `apiKey`
+  as *"API key or Vercel access token"* actively encourages the mistake. That
+  phrase means `VERCEL_OIDC_TOKEN` — a **deployment's** workload identity — not
+  a user's OAuth token.
+
+  Measured against a freshly refreshed one:
+
+| Request | Result |
+| --- | --- |
+| `ai-gateway.vercel.sh/v1/models` | 401 `authentication_error` |
+| `api.vercel.com/v2/teams` | 403 `You don't have permission` |
+| `api.vercel.com/v1/api-keys` | 401 `Method is not allowed for this endpoint` |
+| `api.vercel.com/login/oauth/userinfo` | 200 |
+
+  Sign in with Vercel is identity-only. It cannot authenticate to the gateway
+  and it cannot mint a key on the user's behalf either.
+</Callout>
+
+<Callout type="warn" title="`ALLOW_SHARED_GATEWAY_KEY` is how you end up paying for strangers">
+  Unset (the default), a user who has not saved a key cannot run a turn —
+  `lib/gateway-credentials.ts` throws rather than reaching for
+  `AI_GATEWAY_API_KEY`. Set it to `"true"` and every such user runs on *your*
+  key instead.
+
+  Useful locally, and reasonable on a private deployment where you know
+  everyone. On a public one it is an open bar. If you do set it, set
+  `RATE_LIMIT_PER_MINUTE` too.
+</Callout>
+
+`AI_GATEWAY_API_KEY` is still required either way: document reranking
+(`cohere/rerank-v4-fast`) runs with no user attached and always uses it.
+
+### Setting up the Vercel App
+
+Dashboard → Account Settings → Apps → create an app, then:
+
+| Field | Value |
+| --- | --- |
+| Redirect URL | `https://your-host/api/auth/callback/vercel` |
+| Scopes | `openid`, `email`, `profile`, `offline_access` |
+
+`offline_access` matters: without a refresh token the credential dies with the
+access token and users silently lose the ability to research until they sign in
+again. PKCE is required by Vercel and handled by better-auth.
+
+<Callout type="warn" title="Scopes are set on the App, not in code">
+  `lib/auth.ts` sends no `scope` parameter deliberately. Vercel derives the
+  granted scopes from the App's configuration, and a `scope` parameter can only
+  narrow that set — request anything the App does not have and the authorize
+  call fails immediately with:
+
+```text
+CODE: invalid_scope
+The requested scope is invalid, unknown, or malformed.
+```
+
+  If you see that, the fix is enabling the scope on the Vercel App. Adding it to
+  the provider config is what causes it.
+</Callout>
+
+Google and GitHub stay available and can be linked to the same account. How you
+signed in does not affect billing: the key is stored per user id, so an account
+that never touched Vercel pays for turns exactly like one that did.
+
+## The agent is only closed in production
+
+The agent authenticates callers through an ordered chain in
+`agent/channels/eve.ts`: app session → internal run secret → Vercel OIDC → and,
+in development only, eve's `localDev()`.
+
+That last entry authenticates **any request whose Host is loopback**
+(`127.*`, `localhost`, `[::1]`, `*.localhost`) — it reads the Host the agent was
+reached on, not the client's address. Since it sits last in a first-match-wins
+chain, it only ever fires for callers the three above rejected: anonymous ones.
+
+<Callout type="error" title="This matters because of how the rewrite works">
+  Off Vercel, `withEve` rewrites `/eve/v1/*` to `http://127.0.0.1:4274`, so
+  **every** proxied request arrives at the agent with a loopback Host. With
+  `localDev()` in the chain, an anonymous request from the public internet to
+  `https://your-host/eve/v1/*` is authenticated — as eve's `local-dev`
+  principal, on every agent endpoint.
+
+  It cannot spend your gateway key: `turnCredential` in `agent/agent.ts` only
+  resolves a credential for a `user` principal, and the step throws without one.
+  Everything else the agent exposes is reachable, which is quite enough.
+
+  It is excluded when `NODE_ENV === "production"`, which `eve start` does not
+  set for you. Set it explicitly on the agent process.
+</Callout>
+
+Verify from off-box, with no cookie:
+
+```bash
+curl -sS -o /dev/null -w '%{http_code}\n' https://your-host/eve/v1/info
+```
+
+`401` is correct. `200` means the agent is open.
+
+On Vercel this cannot happen: `withEve` short-circuits, the agent stays
+same-origin, and the Host is your real domain.
+
+## Rate limiting
+
+Off by default. Set `RATE_LIMIT_PER_MINUTE` to a positive integer to cap
+requests per signed-in user on the REST API; the same variable enables and
+configures it, so it cannot be switched on without a budget. Over-budget
+requests get a `429` with `Retry-After`.
+
+<Callout type="warn" title="Know what this does not cover">
+  Counters are in-memory, so the ceiling is per process — behind N instances the
+  effective limit is N × the value, and a restart clears every window. It brakes
+  one runaway client; it is not a quota.
+
+  More importantly it does **not** cap model spend: agent turns run over
+  `/eve/v1/*`, which bypasses these route handlers entirely. The spend guards
+  are `maxOutputTokensPerSession` and `maxInputTokensPerSession` in
+  `agent/agent.ts`.
+</Callout>
+
+## Demo mode
+
+`DEMO_MODE=true` replaces the whole app with a landing page. This is what
+miniscira.com runs, and it is almost certainly *not* what you want on your own
+deployment — leave it unset and you get the app.
+
+It exists because a public deployment of a research tool is a bill waiting to
+happen: either you pay for strangers' turns or you ship a chat that nobody can
+sign into. A landing page is the honest third option.
+
+The switch lives in `proxy.ts`, before the session check:
+
+```ts
+if (isDemoMode()) {
+  if (pathname === "/") return NextResponse.rewrite(new URL(LANDING_PATH, request.url))
+  if (pathname !== LANDING_PATH) return NextResponse.redirect(new URL("/", request.url))
+  return NextResponse.next()
+}
+```
+
+A rewrite for `/` so the marketing URL stays the bare domain, a redirect for
+everything else. It runs before the session lookup deliberately: demo mode is a
+property of the deployment, not of who is asking, so signing in does not get you
+past it.
+
+<Callout type="warn" title="It is server-side only">
+  There is no `NEXT_PUBLIC_DEMO_MODE`. The flag decides nothing in the browser —
+  by the time a page renders, the proxy has already routed the request — and a
+  `NEXT_PUBLIC_` variable would only bake the deployment's configuration into
+  the client bundle for no benefit.
+</Callout>
+
+## The sandbox
+
+`run_code` is backed by Vercel Sandbox, pinned in `agent/sandbox.ts`. It is
+**not** Vercel-only: it creates a hosted sandbox over the API, so it works from
+Docker or a VPS given `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, and
+`VERCEL_PROJECT_ID`.
+
+<Callout type="error" title="The sandbox is a startup dependency, not an optional tool">
+  `eve start` initializes the sandbox template **at boot, before it listens**.
+  If no backend can initialize, the agent never serves: `/eve/v1/*` returns 500
+  while Next.js keeps serving the UI as though everything were fine.
+
+  Disabling the `run_code` tool does **not** avoid this, and neither does
+  deleting `agent/sandbox.ts`. eve then falls back to the `just-bash` backend,
+  which is not bundled with it.
+
+  Off-Vercel you must either supply the three `VERCEL_*` variables or switch
+  `agent/sandbox.ts` to a backend whose package you install. See
+  [the Docker notes](/docs/self-host/docker#the-sandbox-is-a-hard-startup-dependency).
+</Callout>
+
+Individual *sessions* do open their sandbox lazily, so the web-research path
+never spins one up per turn. It is only the template prewarm that is eager.
+
+## Database setup
+
+Once per database:
+
+```bash
+bun run db:setup   # creates the pgvector extension
+bun run db:push    # applies the schema
+```
+
+<Callout type="warn">
+  `db:push` diffs the live database and will offer to **drop** anything not in
+  the schema, including tables you created by hand. Read the plan before
+  confirming.
+</Callout>
+
+Then pick a target: [Vercel](/docs/self-host/vercel),
+[Docker](/docs/self-host/docker), or [VPS](/docs/self-host/vps).

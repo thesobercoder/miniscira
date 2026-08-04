@@ -1,0 +1,42 @@
+name: CI
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      # Placeholders, not secrets. `next build` collects page data for every
+      # route, which constructs the better-auth instance — and that throws on
+      # the default secret. Nothing here reaches a network.
+      BETTER_AUTH_SECRET: ci-placeholder-not-a-real-secret
+      BETTER_AUTH_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+      - name: Lint
+        run: bun run lint
+      - name: Test
+        run: bun test
+
+      # Both halves. `next build` does not build the agent, so an agent that
+      # fails to compile would otherwise sail through CI and break on deploy.
+      - name: Build agent
+        run: bunx eve build --skip-sandbox-prewarm
+      - name: Build app
+        run: bun run build
+
+      # Unused exports. Non-blocking: knip's view of the second entry graphs
+      # (agent/, scripts/, source.config.ts) is configured in knip.jsonc, and a
+      # false positive there should not stop a pull request.
+      - name: Unused exports
+        run: bun run knip
+        continue-on-error: true

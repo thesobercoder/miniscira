@@ -1,0 +1,152 @@
+---
+title: The agent
+description: Instructions, tools, skills, and the researcher subagent. Everything the model can see or do.
+---
+
+Everything under `agent/` is compiled by eve, not by Next.js. The directory
+layout *is* the configuration: eve discovers tools, skills, instructions, and
+subagents from the filesystem.
+
+## The definition
+
+`agent/agent.ts` is small on purpose. It sets the model, the compaction policy,
+and the spend limits. Nothing else.
+
+```ts title="agent/agent.ts"
+export default defineAgent({
+  model: defineDynamic({
+    fallback: DEFAULT_CHAT_MODEL,
+    events: {
+      "step.started": async (_event, ctx) => {
+        const modelId = chatModelFromMessages(ctx.messages) ?? DEFAULT_CHAT_MODEL
+        const credential = await turnCredential(ctx)
+        // No credential means nobody to bill: fail here rather than fall
+        // through to `fallback` on the deployment's own key.
+        if (!credential) throw new NoGatewayCredentialError()
+        return {
+          model: createGateway({ apiKey: credential.apiKey })(modelId),
+          modelContextWindowTokens: await contextWindowFor(
+            modelId,
+            credential.apiKey
+          ),
+        }
+      },
+    },
+  }),
+  // …compaction, limits
+})
+```
+
+<Callout type="warn" title="Two non-obvious details">
+  The resolver runs on `step.started`, **not** `turn.started`. At `turn.started`
+  `ctx.messages` is still empty, so there is no client context to read and every
+  turn falls through to the compiled model.
+
+  `fallback` is a required field and is the compiled *build-time* model. It is
+  what subagents and headless lookout runs use, since neither carries a picker
+  selection. It is not a fallback in the behavioural sense.
+</Callout>
+
+The composer sends `clientContext.chatModel` with each message and the resolver
+reads the last marker in the transcript. The featured list and the compiled
+default live in `lib/models.ts`; see [Models](/docs/customise/models).
+
+### Cost and lifetime guards
+
+| Limit | Value | Why |
+| --- | --- | --- |
+| `maxOutputTokensPerSession` | 200K | A runaway session pauses with eve's Continue/Stop prompt. |
+| `maxInputTokensPerSession` | 10M | A deep-research turn re-reads a growing transcript; input dominates the bill. eve's default of 40M is ~160 such turns. |
+| `sessionTimeoutMs` | 180 days | eve 0.28 started completing sessions after 30 days. A research chat is exactly the thing someone reopens months later. |
+| `compaction.model` | `google/gemini-3.5-flash` | Summarize on something cheap with a big window, not at flagship rates. |
+
+## Instructions
+
+`agent/instructions/` is concatenated in filename order. Files can be static
+Markdown or a `.ts` module that returns a string, which is how per-user context
+gets injected:
+
+| File | Contributes |
+| --- | --- |
+| `00-core.md` | The standing system prompt: role, research method, citation rules. |
+| `05-now.ts` | The current date and time. |
+| `10-memories.ts` | The user's saved memories. |
+| `20-personalization.ts` | Tone and personalization settings. |
+
+See [Editing instructions](/docs/customise/instructions).
+
+## Tools
+
+Each file in `agent/tools/` is one tool, named after the file.
+
+| Group | Tools |
+| --- | --- |
+| Web research | `exa_search`, `firecrawl_search`, `firecrawl_scrape`, `firecrawl_map`, `x_search`, `reddit_search` |
+| Documents | `search_documents` |
+| Memory | `remember`, `list_memories`, `forget` |
+| MCP | `mcp_servers`, `mcp_list_tools`, `mcp_call` |
+| Output | `artifact`, `generate_image` |
+| Compute | `run_code`, `sleep` |
+
+Tools whose provider key is unset degrade rather than crash. The agent simply
+has fewer options that turn.
+
+### The disabled defaults
+
+`agent/tools/web_search.ts` and `agent/tools/web_fetch.ts` both contain a single
+line:
+
+```ts title="agent/tools/web_search.ts"
+export default disableTool()
+```
+
+eve ships built-in `web_search` and `web_fetch` tools. They were turned off
+deliberately: the agent otherwise reached for the generic pair instead of the
+provider tools that produce the structured results the timeline and citation
+pills render from.
+
+## Skills
+
+`agent/skills/*.md` are on-demand playbooks. The agent sees only their names and
+descriptions until it calls `load_skill`, at which point the full body enters
+context. That keeps a long playbook out of every prompt.
+
+| Skill | For |
+| --- | --- |
+| `deep_research.md` | Multi-source reports with a plan and a synthesis pass. |
+| `document_research.md` | Questions answered from uploaded documents. |
+| `fact_check.md` | Verifying a specific claim. |
+| `compare_options.md` | Structured comparisons. |
+| `news_brief.md` | Recent-events summaries. |
+| `social_pulse.md` | X and Reddit sentiment. |
+| `build_ui.md` | Interactive artifacts. |
+
+## The researcher subagent
+
+`agent/subagents/researcher/` is a full agent in its own right, with its own
+instructions and its own copy of the search tools. The main agent delegates a
+scoped research question to it and gets back a summary rather than the raw
+transcript. That is the whole point: the subagent burns its own context window
+on twenty search results, and only the conclusion comes back.
+
+In the UI, a delegated run renders as a nested timeline branching off the main
+rail.
+
+<Callout>
+  Subagents carry no client context, so they always run on
+  `DEFAULT_CHAT_MODEL`, never the model showing in the composer.
+</Callout>
+
+## The sandbox
+
+`agent/sandbox.ts` backs `run_code` with a Vercel Sandbox. `bootstrap` installs
+pandas/numpy/matplotlib once with egress open and reuses the snapshot;
+`onSession` then sets a `deny-all` network policy so user code cannot call out.
+
+<Callout type="warn" title="The template prewarm is eager">
+  Per-session sandboxes open lazily, but `eve start` initializes the *template*
+  before it begins listening and refuses to serve if that fails. On Vercel this
+  is transparent. Anywhere else the agent will not start without working sandbox
+  credentials, whether or not `run_code` is ever called. See
+  [Self-hosting](/docs/self-host#the-sandbox).
+</Callout>

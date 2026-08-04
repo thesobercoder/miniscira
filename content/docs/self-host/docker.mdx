@@ -1,0 +1,322 @@
+---
+title: Docker
+description: A verified two-process image, and the five things that break it.
+---
+
+The [`Dockerfile`](https://github.com/zaidmukaddam/miniscira/blob/main/Dockerfile)
+and `.dockerignore` in the repo root are the ones described here. This image has
+been built and run. Every constraint below is something that actually failed
+first, usually in a way that took a while to understand.
+
+```bash
+docker build --platform linux/amd64 -t miniscira .
+```
+
+```bash
+docker run -d -p 3000:3000 --env-file .env.production miniscira
+```
+
+## Five constraints, all discovered the hard way
+
+<Steps>
+<Step>
+### amd64 only, even on an Apple Silicon host
+
+`@firecrawl/pdf-inspector` ships prebuilt NAPI addons for `linux-x64-gnu`,
+`darwin-arm64` and `win32-x64-msvc`. **There is no `linux-arm64` binary.**
+
+An arm64 image installs cleanly and then dies during `next build`:
+
+```text
+Failed to load external module @firecrawl/pdf-inspector: Cannot find native binding.
+```
+
+Hence `--platform linux/amd64`, which the Dockerfile also pins on each `FROM`.
+</Step>
+
+<Step>
+### Node builds, Bun only installs
+
+Under Docker's amd64 emulation on an Apple Silicon host, Bun crashes partway
+through `next build`:
+
+```text
+panic: Segmentation fault at address 0x13CB0
+error: script "build" was terminated by signal SIGILL (Illegal instruction)
+```
+
+Bun is therefore confined to `bun install` (which needs `bun.lock`) and Node
+runs everything else. On a native amd64 host either works; this way one
+Dockerfile covers both.
+
+Node has to be 24 or newer. The eve CLI refuses to start on anything older.
+</Step>
+
+<Step>
+### `next.config.ts` must exist in the *deps* stage
+
+Not for its contents. The `fumadocs-mdx` CLI, which `postinstall` runs, decides
+whether it is in a Next.js or a Vite project with a bare
+`existsSync("next.config.ts")` on the working directory. Without the file it
+takes the Vite branch and the install fails:
+
+```text
+error: Cannot find package 'vite' from '/app/node_modules/fumadocs-mdx/dist/vite/index.js'
+error: postinstall script from "miniscira" exited with 1
+```
+</Step>
+
+<Step>
+### The agent's build output is `.output/`, not `.eve/`
+
+`.eve/` is dev-server cache, traces and locks. `eve build` writes a Nitro bundle
+to `.output/`, and `eve start` looks for `.output/server/index.mjs`.
+
+Copy the wrong one and the failure is quiet and misleading. The UI serves
+perfectly, `/docs` works, and only chat is broken:
+
+```text
+Missing eve build output at /app/.output/server/index.mjs. Run "eve build" before "eve start".
+```
+</Step>
+
+<Step>
+### The build needs a placeholder `BETTER_AUTH_SECRET`
+
+`next build` collects page data for every route, which constructs the
+better-auth instance. It throws on the default secret:
+
+```text
+[Error [BetterAuthError]: You are using the default secret.]
+Error: Failed to collect page data for /api/documents
+```
+
+The Dockerfile sets a placeholder in the builder stage only. `ENV` does not
+cross a `FROM` boundary, so it never reaches the runner.
+</Step>
+</Steps>
+
+## The sandbox is a hard startup dependency
+
+This is the one that will actually stop you.
+
+<Callout type="error" title="No sandbox, no agent. `run_code` is not optional.">
+  `eve start` initializes the sandbox template **at boot**, before it listens.
+  If that fails, the agent never serves and every `/eve/v1/*` request returns
+  500, while Next.js carries on serving the UI as if nothing were wrong.
+
+  With the default `vercel()` backend and no Vercel credentials:
+
+```text
+eve: failed to initialize sandbox template "root" on backend "vercel":
+Could not get credentials from OIDC context.
+```
+
+  Deleting `agent/sandbox.ts` does **not** help. eve then falls back to
+  `just-bash`, which is not bundled:
+
+```text
+The just-bash sandbox backend requires the `just-bash` package, which is not bundled with eve.
+```
+</Callout>
+
+So pick one, before you deploy:
+
+| Option | What to do |
+| --- | --- |
+| **Keep Vercel Sandbox** (default) | Set `VERCEL_TOKEN`, `VERCEL_TEAM_ID`, `VERCEL_PROJECT_ID`. Works fine from a container, since it's just an HTTPS API. |
+| **Swap the backend** | `bun add -d just-bash`, then `defineSandbox({ backend: justbash() })` in `agent/sandbox.ts`. Verified working in-container. |
+| **`docker()` backend** | `eve/sandbox/docker`. Needs a Docker socket mounted into the container. |
+
+Once a backend initializes you get the line you want:
+
+```text
+eve: initialized 1 sandbox template (0 reused, 1 built).
+[START] server listening at http://127.0.0.1:4274/
+```
+
+## The database must be Neon-compatible
+
+<Callout type="warn" title="A plain Postgres container will not work unmodified">
+  `lib/db/index.ts` uses `drizzle-orm/neon-http` over
+  `@neondatabase/serverless`, which speaks SQL-over-HTTP to a Neon endpoint
+  rather than the Postgres wire protocol. Pointing `DATABASE_URL` at
+  `pgvector/pgvector:pg17` in a compose file will not connect.
+
+  To run against plain Postgres, swap the driver:
+
+```ts title="lib/db/index.ts"
+import { drizzle } from "drizzle-orm/node-postgres"
+```
+
+  Otherwise use Neon, or a Neon HTTP proxy in front of your own Postgres.
+</Callout>
+
+## `.dockerignore`
+
+Copying a host `node_modules` into the image is a reliable way to end up with a
+native addon built for the wrong platform, so it is excluded along with every
+build output:
+
+```text title=".dockerignore"
+node_modules
+.next
+.eve
+.output
+.source
+.git
+.env*
+!.env.example
+```
+
+## The two-process CMD
+
+```sh
+node node_modules/eve/bin/eve.js start --port 4274 & exec node node_modules/next/dist/bin/next start
+```
+
+4274 is the port `withEve` rewrites to when `VERCEL` is unset. If it clashes,
+two separate knobs move: `EVE_NEXT_PRODUCTION_PORT` changes where Next rewrites
+to, and `--port` on `eve start` changes where the agent actually listens. Set
+both, or the rewrite points at nothing.
+
+<Callout type="warn">
+  `sh -c 'a & exec b'` gives you no supervision: if the agent dies, the
+  container keeps serving a UI whose every chat 500s, which is exactly the
+  failure mode above. For anything you care about, use two containers or an init such as
+  `tini` with a process manager.
+</Callout>
+
+## Two containers
+
+Cleaner, and the agent gets its own restart policy. The catch is that the two
+halves still have to meet on loopback, because that is what the image was built
+with — see the callout below before changing the networking.
+
+<Callout type="warn">
+  The single-container image above is the one that has actually been built and
+  run for these docs. This split is the same image with the processes separated;
+  the networking note below is the part that bites.
+</Callout>
+
+```yaml title="compose.yaml"
+services:
+  agent:
+    build: .
+    command: node node_modules/eve/bin/eve.js start --port 4274
+    environment:
+      - DATABASE_URL
+      - AI_GATEWAY_API_KEY
+      - BETTER_AUTH_SECRET
+      - LOOKOUT_RUN_SECRET
+      - VERCEL_TOKEN
+      - VERCEL_TEAM_ID
+      - VERCEL_PROJECT_ID
+    # Both processes' ports are published here, because `web` shares this
+    # container's network namespace.
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  web:
+    build: .
+    command: node node_modules/next/dist/bin/next start
+    # The rewrite baked into the image points at 127.0.0.1:4274, so the web
+    # container has to *be* on the agent's loopback. Sharing the namespace is
+    # what makes that true; a bridge network and a service name will not.
+    network_mode: "service:agent"
+    environment:
+      - DATABASE_URL
+      - AI_GATEWAY_API_KEY
+      - BETTER_AUTH_SECRET
+      - BETTER_AUTH_URL
+      - BLOB_READ_WRITE_TOKEN
+      - APP_URL
+    depends_on:
+      - agent
+    restart: unless-stopped
+```
+
+Note what is *not* in there: `EVE_NEXT_PRODUCTION_ORIGIN`. It is the obvious way
+to point the web container at `agent:4274`, and it does not work here.
+
+<Callout type="error" title="EVE_NEXT_PRODUCTION_ORIGIN will not reach a bare `eve start`">
+  Two separate problems, both measured against this repo's `next.config.ts`.
+
+  It is a **build-time** value. `next build` evaluates `rewrites()` and freezes
+  the result into `.next/routes-manifest.json`; `next start` only replays that
+  file. Setting the variable in `compose.yaml` — after the image is built —
+  changes nothing at all.
+
+  And it is not a host swap. The loopback branch emits
+  `http://127.0.0.1:4274/eve/v1/*`, but the origin branch appends `withEve`'s
+  private service prefix:
+
+  ```
+  unset                → http://127.0.0.1:4274/eve/v1/:path+
+  =http://agent:4274   → http://agent:4274/_eve_internal/eve/eve/v1/:path+
+  ```
+
+  A bare `eve start` serves the protocol at its root, so every one of those
+  requests 404s. `servicePrefix: "/"` does not rescue it either — `withEve`
+  rejects it with "service prefix cannot resolve to the root route".
+
+  Use the origin branch only when something in front of the agent serves or
+  strips `/_eve_internal/eve` — which is what Vercel does, and what a plain
+  container does not. Otherwise keep the two processes in one container, as
+  above, where the `127.0.0.1:4274` default is already right.
+</Callout>
+
+<Callout>
+  Both services need `DATABASE_URL` and `AI_GATEWAY_API_KEY`: the agent reads
+  and writes the same database the app does. Only the agent needs the Vercel
+  sandbox credentials.
+</Callout>
+
+## Verifying a running container
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:3000/docs
+```
+
+| Path | Expect | Means |
+| --- | --- | --- |
+| `/docs` | 200 | Next.js is up, and `source.config.ts` + `content/` made it into the image. |
+| `/` | 307 | The auth proxy is working. |
+| `/eve/v1/info` | 200 *with a session*, 401 without | **The agent is up and the rewrite resolves.** This is the one that catches a missing `.output/` or a failed sandbox — and a `200` with **no** cookie means the agent is open to the internet, see below. |
+
+`/eve/v1/info` also reports the resolved model and whether the gateway
+connected, which is the fastest way to confirm `AI_GATEWAY_API_KEY` reached the
+agent and not just the app.
+
+<Callout type="error" title="`NODE_ENV=production` must reach the agent process">
+  The runner stage sets `ENV NODE_ENV=production`, so the single-container image
+  and both compose services inherit it. If you override the environment — a
+  compose `env_file` that resets it, a `docker run -e NODE_ENV=…` — check it
+  again.
+
+  The agent drops eve's `localDev()` auth entry only in production, and that
+  entry authenticates any request with a loopback Host, which is exactly what
+  the `/eve/v1/*` rewrite produces. An unauthenticated `200` from
+  `/eve/v1/info` means anyone can run turns on your gateway key. Full
+  explanation in
+  [the agent is only closed in production](/docs/self-host#the-agent-is-only-closed-in-production).
+</Callout>
+
+## Image size
+
+The image is around 2.7 GB, which is not great. Two things dominate: the runner
+copies the full `node_modules` including dev dependencies, and `.output/` is a
+self-contained Nitro bundle carrying its own copy of the agent's dependencies.
+
+Both are reducible, either with a production-only install in the runner or with
+Next's `output: "standalone"`. Neither has been tested against the eve build
+here, though, and a wrong guess fails at runtime rather than at build time. So
+it is left alone for now.
+
+## Scheduling
+
+Lookouts run on a minute-tick eve schedule and are leased in the database, so
+scaling `agent` to several replicas does not double-send them: the lease is a
+single conditional `UPDATE … RETURNING`, and a second ticker gets an empty set.
+See [the VPS notes on scaling](/docs/self-host/vps#scaling).

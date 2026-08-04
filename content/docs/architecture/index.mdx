@@ -1,0 +1,90 @@
+---
+title: How it works
+description: One Next.js app, one eve agent, one origin, and the seam between them.
+---
+
+MiniScira is two servers that behave like one.
+
+The Next.js app owns the UI, auth, and the REST endpoints under `app/api`. The
+eve agent owns the model loop, the tools, and the durable session state.
+`withEve()` in `next.config.ts` rewrites `/eve/v1/*` to the agent server, so from
+the browser there is one origin, one cookie jar, and no CORS.
+
+```ts title="next.config.ts"
+export default withEve(withMDX(nextConfig))
+```
+
+<Callout title="The wrapper order is forced">
+  `createMDX()` only accepts a plain config object; it spreads it and reads
+  `.turbopack`. `withEve` returns the *function* form, `(phase, ctx) => config`.
+  MDX has to be applied innermost, or its Turbopack rules are silently dropped
+  and every `.mdx` import fails with "Unknown module type".
+</Callout>
+
+## The repo
+
+| Directory | Owns |
+| --- | --- |
+| `agent/` | Everything the model can see or do. Compiled by eve, not by Next. |
+| `app/(app)/` | The authenticated shell: chat, projects, lookouts, settings, MCP. |
+| `app/api/` | REST endpoints the UI calls directly. |
+| `components/` | `chat/` and `timeline/` are the research transcript; `ui/` is shadcn. |
+| `lib/` | Database, auth, retrieval, model catalog, event parsing. |
+| `proxy.ts` | Next 16's renamed middleware. Redirects anonymous visitors to `/sign-in`. |
+
+## Two auth gates
+
+They are independent, and conflating them is a mistake.
+
+**The app.** `proxy.ts` does an optimistic cookie check only. Real validation
+happens again in every server component and route handler via
+`auth.api.getSession`, with ownership checks in `lib/api-ownership.ts`. The
+matcher skips `api`, `eve`, `sign-in`, `docs`, and static assets.
+
+**The agent.** `/eve/v1/*` is rewritten before Next routing, so `proxy.ts` never
+sees it. `agent/channels/eve.ts` authenticates instead, via an ordered chain:
+app session → internal run secret → Vercel OIDC → local-dev loopback. The first
+entry that resolves wins.
+
+<Callout type="error">
+  Do not sort or tidy that array. Reordering it changes which principal
+  authenticates a request.
+</Callout>
+
+## The schema
+
+Postgres via Drizzle, in `lib/db/schema.ts`. The driver is
+`drizzle-orm/neon-http`, which speaks SQL-over-HTTP rather than the Postgres
+wire protocol; that matters when [self-hosting](/docs/self-host#environment-variables).
+
+| Table | Holds |
+| --- | --- |
+| `user`, `session`, `account`, `verification` | better-auth's own tables. |
+| `user_settings` | Tone, personalization, defaults. |
+| `chat` | One row per conversation. |
+| `chat_event` | The append-only agent event stream. This is the transcript. |
+| `document` | Uploaded files: blob URL, extracted text, owner, optional project. |
+| `document_chunk` | Legacy from the vector-index era. Unused. |
+| `project` | Custom instructions plus a document set. |
+| `memory` | Facts the agent saved via `remember`. |
+| `mcp_server` | User-registered MCP endpoints and their OAuth state. |
+| `lookout` | Scheduled research questions. |
+
+<Callout type="warn">
+  `bun run db:push` diffs the live database and will offer to drop anything not
+  in the schema, including tables you created by hand. Read the plan before
+  confirming.
+</Callout>
+
+## Lookouts
+
+Scheduling is an in-database lease driven by a minute-tick eve schedule in
+`agent/schedules/lookouts.ts`. There is no external queue, so lookouts work the
+same on Vercel, in Docker, and on a VPS, as long as exactly one instance runs
+the schedule.
+
+<Callout type="warn">
+  `lib/lookout-schedule.ts` only understands two UTC cron shapes, `M H * * *`
+  (daily) and `M H * * D` (weekly), and the UI only emits those. Any other shape
+  silently fails to schedule.
+</Callout>

@@ -1,0 +1,224 @@
+---
+title: VPS
+description: Two systemd units behind a reverse proxy, and the one thing you must not scale.
+---
+
+A plain box: Hetzner, DigitalOcean, an old laptop under a desk. Same two
+processes, managed by systemd instead of a container runtime.
+
+## Prerequisites
+
+```bash
+curl -fsSL https://bun.sh/install | bash
+```
+
+Node 24+ if you run the built output with Node instead — eve's CLI declares
+`"node": ">=24"` and refuses to start below it. Bun is what the scripts assume.
+
+## Build
+
+```bash
+git clone https://github.com/zaidmukaddam/miniscira /srv/miniscira
+cd /srv/miniscira
+bun install --frozen-lockfile
+
+# Both halves. `next build` does not build the agent.
+bunx eve build
+bun run build
+```
+
+Put the environment in `/srv/miniscira/.env.production` with `chmod 600`.
+See [the environment matrix](/docs/self-host#environment-variables).
+
+<Callout type="error" title="Sort the sandbox out before you start the agent unit">
+  `eve start` initializes the sandbox template before it listens and exits if it
+  can't. Without `VERCEL_TOKEN` / `VERCEL_TEAM_ID` / `VERCEL_PROJECT_ID`, or a
+  different backend configured in `agent/sandbox.ts`, `miniscira-agent` will
+  restart-loop while `miniscira-web` serves a UI whose every chat 500s. The
+  details, and the alternatives, are in
+  [the Docker notes](/docs/self-host/docker#the-sandbox-is-a-hard-startup-dependency).
+</Callout>
+
+## systemd
+
+<Tabs items={['Agent', 'Web']}>
+<Tab value="Agent">
+
+```ini title="/etc/systemd/system/miniscira-agent.service"
+[Unit]
+Description=MiniScira eve agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=miniscira
+WorkingDirectory=/srv/miniscira
+Environment=NODE_ENV=production
+EnvironmentFile=/srv/miniscira/.env.production
+ExecStart=/home/miniscira/.bun/bin/bunx eve start --port 4274
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+</Tab>
+<Tab value="Web">
+
+```ini title="/etc/systemd/system/miniscira-web.service"
+[Unit]
+Description=MiniScira web
+After=network-online.target miniscira-agent.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=miniscira
+WorkingDirectory=/srv/miniscira
+Environment=NODE_ENV=production
+EnvironmentFile=/srv/miniscira/.env.production
+ExecStart=/home/miniscira/.bun/bin/bun run start
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+</Tab>
+</Tabs>
+
+```bash
+sudo systemctl enable --now miniscira-agent miniscira-web
+```
+
+<Callout>
+  No `EVE_NEXT_PRODUCTION_ORIGIN` needed here. Both units are on the same host,
+  so `withEve`'s default rewrite to `127.0.0.1:4274` is already correct. If that
+  port is taken, change it in two different places: `EVE_NEXT_PRODUCTION_PORT`
+  on the Next unit, which only moves where the rewrite points, and `--port` on
+  the agent's `eve start`, which is what actually moves the listener.
+</Callout>
+
+<Callout type="error" title="`NODE_ENV=production` on the agent unit is a security control">
+  `next start` sets `NODE_ENV` itself, but `eve start` is a separate process
+  and does not. The agent's auth chain in `agent/channels/eve.ts` drops eve's
+  `localDev()` entry only when `NODE_ENV === "production"`.
+
+  That entry authenticates **any request whose Host is loopback** — and on this
+  exact topology every proxied request reaches the agent as `127.0.0.1`. Leave
+  it in and an anonymous request to `https://your-host/eve/v1/*` gets a full
+  agent principal. `Environment=NODE_ENV=production` on the agent unit is what
+  closes it. See [Verifying the agent is not open](#verifying-the-agent-is-not-open).
+</Callout>
+
+## Reverse proxy
+
+```text title="/etc/caddy/Caddyfile"
+miniscira.example.com {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:3000
+}
+```
+
+Caddy handles TLS on its own. Set `BETTER_AUTH_URL` and `APP_URL` to
+`https://miniscira.example.com`.
+
+<Callout type="warn" title="Do not proxy port 4274">
+  Only expose the Next.js port. The agent is reached *through* the app's rewrite,
+  which is what carries the session cookie into `agent/channels/eve.ts`. A
+  publicly routable agent port bypasses the first link of that auth chain.
+</Callout>
+
+### Streaming
+
+Research turns stream for minutes. If you use nginx instead of Caddy:
+
+```nginx
+proxy_buffering off;
+proxy_read_timeout 900s;
+```
+
+Without the first line the timeline arrives in one lump at the end, which looks
+exactly like the agent being broken.
+
+## Database
+
+Use Neon, or a Neon HTTP proxy in front of your own Postgres. The app's driver
+is `drizzle-orm/neon-http` and does not speak the Postgres wire protocol. A
+local `apt install postgresql` will not work until you swap the driver for
+`drizzle-orm/node-postgres` in `lib/db/index.ts`.
+
+Then once:
+
+```bash
+bun run db:setup
+bun run db:push
+```
+
+## Updating
+
+```bash
+cd /srv/miniscira
+git pull
+bun install --frozen-lockfile
+bunx eve build && bun run build
+sudo systemctl restart miniscira-agent miniscira-web
+```
+
+Restart the agent **first, or restart both together**. The web service holds no
+agent state, but a rewrite to a dead port fails fast and confusingly.
+
+## Scaling
+
+The web process is stateless; run as many as you like behind a load balancer.
+
+<Callout title="Several agent processes are safe for lookouts">
+  Lookout scheduling is a minute-tick eve schedule in
+  `agent/schedules/lookouts.ts`, and `claimDueLookouts` in
+  `lib/lookout-schedule.ts` leases due rows in a single
+  `UPDATE … WHERE leased_until IS NULL OR leased_until <= now … RETURNING`. A
+  second process ticking at the same moment re-evaluates that predicate after
+  the first commits, finds the lease in the future, and gets nothing back. No
+  external queue is needed, and a lookout is not delivered twice.
+
+  What a lease cannot cover is a process that dies mid-run: the row stays leased
+  until `LEASE_MS` expires, and the run is retried after that rather than
+  resumed.
+</Callout>
+
+## Checking it works
+
+```bash
+systemctl status miniscira-agent miniscira-web
+journalctl -u miniscira-agent -f
+curl -sS -o /dev/null -w '%{http_code}\n' https://miniscira.example.com/docs
+```
+
+`/docs` is the useful probe: it is unauthenticated and server-rendered, so a 200
+means Next.js is healthy without needing a session. (`/sign-in` qualifies too;
+`/docs` is the one that also proves the MDX build landed.) Neither exercises the
+agent.
+
+## Verifying the agent is not open
+
+Run this from a machine that is **not** the server, with no session cookie:
+
+```bash
+curl -sS -o /dev/null -w '%{http_code}\n' https://miniscira.example.com/eve/v1/info
+```
+
+| Result | Meaning |
+| --- | --- |
+| `401` | Correct. Anonymous callers are rejected. |
+| `200` | **The agent is open to the internet.** `NODE_ENV=production` is not reaching the agent process. |
+
+A `200` here means anyone can run turns on your gateway key. Check
+`systemctl show miniscira-agent -p Environment` and restart the unit after
+fixing it.
+
+Do this once after the first deploy and again after any change to the units —
+it is a two-second check for the one misconfiguration on this page that is
+silently exploitable rather than merely broken.

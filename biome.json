@@ -1,0 +1,117 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.6/schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "ignoreUnknown": false,
+    "includes": [
+      "**",
+      "!!**/.eve",
+      "!!**/.next",
+      "!!**/.source",
+      "!.output",
+      "!out",
+      "!build",
+      "!next-env.d.ts",
+      "!public",
+      "!app/globals.css"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineEnding": "lf",
+    "lineWidth": 80
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "jsxQuoteStyle": "double",
+      "semicolons": "asNeeded",
+      "trailingCommas": "es5",
+      "arrowParentheses": "always",
+      "bracketSpacing": true,
+      "bracketSameLine": false
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "domains": {
+      "next": "recommended",
+      "react": "recommended",
+      "drizzle": "recommended",
+      "tailwind": "recommended"
+    },
+    "rules": {
+      "preset": "recommended",
+      "style": {
+        "noNonNullAssertion": "error",
+        "noRestrictedImports": {
+          "level": "error",
+          "options": {
+            "paths": {
+              "react": {
+                "importNames": ["useEffect"],
+                "message": "Don't call useEffect directly. Derive state, handle it in an event handler, or use useMountEffect from @/hooks/use-mount-effect for one-time external sync. See .claude/skills/no-use-effect."
+              }
+            }
+          }
+        }
+      },
+      "complexity": {
+        "noImportantStyles": "off"
+      },
+      "correctness": {
+        "useExhaustiveDependencies": {
+          "level": "error",
+          "options": { "reportUnnecessaryDependencies": false }
+        }
+      },
+      "performance": {
+        "noImgElement": "warn"
+      },
+      "nursery": {
+        "noJsRestrictedProperties": {
+          "level": "error",
+          "options": {
+            "entries": [{ "object": "React", "property": "useEffect" }]
+          }
+        },
+        "useSortedClasses": {
+          "level": "warn",
+          "options": {
+            "functions": ["cn", "cva"],
+            "attributes": ["classNames"]
+          }
+        }
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["components/ui/**", "lib/dotmatrix-core.tsx"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off",
+            "noNonNullAssertion": "off"
+          },
+          "nursery": { "noJsRestrictedProperties": "off" },
+          "a11y": {
+            "useSemanticElements": "off",
+            "useFocusableInteractive": "off",
+            "useKeyWithClickEvents": "off",
+            "useAriaPropsForRole": "off",
+            "useAriaPropsSupportedByRole": "off",
+            "noStaticElementInteractions": "off",
+            "noNoninteractiveElementInteractions": "off"
+          }
+        }
+      }
+    }
+  ],
+  "assist": {
+    "enabled": true,
+    "actions": { "source": { "organizeImports": "on" } }
+  }
+}

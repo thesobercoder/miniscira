@@ -1,0 +1,42 @@
+---
+title: Introduction
+description: An AI research assistant that searches the web, reads your documents, and cites its sources.
+---
+
+MiniScira is a Next.js app wrapped around an [eve](https://github.com/vercel/eve)
+agent. You ask a research question. The agent plans, searches, reads, and answers
+with citations, and you watch it happen step by step in a live timeline instead
+of staring at a spinner.
+
+| Piece | What it does |
+| --- | --- |
+| `agent/` | The eve agent: tools, skills, a research subagent. Served at `/eve/v1/*`. |
+| `components/` | Streaming transcript, research timeline, citation pills, artifacts. |
+| Documents | Upload PDFs and text; the agent searches them with a lexical shortlist plus a reranker. |
+| Projects | Custom instructions and a document set, scoped to a workspace. |
+| Lookouts | Saved questions that re-run on a schedule and email you the result. |
+| Auth + data | better-auth over Neon Postgres, Drizzle for schema and queries. |
+
+## Run it locally
+
+You need [Bun](https://bun.sh), a Neon database, and a
+[Vercel AI Gateway](https://vercel.com/ai-gateway) key.
+
+```bash
+bun install
+cp .env.example .env.local
+```
+
+Fill in `AI_GATEWAY_API_KEY`, `DATABASE_URL`, and `BETTER_AUTH_SECRET`. Those
+three are the only hard requirements; everything else degrades gracefully when
+unset. Then:
+
+```bash
+bun run db:setup
+bun run db:push
+bun run dev
+```
+
+`bun run dev` starts Next.js and the eve agent together. `withEve()` in
+`next.config.ts` boots the agent beside `next dev` and rewrites `/eve/v1/*` to
+it, so there is only ever one URL to open.

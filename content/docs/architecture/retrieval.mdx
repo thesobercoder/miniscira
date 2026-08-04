@@ -1,0 +1,84 @@
+---
+title: Documents & retrieval
+description: Retrieval without a vector index.
+---
+
+The obvious design is: chunk, embed, store vectors, search by cosine similarity.
+This app doesn't. Upload extracts the text and stores it whole; every query then
+chunks it on the spot, shortlists with a cheap lexical pass, and lets a reranker
+pick the winners.
+
+Why: there is no index to keep warm or migrate, rerankers beat embeddings on
+relevance at this size (per-user sets are hundreds of chunks, not millions), and
+reranking runs through the AI Gateway key that is already required.
+
+## The pipeline
+
+Upload goes to Vercel Blob, metadata to the `document` table. Then, **at upload**:
+
+1. **Extract** — `lib/document-text.ts`. `attachmentKind` classifies the file,
+   `pdfText` handles PDFs, `extractDocumentText` is the entry point. Scanned
+   PDFs raise `ScannedPdfError` rather than returning an empty string. The
+   result is cached whole on `document.content`.
+
+And **at query time**, all three in `agent/tools/search_documents.ts`:
+
+2. **Chunk** — `chunkText` from `lib/rag.ts`, run over `document.content` on
+   every search. It splits on blank lines, so chunk quality is really the
+   *extractor's* quality: unpdf returned one undifferentiated paragraph, leaving
+   `chunkText` nothing to split on but a hard slice every 1400 characters, and
+   29 of 34 chunks began mid-word. That is why extraction moved to
+   pdf-inspector's Markdown — 13 of 41 on the same paper.
+3. **Shortlist** — `lexicalShortlist` in `lib/rag.ts`, a BM25-shaped scorer (IDF
+   weighting, saturating term frequency). When it cannot discriminate, it
+   returns everything rather than an arbitrary slice.
+4. **Rerank** — the shortlist goes to `cohere/rerank-v4-fast`, which returns the
+   top chunks.
+
+<Callout title="Chunks are never stored">
+  Only the extracted text is. That is why changing the chunker needs no
+  migration and no re-upload — the next query simply chunks differently. If you
+  change the *extractor*, `bun run db:backfill -- --write --force` refills
+  `document.content` for existing documents.
+
+  A `documentChunk` table still exists in `lib/db/schema.ts` from the vector-index
+  design. Nothing reads or writes it.
+</Callout>
+
+<Callout type="warn" title="Extraction lives in its own file for a reason">
+  It used to be inside `lib/rag.ts`. The PDF path pulls in a native `.node`
+  addon, and eve's Rolldown bundler failed with `UNLOADABLE_DEPENDENCY` when the
+  agent imported anything from that module. `next.config.ts` also lists
+  `@firecrawl/pdf-inspector` in `serverExternalPackages` for the same reason.
+</Callout>
+
+<Callout type="error" title="pdf.js transfers the ArrayBuffer">
+  `pdfText` copies with `buffer.slice(0)` before handing the data over. Without
+  the copy the caller's buffer is detached and every later read sees zero bytes.
+</Callout>
+
+## When extraction fails
+
+A file with no recoverable text — a scanned PDF, an empty upload — is stored
+with `status = "error"` and the reason on `document.error`. Search skips it, via
+an `isNotNull(document.content)` filter, so it can never contribute an empty
+chunk to a shortlist.
+
+That exclusion is silent by nature, so the project panel labels the file **Not
+searchable** with the reason on hover. Without that the only symptom is an agent
+that never cites a document sitting in plain sight, which is indistinguishable
+from a retrieval bug. The fix is to remove the file and upload a version with a
+text layer; no script involved.
+
+## The two constants
+
+```ts title="agent/tools/search_documents.ts"
+const SHORTLIST_KEEP = 100
+const MAX_CANDIDATES = 200
+```
+
+Both are measured. Against a 216-passage corpus, comparing each setting's top-6
+against the top-6 from reranking everything, `SHORTLIST_KEEP = 60` returned only
+4 of the 6; 100 is the smallest value that loses nothing. If you change the
+chunker, re-run that sweep. The number is a property of the corpus, not a
+universal constant.

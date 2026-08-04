@@ -1,7 +1,9 @@
 "use client"
 
-import * as React from "react"
 import { ThemeProvider as NextThemesProvider, useTheme } from "next-themes"
+import * as React from "react"
+
+import { useMountEffect } from "@/hooks/use-mount-effect"
 
 function ThemeProvider({
   children,
@@ -37,7 +39,12 @@ function isTypingTarget(target: EventTarget | null) {
 function ThemeHotkey() {
   const { resolvedTheme, setTheme } = useTheme()
 
-  React.useEffect(() => {
+  // Mirror the theme so the listener always reads the latest without being
+  // re-bound on every theme change (which the old dependency array did).
+  const themeRef = React.useRef(resolvedTheme)
+  themeRef.current = resolvedTheme
+
+  useMountEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.defaultPrevented || event.repeat) {
         return
@@ -55,7 +62,7 @@ function ThemeHotkey() {
         return
       }
 
-      setTheme(resolvedTheme === "dark" ? "light" : "dark")
+      setTheme(themeRef.current === "dark" ? "light" : "dark")
     }
 
     window.addEventListener("keydown", onKeyDown)
@@ -63,7 +70,7 @@ function ThemeHotkey() {
     return () => {
       window.removeEventListener("keydown", onKeyDown)
     }
-  }, [resolvedTheme, setTheme])
+  })
 
   return null
 }

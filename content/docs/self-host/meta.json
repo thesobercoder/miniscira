@@ -1,0 +1,4 @@
+{
+  "title": "Self-host",
+  "pages": ["index", "vercel", "docker", "vps"]
+}

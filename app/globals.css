@@ -2,6 +2,20 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Fumadocs (/docs). Its own tokens are namespaced `--color-fd-*`, and the
+   `shadcn` theme aliases them onto the tokens defined below, so the docs
+   inherit this app's palette instead of shipping a second one.
+
+   Order is load-bearing: `preset.css` redefines the `dark` variant as
+   `&:where(.dark, .dark *)`, which is both broader and zero-specificity. Our
+   `@custom-variant` below has to come after it to win, or every `dark:` utility
+   in the app quietly drops a specificity level. */
+@import "fumadocs-ui/css/shadcn.css";
+@import "fumadocs-ui/css/preset.css";
+
+/* Let Tailwind scan Streamdown's classes so its markdown styles apply. */
+@source "../node_modules/streamdown/dist/*.js";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -31,6 +45,7 @@
     --color-secondary-foreground: var(--secondary-foreground);
     --color-secondary: var(--secondary);
     --color-primary-foreground: var(--primary-foreground);
+    --color-primary-strong: var(--primary-strong);
     --color-primary: var(--primary);
     --color-popover-foreground: var(--popover-foreground);
     --color-popover: var(--popover);
@@ -45,75 +60,94 @@
     --radius-2xl: calc(var(--radius) * 1.8);
     --radius-3xl: calc(var(--radius) * 2.2);
     --radius-4xl: calc(var(--radius) * 2.6);
+    /* Motion tokens. Named with a `-strong` suffix on purpose: Tailwind already
+       ships `ease-out` / `ease-in-out` utilities, and defining `--ease-out` here
+       would silently restyle every existing `ease-out` site in the app. Distinct
+       names mean a site only gets these curves when it opts in.
+       Easing rule: entering or exiting → ease-out-strong; moving or morphing on
+       screen → ease-in-out-strong; hover / colour change → ease; constant
+       motion → linear. Drawer-like sheets use ease-drawer. */
+    --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
+    --background: oklch(0.98 0.005 130);
+    --foreground: oklch(0.18 0.012 130);
+    --card: oklch(0.995 0.003 130);
+    --card-foreground: oklch(0.18 0.012 130);
+    --popover: oklch(0.995 0.003 130);
+    --popover-foreground: oklch(0.18 0.012 130);
     --primary: oklch(0.841 0.238 128.85);
     --primary-foreground: oklch(0.405 0.101 131.063);
-    --secondary: oklch(0.967 0.001 286.375);
-    --secondary-foreground: oklch(0.21 0.006 285.885);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
+    /* Brand lime is a *fill* colour (L 0.841): on the light surface it measures
+       1.45:1, so it can never carry text or an icon. --primary-strong is the
+       foreground-role token — same hue, dropped to L 0.532 for 4.69:1 on
+       --background. In dark mode --primary is already 9.69:1, so they converge. */
+    --primary-strong: oklch(0.532 0.157 131.589);
+    --secondary: oklch(0.955 0.008 130);
+    --secondary-foreground: oklch(0.25 0.012 130);
+    --muted: oklch(0.955 0.008 130);
+    /* L 0.55 only cleared 4.5:1 against --background; it failed on every
+       darker light surface (sidebar 4.37, accent 4.24, sidebar-accent 3.94).
+       L 0.51 clears 4.5:1 on all of them (worst case sidebar-accent 4.67). */
+    --muted-foreground: oklch(0.51 0.015 130);
+    --accent: oklch(0.955 0.008 130);
+    --accent-foreground: oklch(0.22 0.012 130);
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+    --border: oklch(0.91 0.012 130);
+    --input: oklch(0.91 0.012 130);
+    --ring: oklch(0.71 0.03 130);
     --chart-1: oklch(0.897 0.196 126.665);
     --chart-2: oklch(0.768 0.233 130.85);
     --chart-3: oklch(0.648 0.2 131.684);
     --chart-4: oklch(0.532 0.157 131.589);
     --chart-5: oklch(0.453 0.124 130.933);
     --radius: 0.875rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar: oklch(0.965 0.007 130);
+    --sidebar-foreground: oklch(0.18 0.012 130);
     --sidebar-primary: oklch(0.648 0.2 131.684);
     --sidebar-primary-foreground: oklch(0.986 0.031 120.757);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --sidebar-accent: oklch(0.93 0.014 130);
+    --sidebar-accent-foreground: oklch(0.22 0.012 130);
+    --sidebar-border: oklch(0.905 0.012 130);
+    --sidebar-ring: oklch(0.71 0.03 130);
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
+    --background: oklch(0.175 0.008 130.85);
+    --foreground: oklch(0.965 0.008 130);
+    --card: oklch(0.225 0.011 130.85);
+    --card-foreground: oklch(0.965 0.008 130);
+    --popover: oklch(0.225 0.011 130.85);
+    --popover-foreground: oklch(0.965 0.008 130);
     --primary: oklch(0.768 0.233 130.85);
     --primary-foreground: oklch(0.405 0.101 131.063);
-    --secondary: oklch(0.274 0.006 286.033);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
+    --primary-strong: oklch(0.768 0.233 130.85);
+    --secondary: oklch(0.275 0.012 130.85);
+    --secondary-foreground: oklch(0.965 0.008 130);
+    --muted: oklch(0.27 0.012 130.85);
+    --muted-foreground: oklch(0.72 0.018 130);
+    --accent: oklch(0.27 0.012 130.85);
+    --accent-foreground: oklch(0.965 0.008 130);
     --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
+    --border: oklch(0.95 0.04 130 / 12%);
+    --input: oklch(0.95 0.04 130 / 16%);
+    --ring: oklch(0.56 0.04 130);
     --chart-1: oklch(0.897 0.196 126.665);
     --chart-2: oklch(0.768 0.233 130.85);
     --chart-3: oklch(0.648 0.2 131.684);
     --chart-4: oklch(0.532 0.157 131.589);
     --chart-5: oklch(0.453 0.124 130.933);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar: oklch(0.2 0.01 130.85);
+    --sidebar-foreground: oklch(0.965 0.008 130);
     --sidebar-primary: oklch(0.768 0.233 130.85);
     --sidebar-primary-foreground: oklch(0.274 0.072 132.109);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --sidebar-accent: oklch(0.27 0.012 130.85);
+    --sidebar-accent-foreground: oklch(0.965 0.008 130);
+    --sidebar-border: oklch(0.95 0.04 130 / 12%);
+    --sidebar-ring: oklch(0.56 0.04 130);
 }
 
 @layer base {
@@ -122,6 +156,9 @@
     }
   body {
     @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
     }
   button:not(:disabled), [role="button"]:not(:disabled) {
     cursor: pointer;
@@ -129,4 +166,196 @@
   html {
     @apply font-sans;
     }
+}
+/* Slow breathing for the resting voice orb's glow. */
+@keyframes orb-breathe {
+  0%,
+  100% {
+    transform: scale(0.94);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 0.8;
+  }
+}
+.animate-orb-breathe {
+  animation: orb-breathe 4.5s ease-in-out infinite;
+}
+
+/* AIcss image-generation canvas: a dot-matrix grid with a soft radial bloom
+   pulsing out from the center while a picture is being generated. The bright
+   dot layer is masked by a radial gradient whose size breathes in and out. */
+@keyframes dot-bloom {
+  0%,
+  100% {
+    mask-size: 55% 55%;
+    -webkit-mask-size: 55% 55%;
+    opacity: 0.55;
+  }
+  50% {
+    mask-size: 115% 115%;
+    -webkit-mask-size: 115% 115%;
+    opacity: 1;
+  }
+}
+.dotmatrix-canvas::before,
+.dotmatrix-canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(var(--dot-color, var(--muted-foreground)) 1px, transparent 1.6px);
+  background-size: 15px 15px;
+  background-position: center;
+}
+/* Dim base grid. */
+.dotmatrix-canvas::before {
+  --dot-color: color-mix(in oklch, var(--muted-foreground) 22%, transparent);
+}
+/* Bright grid, revealed by the breathing radial mask → the generating bloom. */
+.dotmatrix-canvas::after {
+  --dot-color: var(--muted-foreground);
+  mask-image: radial-gradient(circle at center, #000 0%, transparent 62%);
+  -webkit-mask-image: radial-gradient(circle at center, #000 0%, transparent 62%);
+  mask-repeat: no-repeat;
+  -webkit-mask-repeat: no-repeat;
+  mask-position: center;
+  -webkit-mask-position: center;
+  animation: dot-bloom 2.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dotmatrix-canvas::after {
+    animation: none;
+    mask-size: 80% 80%;
+    -webkit-mask-size: 80% 80%;
+  }
+}
+
+/* Shimmer sweep for the timeline's "working" text (small, local paint anim). */
+@keyframes shimmer-sweep {
+  0% {
+    background-position: 150% 0;
+  }
+  100% {
+    background-position: -50% 0;
+  }
+}
+
+.shimmer-text {
+  background: linear-gradient(
+    100deg,
+    var(--muted-foreground) 35%,
+    var(--foreground) 50%,
+    var(--muted-foreground) 65%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer-sweep 1.8s linear infinite;
+}
+
+/* Disclosure height, driven by the measurement Radix publishes on the content.
+   Fading alone made expand/collapse read as a jump-cut; animating the height
+   keeps the surrounding timeline continuous while a step opens. */
+@keyframes collapsible-open {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--collapsible-panel-height);
+  }
+}
+
+@keyframes collapsible-close {
+  from {
+    height: var(--collapsible-panel-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+.collapsible-height[data-state="open"] {
+  animation: collapsible-open 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.collapsible-height[data-state="closed"] {
+  animation: collapsible-close 180ms cubic-bezier(0.4, 0, 1, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .collapsible-height[data-state="open"],
+  .collapsible-height[data-state="closed"] {
+    animation: none;
+  }
+
+  /* Blanket honouring of the OS preference. Per-component `motion-reduce:`
+     classes only cover what someone remembered to annotate, and this app runs a
+     lot of continuous decorative motion — the composer's border beam, the
+     timeline's shimmer, the loader orbs — none of which is worth a migraine.
+     Durations go to ~0 rather than `none` so animation/transition end events
+     still fire and nothing waits forever on a callback that never arrives. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Shiki code view in the artifact panel: strip Shiki's inline background so the
+   panel surface shows through, use the app's mono font, and add gutter line
+   numbers via a CSS counter for an editor feel. */
+.shiki-code pre.shiki {
+  margin: 0;
+  background: transparent !important;
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+  counter-reset: sln;
+}
+.shiki-code code {
+  display: inline-block;
+  min-width: 100%;
+}
+.shiki-code .line {
+  counter-increment: sln;
+}
+.shiki-code .line::before {
+  content: counter(sln);
+  display: inline-block;
+  width: 2rem;
+  margin-right: 1.25rem;
+  text-align: right;
+  color: var(--muted-foreground);
+  opacity: 0.45;
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-text {
+    animation: none;
+    color: var(--muted-foreground);
+  }
+
+  /* Stop looping/decorative keyframe animations outright, and never smooth-scroll. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Keep the transitions that communicate state — opacity and colour carry no
+     movement — and drop everything that moves an element through space or
+     changes its size: transform, position and layout properties simply do not
+     transition, so they snap to their final value while the fade still reads. */
+  *,
+  *::before,
+  *::after {
+    transition-property: opacity, color, background-color, border-color, fill, stroke !important;
+    transition-duration: 150ms !important;
+  }
 }

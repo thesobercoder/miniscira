@@ -1,0 +1,80 @@
+---
+title: Chat & the timeline
+description: How agent events become a durable transcript.
+---
+
+The chat UI is a projection of an append-only event stream, not a message list.
+Resuming mid-stream and replaying a months-old chat both fall out of that.
+
+`hooks/use-eve-chat.ts` consumes eve's typed events and does three things:
+
+1. **Dedupe.** Every event is checked against `seenIdsRef`, keyed on
+   `eventId(event)` which reads `meta.id`.
+2. **Project.** Events are reduced into `EveMessagePart`s: `text`, `reasoning`,
+   `file`, `step-start`, `authorization`, `dynamic-tool`.
+3. **Persist.** `hooks/use-event-queue.ts` buffers events in the browser and
+   POSTs them to `/api/chats/:id/events`, PATCHing the cursor alongside, so a
+   reload re-attaches at `startIndex: cursorRef.current.streamIndex` instead of
+   replaying from zero. `agent/hooks/persist-session-cursor.ts` is the
+   server-side backstop: on `session.waiting` it writes the continuation token
+   to `chat.continuation_token`, so a tab that dies mid-turn can still resume.
+
+<Callout type="warn" title="The dedupe is not paranoia">
+  Replayed `session.started` events used to increment the live-session ref a
+  second time, and a mid-stream reload persisted the whole turn again. By the
+  time anyone noticed, that was 6682 rows for 2491 distinct events.
+</Callout>
+
+<Callout type="error" title="`lib/chat-events.ts` is the only place allowed to read `.type`">
+  eve's event payloads are not one discriminated union. `eventType()` is the
+  single sanctioned place to inspect `.type`; everything else must go through
+  the exported predicates.
+</Callout>
+
+## Splitting reasoning at tool boundaries
+
+`lib/message-reducer.ts` wraps eve's `defaultMessageReducer` with
+`segmentedMessageReducer`, wired at the transport in `hooks/use-eve-chat.ts`.
+
+Without it, `upsertRun` produces one reasoning part per step, so a turn that
+thinks, searches, thinks again, and searches again collapses all its thinking
+into a single node at the top of the timeline. The wrapper seals an interrupted
+reasoning run and trims already-shown text, so each block sits next to the tool
+call it led to.
+
+## The timeline
+
+| Concept | Where |
+| --- | --- |
+| Grouping, adjacency, error extraction | `components/timeline/parts.ts` |
+| Node renderers per kind | `components/timeline/nodes/` — split by what the step *is* (`research`, `execution`, `interaction`, `session`), re-exported from `index.ts` |
+| Rail, elbows, stagger | `components/timeline/primitives.tsx` |
+| Assembly and node registry | `components/research-timeline.tsx` |
+
+Tool parts move through eve's states (`input-streaming`, `input-available`,
+`approval-requested`, `approval-responded`, `output-available`, `output-error`,
+`output-denied`) and each maps to a visual state. `isPartDone()` treats
+`output-denied` as terminal; a denied tool call is finished, not pending.
+
+<Callout type="error" title="Never put `overflow-hidden` on the step content box">
+  A subagent draws its connector back to the parent rail at `-left-4`, outside
+  its own content box. `overflow-hidden` clips it and the branch appears to
+  connect to nothing. Use `overflow-clip` with
+  `overflow-clip-margin: 1.5rem` instead. This has regressed twice; the comment
+  in `components/ai-elements/chain-of-thought.tsx` exists to stop a third.
+</Callout>
+
+## Citations
+
+`components/markdown.tsx` renders model output through
+[Streamdown](https://streamdown.ai), which tolerates the unclosed fences and
+half-written tables of text that is still arriving. On top of it,
+`normalizeCitations` rewrites link runs into pills: bracketed groups
+(`[[Label](url)]`) and adjacent link runs of two or more links separated only by
+whitespace.
+
+<Callout>
+  `app/globals.css` has a `@source` directive pointing at Streamdown's dist
+  bundle so Tailwind scans its class names. Drop it and markdown renders
+  unstyled.
+</Callout>

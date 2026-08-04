@@ -1,0 +1,45 @@
+# Excluded from the upload to Vercel. Everything the build actually needs stays:
+# `agent/` in particular, because `withEve()` builds the agent as part of the
+# same deployment — dropping it would produce an app whose /eve/v1/* rewrites
+# point at nothing. `content/` and `source.config.ts` stay too; fumadocs
+# compiles the docs site at build time.
+
+node_modules
+
+# Build output, regenerated on Vercel.
+.next
+.eve
+.output
+.source
+*.tsbuildinfo
+
+# Secrets come from the project's environment variables, never the upload.
+.env*
+!.env.example
+
+# Container build path — unused on Vercel.
+Dockerfile
+.dockerignore
+
+# CI config and the README banner. Nothing here is read at build time, and the
+# banner PNG is the single largest non-code file in the repo.
+.github
+
+# Agent evals and hand-run maintenance scripts. Both are developer tooling and
+# neither is invoked by `next build` or `eve build`.
+evals
+scripts
+
+# Local agent/editor state.
+.claude
+.agents
+.vercel
+.workflow-data
+
+# Tests. Nothing imports them, so they are never bundled — this just keeps them
+# out of the upload.
+*.test.ts
+*.test.tsx
+
+.git
+.DS_Store

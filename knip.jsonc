@@ -1,0 +1,64 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  // Vendored surface: the shadcn primitives, the wheel-picker, the dotmatrix art
+  // library and the generated MCP registry all expose a full API on purpose, so
+  // their unreferenced exports aren't dead code. Everything else is checked, and
+  // first-party exports that are intentionally ahead of their callers are tagged
+  // `@public` at the definition instead of being listed here.
+  // Note: `--include files,dependencies` will suggest dropping the four
+  // vendored-surface entries below as unnecessary. It is judging file
+  // reachability only; they exist for the *exports* run that `bun run knip`
+  // performs, and removing them turns that run red.
+  // The eve agent is a second entry graph: nothing under Next.js imports
+  // agent/agent.ts, its tools or its schedules — the framework loads them. Without
+  // these entries knip reports every lib/ helper the agent uses as unused, which
+  // is how a "cleanup" could quietly delete the agent's dependencies.
+  // source.config.ts is a third: it is read by the fumadocs-mdx plugin in
+  // next.config.ts, never imported by app code, and its output lands in the
+  // gitignored .source/ that knip cannot see.
+  // scripts/ is a fourth: the maintenance scripts are run by hand and reach
+  // into lib/ through a dynamic `await import()`, which knip cannot follow — so
+  // without this, everything only they use reads as dead (ScannedPdfError did).
+  // The channel, sandbox and hooks are loaded by eve from their paths rather
+  // than imported, so they are entry points too — without them knip reports the
+  // agent's own plumbing as unused files.
+  "entry": [
+    "source.config.ts",
+    "scripts/**/*.mjs",
+    "agent/agent.ts",
+    "agent/channels/**/*.ts",
+    "agent/hooks/**/*.ts",
+    "agent/sandbox.ts",
+    "agent/tools/**/*.ts",
+    "agent/schedules/**/*.ts",
+    "agent/subagents/**/*.ts",
+    "agent/instructions/**/*.ts",
+    "evals/**/*.ts"
+  ],
+  "ignore": [
+    "components/ui/**",
+    "components/wheel-picker.tsx",
+    "lib/dotmatrix-core.tsx",
+    "lib/dotmatrix-hooks.ts",
+    "lib/mcp-catalog-registry.ts",
+    // Render target for the README banner, not part of any build. See
+    // .github/assets/README.md.
+    ".github/assets/**",
+    // Read by the drizzle-kit CLI, never imported.
+    "drizzle.config.ts"
+  ],
+  // These three back shadcn primitives under the ignored components/ui/**, so
+  // knip cannot see the import and reports them as unused. They are not dead:
+  // deleting one breaks the component that imports it.
+  "ignoreDependencies": [
+    "embla-carousel-react",
+    "input-otp",
+    "recharts"
+  ],
+  // Loading drizzle.config.ts requires DATABASE_URL, which knip runs without.
+  "drizzle": false
+  // `bun run knip` enforces unused *value* exports only. Unused exported *types*
+  // carry no runtime cost and are largely a module's vocabulary (component
+  // `*Props`, domain aliases), so they're surfaced on demand rather than gating:
+  //   bun run knip -- --include exports,types
+}

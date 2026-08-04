@@ -1,0 +1,161 @@
+---
+title: Tools
+description: Add a capability, disable one, and make it render properly in the timeline.
+---
+
+One file in `agent/tools/` is one tool. **The filename is the tool name**: the
+model sees `x_search` because the file is `x_search.ts`. There is no registry to
+update.
+
+## Adding a tool
+
+```ts title="agent/tools/hn_search.ts"
+import { defineTool } from "eve/tools"
+import { z } from "zod"
+
+// The model sees this tool as `hn_search`, from the filename.
+export default defineTool({
+  description:
+    "Search Hacker News stories and comments by relevance or recency. Use for developer sentiment and launch discussion, not for general news.",
+  inputSchema: z.object({
+    query: z.string().describe("Search terms."),
+    sortBy: z
+      .enum(["relevance", "date"])
+      .default("relevance")
+      .describe("Rank by match quality or recency."),
+  }),
+  async execute({ query, sortBy }) {
+    const endpoint =
+      sortBy === "date" ? "search_by_date" : "search"
+    const res = await fetch(
+      `https://hn.algolia.com/api/v1/${endpoint}?query=${encodeURIComponent(query)}`
+    )
+
+    if (!res.ok) {
+      return { query, error: `Algolia returned ${res.status}.`, results: [] }
+    }
+
+    const data = await res.json()
+    return {
+      query,
+      results: data.hits.slice(0, 20).map((hit) => ({
+        title: hit.title ?? hit.story_title,
+        url: hit.url ?? `https://news.ycombinator.com/item?id=${hit.objectID}`,
+        points: hit.points,
+        comments: hit.num_comments,
+      })),
+    }
+  },
+})
+```
+
+That's the whole thing. Restart `bun run dev` and the agent has it.
+
+### Three rules the existing tools follow
+
+<Steps>
+<Step>
+### Describe *when*, not *what*
+
+`description` is the only routing signal the model has. "Search Hacker News" is
+a label; "…for developer sentiment and launch discussion, not for general news"
+is a decision rule. Same for every `.describe()` on the schema.
+</Step>
+
+<Step>
+### Return errors, don't throw
+
+```ts
+if (!process.env.XAI_API_KEY) {
+  return { queries, error: "XAI_API_KEY is not configured.", results: [] }
+}
+```
+
+A returned error becomes a normal `output-available` part the model can read and
+route around. A thrown one becomes `output-error`, which ends the branch. Missing
+credentials should degrade the turn, not fail it. That's how every optional
+provider key in this app stays optional.
+</Step>
+
+<Step>
+### Return a stable shape
+
+The timeline renders from the tool's output. Keep `{ query, results: [...] }`
+consistent across calls so `SearchNode` in
+`components/timeline/nodes/research.tsx` can render it without special-casing.
+</Step>
+</Steps>
+
+## Disabling a built-in
+
+eve ships its own tools. To remove one, create a file with its slug:
+
+```ts title="agent/tools/web_search.ts"
+import { disableTool } from "eve/tools"
+
+export default disableTool()
+```
+
+<Callout type="warn">
+  **The filename is the selector.** Renaming `web_search.ts` silently
+  re-enables eve's built-in `web_search`. There is no error and no warning. The
+  agent just quietly starts choosing it again.
+</Callout>
+
+`web_search` and `web_fetch` are both disabled here. With them present the model
+had two general-purpose search tools with overlapping descriptions and no stated
+reason to prefer either, so it drifted between them and produced results the
+citation pills couldn't render. The `noWebTools` helper in `evals/tools.ts`
+guards the replacements, not the built-ins: it asserts no `exa_search`,
+`firecrawl_search`, `x_search`, `reddit_search`, `firecrawl_scrape` or
+`firecrawl_map` call was made. Re-enabling `web_search` would slip past it.
+
+## Giving a tool a timeline node
+
+New tools render with a generic node. The registry is keyed by *kind*, not by
+tool name, so custom rendering takes two steps. First map the tool onto a kind
+in `kindOfPart` in `components/timeline/parts.ts` — reuse an existing one if it
+fits, since `hn_search` is just another search:
+
+```ts title="components/timeline/parts.ts"
+case "hn_search":
+  return "search"
+```
+
+Reusing `search` is the whole job; it already has a renderer. Only add a new
+kind to the `Kind` union and register it when the step genuinely looks different:
+
+```tsx title="components/research-timeline.tsx"
+const NODE_BY_KIND: Partial<
+  Record<ToolKind, React.ComponentType<ToolNodeProps>>
+> = {
+  // …
+  hackernews: HackerNewsNode,
+}
+```
+
+Anything unmapped falls through to `SimpleNode` rather than breaking.
+
+and handle its part states in the matching module under
+`components/timeline/nodes/` (`research.tsx` for anything that searches or
+reads), exporting it from that directory's `index.ts`. A node must cover
+all of `input-streaming`, `input-available`, `output-available`, `output-error`,
+and `output-denied`. `isPartDone()` in `components/timeline/parts.ts` treats the
+last as terminal.
+
+## Subagent tools
+
+`agent/subagents/researcher/tools/` is a separate set. The researcher gets its
+own copies of the search tools so it can burn context on twenty results and hand
+back only a summary. A tool added to `agent/tools/` is **not** automatically
+available to it. Copy or re-export it deliberately.
+
+## Then write an eval
+
+Tool-routing regressions are invisible to `typecheck` and `bun test`. Add an
+eval in `evals/*.eval.ts` asserting the new tool ran (and that generic web
+search did not), using the helpers in `evals/tools.ts`, then:
+
+```bash
+bunx eve eval hn-search
+```

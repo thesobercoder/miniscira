@@ -1,0 +1,110 @@
+---
+title: Instructions & skills
+description: Change what the agent knows, how it reasons, and when it reaches for a playbook.
+---
+
+## Instructions
+
+`agent/instructions/` is concatenated in filename order into the system prompt.
+The numeric prefixes are the ordering mechanism, so leave gaps when you add
+files.
+
+Two kinds are supported:
+
+<Tabs items={['Static Markdown', 'Dynamic TypeScript']}>
+<Tab value="Static Markdown">
+
+```md title="agent/instructions/00-core.md"
+You are a research assistant. Search before you answer…
+```
+
+Anything that is true for every user and every turn.
+
+</Tab>
+<Tab value="Dynamic TypeScript">
+
+```ts title="agent/instructions/05-now.ts"
+import { defineDynamic, defineInstructions } from "eve/instructions"
+
+export default defineDynamic({
+  events: {
+    "turn.started": () => {
+      const iso = new Date().toISOString().slice(0, 10)
+      return defineInstructions({
+        markdown: `## Today's date\n\nToday is ${iso} (UTC).`,
+      })
+    },
+  },
+})
+```
+
+The return value has to be a `defineInstructions(...)` object — returning a bare
+string throws in eve's loader. Pick the event deliberately: `turn.started`
+re-resolves on every turn, which is what a durable, resumable session needs. A
+plain `.md` module is captured into the build manifest and never re-runs, so it
+would freeze the date at deploy time.
+
+Anything per-user or per-request: the current time (`05-now.ts`), saved memories
+(`10-memories.ts`), personalization settings (`20-personalization.ts`).
+
+</Tab>
+</Tabs>
+
+<Callout type="warn" title="Behaviour problems are usually instruction problems">
+  When the agent does something structurally wrong (announcing a plan it never
+  follows, skipping a research step, citing inconsistently) reach for the
+  instructions before you reach for the code. Most of these turn out to be a
+  missing sentence in `00-core.md`, not a bug in the timeline renderer.
+</Callout>
+
+### Adding one
+
+Create `agent/instructions/30-house-style.md`:
+
+```md title="agent/instructions/30-house-style.md"
+## House style
+
+Answer in British English. Lead with the conclusion, then the evidence.
+Never present a single source as corroboration.
+```
+
+Restart `bun run dev` afterwards. eve recompiles the agent on change, but
+instruction files are read at compile time, not per turn.
+
+## Skills
+
+Skills are Markdown playbooks the agent loads **on demand**. It sees only the
+name and description until it calls `load_skill`, at which point the body enters
+context. That's what lets a 2,000-word deep-research procedure exist without
+paying for it on every "what's the weather" turn.
+
+```md title="agent/skills/competitor_scan.md"
+---
+description: Profile a company's direct competitors with sourced claims.
+---
+
+## When to use this
+
+The user names a company and asks who it competes with…
+
+## Procedure
+
+1. Establish the company's actual market from its own site…
+```
+
+The frontmatter `description` is the *only* thing the agent sees before loading,
+so it carries all the routing weight. Write it as a trigger condition ("the user
+names a company and asks…"), not as a topic label ("competitors").
+
+<Callout>
+  If a skill never fires, the description is almost always the cause. Confirm
+  with an eval that asserts `load_skill` was called for a representative prompt
+  before you rewrite the body.
+</Callout>
+
+## Per-project instructions
+
+Projects layer their own instructions on top of the global ones, edited in the
+UI rather than in the repo. They're stored on the `project` table and prepended
+for any chat started inside that project. That is the right place for
+"this-client-only" rules that shouldn't ship in `agent/`.

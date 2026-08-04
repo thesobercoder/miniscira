@@ -1,0 +1,27 @@
+# Never copy a host node_modules into the image: @firecrawl/pdf-inspector ships
+# a per-platform native .node addon, so a macOS build inside a Linux image fails
+# at the first PDF upload rather than at build time.
+node_modules
+
+# Build output — regenerated inside the image.
+.next
+.eve
+.output
+.source
+
+.git
+.github
+.vscode
+.claude
+.vercel
+.migration
+.workflow-data
+
+# Secrets stay out of the image; pass them at run time.
+.env*
+!.env.example
+
+*.tsbuildinfo
+.DS_Store
+Dockerfile
+compose.yaml

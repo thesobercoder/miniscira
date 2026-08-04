@@ -1,0 +1,106 @@
+---
+title: Models
+description: The picker list, the compiled default, and the two places that must stay in sync.
+---
+
+Every model runs through the [Vercel AI Gateway](https://vercel.com/ai-gateway),
+so there are no per-provider keys for chat. A chat turn runs on the key its user
+saved in Settings, not on `AI_GATEWAY_API_KEY` — that one covers
+`cohere/rerank-v4-fast`, the single model call with no user behind it. See
+[Who pays for a turn](/docs/self-host#who-pays-for-a-turn).
+
+## The picker list
+
+```ts title="lib/models.ts"
+export const DEFAULT_CHAT_MODEL = "xai/grok-4.20-reasoning"
+
+export const CHAT_MODELS: ChatModel[] = [
+  {
+    id: "xai/grok-4.20-reasoning",
+    name: "Grok 4.20",
+    vendor: "xAI",
+    hint: "Fast reasoning · default",
+  },
+  // …
+]
+```
+
+Add an entry and it appears in the composer. Two requirements:
+
+- **Vision and tool use.** Attachments and the research tools both depend on
+  them; a text-only model will fail mid-turn rather than at selection.
+- **A gateway id of the form `provider/model`.** Validated loosely by
+  `MODEL_ID_RE`.
+
+Provider logos are self-hosted under `public/providers` (from
+[svgl.app](https://svgl.app)) and registered in the `PROVIDERS` map. Monochrome
+marks need both `icon` and `iconDark`; colourful ones set only `icon`.
+
+## Changing the default
+
+`DEFAULT_CHAT_MODEL` is more load-bearing than it looks. It is:
+
+1. the model shown pre-selected in the composer,
+2. `fallback` in `defineDynamic`, the compiled build-time model used for
+   context-window math, and
+3. the model for every turn that carries no pick: **subagents and headless
+   lookout runs**.
+
+<Callout type="warn" title="Pick something that survives long multi-tool turns">
+  The default was `google/gemini-3.5-flash-lite`. Four of its ten sessions died
+  on the step *following* a multi-tool-call step, with an AI Gateway 400:
+  "Corrupted thought signature", and under it "the number of function response
+  parts is equal to the number of function call parts". Grok and Sonnet went
+  0-for-67 on the same workload. This is a real failure mode for a research
+  agent, and it will not show up in a single-turn test.
+</Callout>
+
+## How a pick reaches the agent
+
+The composer sends `clientContext.chatModel`; eve serializes it into a user-role
+context message; `agent/agent.ts` reads the last marker in the transcript on
+`step.started`.
+
+```ts title="agent/agent.ts"
+const MARKER = /"chatModel"\s*:\s*"([\w.:/-]+)"/g
+```
+
+<Callout type="error" title="Read message text, not `JSON.stringify(messages)`">
+  eve puts the client context in the *body* of a user message, as the literal
+  string `Client context:\n{"chatModel":"…"}`. Stringifying the message array
+  escapes those inner quotes to `\"`, so a `"chatModel"` pattern never matches.
+  That bug made the resolver return `null` for every turn. The picker looked
+  like it worked, and the compiled fallback silently answered everything.
+</Callout>
+
+### No validation gate
+
+An earlier version validated the pick against the live gateway catalog and
+returned `null` when it couldn't confirm it. A cold cache or a transient fetch
+failure then ran the turn on a *different* model than the composer was showing,
+which made the resulting failures nearly impossible to attribute.
+
+A pick is now honoured as sent. A genuinely bad id fails loudly on the model
+call, which the turn already surfaces as a failed-turn note.
+
+## The compaction model
+
+```ts title="agent/agent.ts"
+compaction: {
+  thresholdPercent: 0.85,
+  model: "google/gemini-3.5-flash",
+}
+```
+
+Set explicitly so summarization doesn't bill at the active turn model's rate. On
+an Opus or Grok thread, every compaction pass would otherwise cost flagship
+prices to produce a summary. Flash has the window and the price for it.
+
+## Keep the two in sync
+
+<Callout type="warn">
+  `lib/models.ts` holds the list and the default; `agent/agent.ts` chooses the
+  live model per turn and computes the context window via `contextWindowFor()`.
+  Changing one without the other desyncs the context-window math, and the agent
+  compacts at the wrong point: either wasting window or overflowing it.
+</Callout>

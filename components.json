@@ -1,6 +1,6 @@
 {
   "$schema": "https://ui.shadcn.com/schema.json",
-  "style": "radix-nova",
+  "style": "base-nova",
   "rsc": true,
   "tsx": true,
   "tailwind": {
@@ -12,6 +12,8 @@
   },
   "iconLibrary": "remixicon",
   "rtl": false,
+  "menuColor": "default-translucent",
+  "menuAccent": "subtle",
   "aliases": {
     "components": "@/components",
     "utils": "@/lib/utils",
@@ -19,7 +21,9 @@
     "lib": "@/lib",
     "hooks": "@/hooks"
   },
-  "menuColor": "default-translucent",
-  "menuAccent": "subtle",
-  "registries": {}
+  "registries": {
+    "@dotmatrix": "https://dotmatrix.zzzzshawn.cloud/r/{name}.json",
+    "@ai-elements": "https://ai-sdk.dev/elements/api/registry/{name}.json",
+    "@ncdai": "https://chanhdai.com/r/{name}.json"
+  }
 }
