@@ -15,6 +15,12 @@ jobs:
       BETTER_AUTH_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v4
+      # eve's CLI declares `"node": ">=24"` and refuses to start below it.
+      # ubuntu-latest ships Node 22, so without this the agent build fails with
+      # "eve requires Node.js >=24" while every other step passes.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
