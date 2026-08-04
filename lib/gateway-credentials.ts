@@ -7,29 +7,17 @@ import { eq } from "drizzle-orm"
 
 import { db } from "@/lib/db"
 import { userSettings } from "@/lib/db/schema"
+import { gatewayBaseUrl } from "@/lib/gateway-models"
 import { open } from "@/lib/secret-box"
 
 /**
  * Whose AI Gateway credential pays for a turn.
  *
- * The product rule for miniscira.com: users bring their own key.
- *
- * This was originally built on the user's Vercel OAuth token, on the strength
- * of `@ai-sdk/gateway` documenting `apiKey` as "API key or Vercel access
- * token". That is false for *this* kind of token. Measured against a freshly
- * refreshed one: the gateway answers 401 `authentication_error`, `/v2/teams`
- * answers 403, and `/v1/api-keys` answers 401 "Method is not allowed for this
- * endpoint" — Sign in with Vercel is an identity-only OIDC flow whose token
- * reaches `/login/oauth/userinfo` and nothing else. The "Vercel access token"
- * the gateway accepts is `VERCEL_OIDC_TOKEN`, a deployment's workload identity,
- * which no end user has.
- *
- * So the key is supplied by the user and sealed at rest. Sign in with Vercel
- * remains the default login; it just carries identity, not billing.
- *
- * Our own `AI_GATEWAY_API_KEY` stays a development convenience, used only when
- * `ALLOW_SHARED_GATEWAY_KEY` is set — which production leaves unset so a
- * missing user key fails loudly instead of quietly landing on our bill.
+ * On this self-hosted deployment every user shares the deployment's gateway
+ * (CLIProxyAPI) and, unless they saved a personal key in Settings, the
+ * deployment-wide `AI_GATEWAY_API_KEY`. The shared key is only used when
+ * `ALLOW_SHARED_GATEWAY_KEY=true`; with it unset, a missing user key fails
+ * loudly instead of quietly landing on a pooled bill.
  */
 
 export type GatewayCredential =
@@ -39,7 +27,7 @@ export type GatewayCredential =
 export class NoGatewayCredentialError extends Error {
   constructor() {
     super(
-      "Add your AI Gateway API key in Settings to run research. Requests are billed to your own Vercel team."
+      "Add your AI Gateway API key in Settings to run research. Requests are billed to your own gateway key."
     )
     this.name = "NoGatewayCredentialError"
   }
@@ -103,7 +91,7 @@ export async function verifyGatewayKey(
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   let res: Response
   try {
-    res = await fetch("https://ai-gateway.vercel.sh/v1/models", {
+    res = await fetch(`${gatewayBaseUrl()}/models`, {
       headers: { authorization: `Bearer ${apiKey}` },
       signal: AbortSignal.timeout(10_000),
     })
@@ -118,7 +106,7 @@ export async function verifyGatewayKey(
     return {
       ok: false,
       reason:
-        "The AI Gateway rejected that key. Copy it again from vercel.com/ai-gateway → API Keys.",
+        "The AI Gateway rejected that key. Copy it again from your AI gateway provider.",
     }
   return { ok: false, reason: `AI Gateway returned ${res.status}.` }
 }

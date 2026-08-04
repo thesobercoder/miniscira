@@ -12,9 +12,8 @@
 # 2. **Node runs the build, Bun only installs.** Under Docker's amd64 emulation
 #    on an Apple Silicon host, Bun crashes with SIGILL partway through
 #    `next build`. Node has no such problem, so Bun is confined to
-#    `bun install` (which needs bun.lock) and everything else runs on Node.
-#    On a native amd64 host either would work; this way one Dockerfile covers
-#    both.
+#    `bun install` and everything else runs on Node. On a native amd64 host
+#    either would work; this way one Dockerfile covers both.
 
 # Node 24 or newer: the eve CLI refuses to run on anything older.
 ARG NODE_IMAGE=node:24-bookworm-slim
@@ -34,7 +33,10 @@ COPY package.json bun.lock ./
 # takes the Vite branch and dies with "Cannot find package 'vite'".
 COPY source.config.ts next.config.ts ./
 COPY content ./content
-RUN bun install --frozen-lockfile
+# deps stage: the lockfile is regenerated on first build because the self-hosted
+# patch adds deps (pg, @ai-sdk/openai, @types/pg) that are not in the shipped
+# bun.lock. Subsequent builds reuse the resolved lock.
+RUN bun install
 
 # ---- builder ------------------------------------------------------------
 FROM --platform=linux/amd64 ${NODE_IMAGE} AS builder
@@ -61,6 +63,14 @@ FROM --platform=linux/amd64 ${NODE_IMAGE} AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# The eve sandbox backs `run_code` with the docker backend (self-hosted): eve
+# shells out to the docker CLI, which reaches the host daemon through the
+# /var/run/docker.sock mounted at runtime. Only the client is needed here — the
+# daemon runs on the host.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends docker.io \
+ && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next

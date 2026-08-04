@@ -1,4 +1,4 @@
-import { put } from "@vercel/blob"
+import { put } from "@/lib/local-blob"
 import { and, asc, desc, eq, inArray } from "drizzle-orm"
 import { NextResponse } from "next/server"
 
@@ -107,7 +107,7 @@ export const POST = authed(async (request, { userId }) => {
   // leave an orphan blob behind for a request we are about to refuse.
   //
   // Both checks together, and the buffer read alongside them: they are three
-  // independent operations, and `lib/db` is the Neon HTTP driver, so each query
+  // independent operations, and `lib/db` is a local Postgres pool, so each query
   // is its own round trip. Awaiting them in sequence made an upload carrying
   // both a chatId and a projectId pay for two.
   const [ownsChat, ownsProject, buffer] = await Promise.all([
@@ -125,7 +125,6 @@ export const POST = authed(async (request, { userId }) => {
     // move the object out of this user's prefix, so flatten it to a leaf.
     const safeName = file.name.replace(/[/\\]/g, "_").slice(-200) || "upload"
     const blob = await put(`documents/${userId}/${safeName}`, buffer, {
-      access: "public",
       addRandomSuffix: true,
       contentType: file.type || "application/octet-stream",
     })
@@ -133,7 +132,7 @@ export const POST = authed(async (request, { userId }) => {
   } catch (err) {
     console.error("blob upload failed", err)
     return NextResponse.json(
-      { error: "Upload storage is not configured (BLOB_READ_WRITE_TOKEN)." },
+      { error: "Upload storage is not configured (LOCAL_STORAGE_DIR)." },
       { status: 500 }
     )
   }

@@ -1,6 +1,6 @@
-// Enables the pgvector extension on Neon before `drizzle-kit push` creates the
-// vector columns. Run once: `bun run db:setup`, then `bun run db:push`.
-import { neon } from "@neondatabase/serverless"
+// Enables the pgvector extension before `drizzle-kit push` creates the vector
+// columns. Run once: `bun run db:setup`, then `bun run db:push`.
+import pg from "pg"
 
 const url = process.env.DATABASE_URL
 if (!url) {
@@ -8,6 +8,8 @@ if (!url) {
   process.exit(1)
 }
 
-const sql = neon(url)
-await sql`CREATE EXTENSION IF NOT EXISTS vector`
+const client = new pg.Client({ connectionString: url })
+await client.connect()
+await client.query("CREATE EXTENSION IF NOT EXISTS vector")
+await client.end()
 console.log("✓ pgvector extension enabled")

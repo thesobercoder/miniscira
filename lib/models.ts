@@ -1,5 +1,6 @@
-// The models users can pick in the composer. All are AI Gateway ids served with
-// the existing AI_GATEWAY_API_KEY — no extra provider keys. Every entry must
+// The models users can pick in the composer. All are served by the
+// deployment's own OpenAI-compatible AI gateway (CLIProxyAPI by default) with
+// the shared AI_GATEWAY_API_KEY — no per-provider keys. Every entry must
 // support vision + tool use (attachments and the research tools rely on both).
 export type ChatModel = {
   id: string
@@ -9,43 +10,130 @@ export type ChatModel = {
 }
 
 // Also the dynamic fallback in agent/agent.ts and the researcher subagent's
-// model, so it has to survive long multi-tool turns. gemini-3.5-flash-lite did
-// not: 4 of its 10 sessions died at the step following a multi-tool-call step
-// with an AI Gateway 400 ("Corrupted thought signature", under it "the number of
-// function response parts is equal to the number of function call parts"),
-// while grok and sonnet went 0/67. Keep this on a model with a clean record.
-export const DEFAULT_CHAT_MODEL = "xai/grok-4.20-reasoning"
+// model, so it has to survive long multi-tool turns.
+export const DEFAULT_CHAT_MODEL = "gpt-5.6-sol"
 
 export const CHAT_MODELS: ChatModel[] = [
   {
-    id: "xai/grok-4.20-reasoning",
-    name: "Grok 4.20",
-    vendor: "xAI",
-    hint: "Fast reasoning · default",
+    id: "gpt-5.6-sol",
+    name: "GPT-5.6 Sol",
+    vendor: "openai",
+    hint: "Flagship reasoning · default",
   },
   {
-    id: "anthropic/claude-sonnet-5",
+    id: "claude-sonnet-5",
     name: "Claude Sonnet 5",
-    vendor: "Anthropic",
+    vendor: "anthropic",
     hint: "Strong writing & analysis",
   },
   {
-    id: "openai/gpt-5.5",
-    name: "GPT-5.5",
-    vendor: "OpenAI",
-    hint: "All-round flagship",
+    id: "gemini-3-flash",
+    name: "Gemini 3 Flash",
+    vendor: "google",
+    hint: "Fast & cheap",
   },
   {
-    id: "google/gemini-3.5-flash",
-    name: "Gemini 3.5 Flash",
-    vendor: "Google",
-    hint: "Fastest & cheapest",
+    id: "gpt-5.6-luna",
+    name: "GPT-5.6 Luna",
+    vendor: "openai",
+    hint: "Routine reasoning",
+  },
+  {
+    id: "deepseek-v4-pro",
+    name: "DeepSeek V4 Pro",
+    vendor: "deepseek",
+    hint: "Deep research",
+  },
+  {
+    id: "claude-opus-5",
+    name: "Claude Opus 5",
+    vendor: "anthropic",
+    hint: "Heavy lifting",
+  },
+  {
+    id: "glm-5.2",
+    name: "GLM 5.2",
+    vendor: "zai",
+    hint: "Versatile all-rounder",
+  },
+  {
+    id: "qwen3.8-max",
+    name: "Qwen 3.8 Max",
+    vendor: "alibaba",
+    hint: "Long context",
   },
 ]
 
-// Loose shape check for a gateway model id ("provider/model"). The router
-// additionally validates picked ids against the live gateway catalog.
-export const MODEL_ID_RE = /^[a-z0-9-]+\/[a-z0-9._:-]+$/i
+// Loose shape check for a model id. The gateway serves bare ids (no
+// provider/ prefix), so a slash is optional.
+export const MODEL_ID_RE = /^[a-z0-9][a-z0-9._:-]*(\/[a-z0-9._:-]+)?$/i
+
+// Bare model id -> provider slug, for ids the gateway serves without a
+// provider/ prefix. Everything CLIProxyAPI exposes maps to a real vendor.
+export const MODEL_VENDOR: Record<string, string> = {
+  // OpenAI
+  "gpt-5.6-sol": "openai",
+  "gpt-5.6-luna": "openai",
+  "gpt-5.6-terra": "openai",
+  "gpt-5.5": "openai",
+  "gpt-5.4": "openai",
+  "gpt-5.4-mini": "openai",
+  "gpt-image-2": "openai",
+  "gpt-image-1.5": "openai",
+  // Anthropic
+  "claude-sonnet-5": "anthropic",
+  "claude-sonnet-4-6": "anthropic",
+  "claude-opus-5": "anthropic",
+  "claude-opus-4-8": "anthropic",
+  "claude-opus-4-6-thinking": "anthropic",
+  "claude-haiku-4-5-20251001": "anthropic",
+  "claude-fable-5": "anthropic",
+  // Google
+  "gemini-3-flash": "google",
+  "gemini-3-flash-agent": "google",
+  "gemini-3.1-flash-lite": "google",
+  "gemini-3.1-flash-image": "google",
+  "gemini-3.6-flash-high": "google",
+  "gemini-pro-agent": "google",
+  // DeepSeek
+  "deepseek-v4-flash": "deepseek",
+  "deepseek-v4-pro": "deepseek",
+  // xAI
+  "grok-4.5": "xai",
+  "grok-composer-2.5-fast": "xai",
+  "grok-imagine-image": "xai",
+  "grok-imagine-image-quality": "xai",
+  "grok-imagine-video": "xai",
+  "grok-imagine-video-1.5": "xai",
+  "grok-imagine-video-1.5-preview": "xai",
+  // Z.ai / Alibaba / Moonshot
+  "glm-5.2": "zai",
+  "qwen3.7-plus": "alibaba",
+  "qwen3.8-max": "alibaba",
+  "kimi-k3": "moonshotai",
+}
+
+const VENDOR_SLUGS = new Set([
+  "xai",
+  "anthropic",
+  "openai",
+  "google",
+  "meta",
+  "mistral",
+  "deepseek",
+  "alibaba",
+  "moonshotai",
+  "cohere",
+  "nvidia",
+  "amazon",
+  "minimax",
+  "bytedance",
+  "xiaomi",
+  "zai",
+  "tencent",
+  "stepfun",
+  "kwaipilot",
+])
 
 /**
  * Provider display names + logos, self-hosted under /public/providers (pulled
@@ -112,14 +200,28 @@ export const PROVIDERS: Record<
     icon: "/providers/thinkingmachines.png",
   },
   interfaze: { name: "Interfaze", icon: "/providers/interfaze.svg" },
+  // The gateway itself, when an id doesn't map to a branded vendor.
+  cpa: { name: "CLIProxyAPI" },
 }
 
 /** Featured providers listed first in the picker; the rest follow alphabetically. */
-export const PROVIDER_ORDER = ["xai", "anthropic", "openai", "google"]
+export const PROVIDER_ORDER = [
+  "openai",
+  "anthropic",
+  "google",
+  "deepseek",
+  "xai",
+  "zai",
+  "alibaba",
+  "moonshotai",
+]
 
-/** Provider slug of a `provider/model` gateway id: `openai/gpt-5` → `openai`. */
+/** Provider slug of a model id: `openai/gpt-5` → `openai`, `gpt-5.6-sol` → `openai`. */
 export function providerOf(id: string): string {
-  return id.split("/")[0]
+  if (MODEL_VENDOR[id]) return MODEL_VENDOR[id]
+  const head = id.split("/")[0]
+  if (VENDOR_SLUGS.has(head)) return head
+  return MODEL_VENDOR[head] ?? "cpa"
 }
 
 export function providerLabel(provider: string): string {

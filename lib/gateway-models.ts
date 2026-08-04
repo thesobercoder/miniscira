@@ -1,9 +1,13 @@
-// Server-side: the AI Gateway model catalog, cached in memory for an hour.
-// Shared by /api/models (the picker's list) and the model router (validation),
-// so a picked id is always checked against the live catalog.
+// Server-side: the model catalog, cached in memory for an hour. Shared by
+// /api/models (the picker's list) and the model router (validation), so a
+// picked id is always checked against the live catalog.
+//
+// Self-hosted: the catalog comes from the deployment's own OpenAI-compatible
+// AI gateway (CLIProxyAPI by default), not the Vercel AI Gateway.
 
 import { z } from "zod"
-import { providerOf } from "./models"
+
+import { MODEL_VENDOR, providerOf } from "./models"
 
 export type GatewayModel = {
   id: string
@@ -15,21 +19,42 @@ export type GatewayModel = {
   released: number
 }
 
+/** Base URL of the deployment's OpenAI-compatible gateway, no trailing slash. */
+export function gatewayBaseUrl(): string {
+  return (
+    process.env.AI_GATEWAY_BASE_URL ?? "http://host.docker.internal:8317/v1"
+  ).replace(/\/+$/, "")
+}
+
+// Models the gateway exposes that are not chat models (image/video generators)
+// and must never appear in the chat picker.
+const NON_CHAT_MODELS = new Set([
+  "grok-imagine-image",
+  "grok-imagine-image-quality",
+  "grok-imagine-video",
+  "grok-imagine-video-1.5",
+  "grok-imagine-video-1.5-preview",
+  "gemini-3.1-flash-image",
+  "gpt-image-2",
+  "gpt-image-1.5",
+])
+
+// The gateway does not advertise context windows, so every model gets the
+// deployment-wide default (matches the 200K convention used elsewhere).
+const DEFAULT_CONTEXT_WINDOW = 200_000
+const CONTEXT_WINDOWS: Record<string, number> = {}
+
 /**
  * The gateway's catalog is third-party data, so it's parsed rather than
- * asserted. `id` is required here (an entry without one is unusable), which is
- * what lets the mapping below read it without a non-null assertion; every other
- * field is optional and defaulted. Unknown entries are dropped, not thrown on —
- * one malformed model shouldn't empty the whole picker.
+ * asserted. `id` is required here (an entry without one is unusable); every
+ * other field is optional and defaulted. Unknown entries are dropped, not
+ * thrown on — one malformed model shouldn't empty the whole picker.
  */
 const RawModelSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
-  type: z.string().optional(),
   owned_by: z.string().optional(),
-  context_window: z.number().optional(),
-  released: z.number().optional(),
-  tags: z.array(z.string()).default([]),
+  created: z.number().optional(),
 })
 
 const CatalogSchema = z.object({
@@ -40,8 +65,8 @@ const CatalogSchema = z.object({
  * Shared across users on purpose.
  *
  * The catalog is a property of the gateway, not of whose key fetched it — every
- * key sees the same list of tool-capable models. Caching per user would mean
- * one upstream request per signed-in person per hour for identical data.
+ * key sees the same list. Caching per user would mean one upstream request per
+ * signed-in person per hour for identical data.
  */
 let cache: { at: number; models: GatewayModel[] } | null = null
 const TTL_MS = 60 * 60 * 1000
@@ -62,24 +87,26 @@ export async function fetchGatewayModels(
   const key = apiKey ?? process.env.AI_GATEWAY_API_KEY
   if (!key) return cache?.models ?? []
   try {
-    const res = await fetch("https://ai-gateway.vercel.sh/v1/models", {
+    const res = await fetch(`${gatewayBaseUrl()}/models`, {
       headers: { authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(10_000),
     })
     if (!res.ok) throw new Error(`gateway /v1/models returned ${res.status}`)
     const catalog = CatalogSchema.parse(await res.json())
     const models = catalog.data
       .map((entry) => RawModelSchema.safeParse(entry))
       .flatMap((parsed) => (parsed.success ? [parsed.data] : []))
-      // The research harness needs tool calling; anything else would silently break it.
-      .filter((m) => m.type === "language" && m.tags.includes("tool-use"))
+      .filter((m) => !NON_CHAT_MODELS.has(m.id))
       .map((m) => ({
         id: m.id,
-        name: m.name ?? m.id.split("/")[1],
-        provider: m.owned_by ?? providerOf(m.id),
-        context: m.context_window ?? 0,
-        vision: m.tags.includes("vision"),
-        fileInput: m.tags.includes("file-input"),
-        released: m.released ?? 0,
+        name: m.name ?? m.id.split("/")[1] ?? m.id,
+        provider: MODEL_VENDOR[m.id] ?? m.owned_by ?? providerOf(m.id),
+        context: CONTEXT_WINDOWS[m.id] ?? DEFAULT_CONTEXT_WINDOW,
+        // Chat models behind the gateway are treated as vision + file capable;
+        // the research harness relies on attachments and tool use.
+        vision: true,
+        fileInput: true,
+        released: m.created ?? 0,
       }))
     if (models.length > 0) cache = { at: Date.now(), models }
     return models

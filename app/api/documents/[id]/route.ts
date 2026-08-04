@@ -1,4 +1,4 @@
-import { del } from "@vercel/blob"
+import { del } from "@/lib/local-blob"
 import { and, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 

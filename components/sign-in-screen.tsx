@@ -164,14 +164,11 @@ function SignInForm({ providers }: { providers: EnabledProviders }) {
       {/* One group for "sign in with an account you already have", one for
           email — and a single divider between them. Two dividers made three
           disconnected blocks out of what is really a choice of two paths.
-          Vercel leads because the gateway key is issued by Vercel, so that
-          account is the one the user needs anyway. It does not supply the key:
-          Sign in with Vercel is identity-only OIDC, and every user pastes a key
-          regardless of how they signed in — see lib/gateway-credentials.ts for
-          the measured evidence, since assuming otherwise is an easy mistake.
-          Each button appears only when the server holds its credentials, so a
-          half-configured deployment shows fewer options rather than options
-          that fail on click. */}
+          Email/password works with no configuration; the social buttons appear
+          only when the server holds their credentials, so a half-configured
+          deployment shows fewer options rather than options that fail on
+          click. Users paste a gateway key in Settings (or the deployment
+          shares its own key) regardless of how they signed in. */}
       {anySocial && (
         <>
           <div className="flex flex-col gap-2">

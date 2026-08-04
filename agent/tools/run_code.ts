@@ -1,4 +1,4 @@
-import { put } from "@vercel/blob"
+import { put } from "@/lib/local-blob"
 import { and, eq, inArray } from "drizzle-orm"
 import { defineTool } from "eve/tools"
 import { z } from "zod"
@@ -7,7 +7,8 @@ import { db } from "@/lib/db"
 import { document } from "@/lib/db/schema"
 
 // The model sees this tool as `run_code`. It runs a Python script in the agent's
-// Vercel sandbox — for calculations, statistics, and data analysis over the
+// Docker-backed sandbox (containers on this host, see agent/sandbox.ts) — for
+// calculations, statistics, and data analysis over the
 // user's uploaded files — and returns stdout/stderr plus any charts it saved.
 // The sandbox is offline (network denied) with pandas / numpy / matplotlib
 // preinstalled; see agent/sandbox.ts. Paths resolve from /workspace, so a bare
@@ -77,7 +78,13 @@ export default defineTool({
             continue
           }
           try {
-            const res = await fetch(url)
+            // Local-blob URLs carry the public origin; fetch over loopback
+            // instead — the hostname doesn't resolve inside this container.
+            const localUrl = url.replace(
+              /^https?:\/\/[^/]+/,
+              "http://127.0.0.1:3000"
+            )
+            const res = await fetch(localUrl)
             if (!res.ok) throw new Error(`HTTP ${res.status}`)
             const bytes = new Uint8Array(await res.arrayBuffer())
             await sandbox.writeBinaryFile({ path: name, content: bytes })
@@ -99,26 +106,19 @@ export default defineTool({
 
     // Upload any newly-created charts so the UI can show them inline.
     const images: { name: string; url: string }[] = []
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
-      for (const name of await listImages()) {
+    for (const name of await listImages()) {
         if (before.has(name)) continue
         try {
           const bytes = await sandbox.readBinaryFile({ path: name })
           if (!bytes) continue
-          const blob = await put(
-            `runcode/${Date.now()}-${name}`,
-            Buffer.from(bytes),
-            {
-              access: "public",
-              addRandomSuffix: true,
-            }
-          )
+          const blob = await put(`runcode/${Date.now()}-${name}`, Buffer.from(bytes), {
+            addRandomSuffix: true,
+          })
           images.push({ name, url: blob.url })
         } catch {
           // A chart that fails to upload just doesn't render; the run still stands.
         }
       }
-    }
 
     return {
       title,

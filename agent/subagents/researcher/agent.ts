@@ -1,5 +1,6 @@
 import { defineAgent } from "eve"
 
+import { chatModel } from "@/lib/gateway"
 import { DEFAULT_CHAT_MODEL } from "@/lib/models"
 
 // A focused research specialist the root delegates sub-questions to during deep
@@ -14,5 +15,5 @@ import { DEFAULT_CHAT_MODEL } from "@/lib/models"
 export default defineAgent({
   description:
     "Investigate ONE self-contained research sub-question in depth using firecrawl_search, exa_search, firecrawl_scrape, x_search, and reddit_search. Returns a tight Markdown brief with inline source-URL citations. For breadth, delegate independent sub-questions to several researcher calls at once, each with a specific, non-overlapping task.",
-  model: DEFAULT_CHAT_MODEL,
+  model: chatModel(DEFAULT_CHAT_MODEL),
 })

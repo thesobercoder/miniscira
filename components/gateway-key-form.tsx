@@ -9,10 +9,10 @@ import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { useMountEffect } from "@/hooks/use-mount-effect"
 
-// Vercel's `/d?to=` deep link resolves `[team]` to whichever team the user is
-// in, so this works without knowing their slug.
-const GATEWAY_KEYS_URL =
-  "https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai-gateway%2Fapi-keys"
+// Where to find a gateway key. Self-hosted deployments usually share one
+// deployment-wide key (AI_GATEWAY_API_KEY, see ALLOW_SHARED_GATEWAY_KEY), so
+// this link is mostly for users who want to bring their own.
+const GATEWAY_KEYS_URL = "https://miniscira.com/docs/self-host"
 
 type State = { saved: boolean; last4: string | null }
 

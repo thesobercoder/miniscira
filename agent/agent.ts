@@ -1,4 +1,4 @@
-import { createGateway } from "@ai-sdk/gateway"
+import { chatModel } from "@/lib/gateway"
 import { defineAgent, defineDynamic } from "eve"
 
 import {
@@ -101,11 +101,12 @@ export default defineAgent({
   // The resolver also decides *whose* gateway credential pays. It returns a
   // `LanguageModel` instance rather than a model id string — eve accepts either
   // (`PublicAgentStaticModelDefinition = string | LanguageModel`) — built from
-  // the key that caller saved in Settings, decrypted for this turn. So a turn
-  // bills the user's own Vercel team, not ours. Nothing here reads an OAuth
-  // token: Sign in with Vercel is identity only.
+  // the key that caller saved in Settings, decrypted for this turn (or the
+  // deployment's shared AI_GATEWAY_API_KEY when no per-user key is set). So a
+  // turn bills the user's own gateway key, not a pooled one. Nothing here reads
+  // an OAuth token: the provider sign-in is identity only.
   model: defineDynamic({
-    fallback: DEFAULT_CHAT_MODEL,
+    fallback: chatModel(DEFAULT_CHAT_MODEL),
     events: {
       "step.started": async (_event, ctx) => {
         const modelId =
@@ -117,10 +118,10 @@ export default defineAgent({
         if (!credential) throw new NoGatewayCredentialError()
 
         return {
-          // A gateway API key is already scoped to the team that issued it, so
-          // there is no `teamIdOrSlug` to pass — that option only matters for a
-          // token that can see several teams, which is not this.
-          model: createGateway({ apiKey: credential.apiKey })(modelId),
+          // Model built against the deployment's own OpenAI-compatible gateway
+          // (CLIProxyAPI by default) — see lib/gateway.ts. The caller's saved
+          // key (or the shared AI_GATEWAY_API_KEY) bills the turn.
+          model: chatModel(modelId, credential.apiKey),
           // Undefined when the catalog can't answer; eve then keeps the
           // compiled window rather than guessing one.
           // Same key the turn runs on, so the catalog can be primed even when
@@ -136,10 +137,11 @@ export default defineAgent({
   compaction: {
     thresholdPercent: 0.85,
     // Run the summary pass on a fast, cheap, large-context model rather than the
-    // active turn model (eve's default). Without this, every compaction on an
-    // Opus or Grok thread bills its summary at flagship rates; Flash summarizes
-    // long transcripts well and has the window to hold them.
-    model: "google/gemini-3.5-flash",
+    // active turn model (eve's default). Without this, every compaction bills
+    // its summary at flagship rates; Gemini 3 Flash summarizes long transcripts
+    // well and has the window to hold them. A LanguageModel instance — never a
+    // string, which eve would route through the (cloud) gateway.
+    model: chatModel("gemini-3-flash"),
   },
   limits: {
     // Cost guard: a session that has produced 200K output tokens pauses with

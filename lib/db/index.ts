@@ -1,9 +1,9 @@
-import { neon } from "@neondatabase/serverless"
-import { drizzle, type NeonHttpDatabase } from "drizzle-orm/neon-http"
+import { Pool } from "pg"
+import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres"
 
 import * as schema from "./schema"
 
-type DB = NeonHttpDatabase<typeof schema>
+type DB = NodePgDatabase<typeof schema>
 
 let _db: DB | undefined
 
@@ -12,10 +12,12 @@ function init(): DB {
   const url = process.env.DATABASE_URL
   if (!url) {
     throw new Error(
-      "DATABASE_URL is not set. Add your Neon connection string to .env"
+      "DATABASE_URL is not set. Add your Postgres connection string to .env"
     )
   }
-  _db = drizzle(neon(url), { schema })
+  // Self-hosted Postgres via node-postgres. The lazy proxy below keeps
+  // building/discovery without DATABASE_URL from crashing.
+  _db = drizzle(new Pool({ connectionString: url }), { schema })
   return _db
 }
 

@@ -38,7 +38,10 @@ export default defineTool({
 
     let res: Response
     try {
-      res = await fetch("https://api.firecrawl.dev/v2/search", {
+      const base = (
+        process.env.FIRECRAWL_API_URL ?? "https://api.firecrawl.dev"
+      ).replace(/\/+$/, "")
+      res = await fetch(`${base}/v2/search`, {
         method: "POST",
         headers: {
           authorization: `Bearer ${key}`,
