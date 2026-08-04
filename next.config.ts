@@ -4,6 +4,9 @@ import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  // The floating dev-tools badge sits bottom-left, on top of the sidebar footer
+  // and inside every screenshot taken of a dev build.
+  devIndicators: false,
   experimental: {
     // The TypeScript CLI checker and the Turbopack dev/build filesystem caches
     // all became defaults in 16.3, so only the Rust compiler stays opt-in here.

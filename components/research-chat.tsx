@@ -359,8 +359,14 @@ export function ResearchChat({
   const panelOpen =
     openArtifactId != null && artifacts.some((a) => a.id === openArtifactId)
   const lastIsUser = messages.at(-1)?.role === "user"
+  // Shown from the moment the turn is submitted, including while the optimistic
+  // bubble is still standing in for the server's echo. `!pendingUser` used to
+  // gate it out, which meant the indicator waited for `message.received` to
+  // land before appearing — a send looked like it had gone nowhere for the
+  // whole server round trip. The optimistic bubble renders directly above this,
+  // so the pair appears together, in order, on the same frame as the keypress.
   const showThinking =
-    isBusy && (messages.length === 0 || lastIsUser) && !pendingUser
+    isBusy && (pendingUser != null || lastIsUser || messages.length === 0)
   const isEmpty = messages.length === 0 && !pendingUser
   // The user-turn ordinal of each message (for attachment lookup); -1 for
   // assistant. A plain loop, not `.map`, because it also yields the running

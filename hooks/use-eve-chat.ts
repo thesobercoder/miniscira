@@ -87,6 +87,32 @@ export function shouldForgetSession({
   return response != null && !followed && hadSession
 }
 
+/**
+ * Drain one stream until a turn boundary, or until it ends on its own.
+ *
+ * Breaking *on* the boundary rather than waiting for the iterator to return is
+ * the whole point. eve keeps a durable session's stream open after
+ * `session.completed` — the session outlives the turn, so there is nothing to
+ * close — and the previous version only checked `settled` once the `for await`
+ * had finished. It never did, so a turn that had visibly finished answering
+ * left the composer locked in its streaming state until the tab was reloaded.
+ *
+ * Exported for the test: this is a rule about when to stop reading, and it is
+ * worth being able to assert without mounting the hook.
+ */
+export async function drainUntilBoundary(
+  stream: AsyncIterable<ChatEvent>,
+  onEvent: (event: ChatEvent) => void
+): Promise<{ settled: boolean; received: number }> {
+  let received = 0
+  for await (const event of stream) {
+    received += 1
+    onEvent(event)
+    if (isTurnBoundary(event)) return { settled: true, received }
+  }
+  return { settled: false, received }
+}
+
 export function useEveChat({
   chatId,
   initialEvents = [],
@@ -187,11 +213,9 @@ export function useEveChat({
       try {
         for (let attempt = 0; ; attempt += 1) {
           try {
-            for await (const event of stream) {
-              received += 1
-              ingest(event)
-              if (isTurnBoundary(event)) settled = true
-            }
+            const drained = await drainUntilBoundary(stream, ingest)
+            received += drained.received
+            if (drained.settled) settled = true
           } catch (err) {
             if ((err as Error)?.name === "AbortError") break
             console.error("eve stream error", err)
@@ -234,7 +258,7 @@ export function useEveChat({
       }
       return settled || received > 0
     },
-    [ingest, flush, patchCursor, getSession]
+    [ingest, getSession, patchCursor, flush]
   )
 
   // Resume an in-flight turn after a reload: if the last persisted event isn't a

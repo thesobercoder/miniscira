@@ -131,9 +131,15 @@ function SubagentNode({ group, last, active, childParts }: ToolNodeProps) {
   const part = group.parts[0]
   const finished = isPartDone(part)
   const live = Boolean(active) && !finished
-  // null = user hasn't chosen. Expanded while the delegate is working so its
-  // progress is actually visible, collapsed once it settles — the same rule the
-  // outer timeline uses. Defaulting to false hid the nested view entirely.
+  // null = user hasn't chosen, which means collapsed.
+  //
+  // This used to auto-expand while the delegate was working, on the theory that
+  // its progress should be visible. In practice a subagent emits a lot of steps
+  // quickly, and an expanded nested timeline re-groups and reflows on every
+  // delta — the parent transcript jumps around underneath whatever the reader
+  // is trying to read. The step's own `description` already reports live
+  // progress ("Working · 6 steps") in one line that changes without moving
+  // anything, which is the part worth seeing by default. Opening it is a click.
   const [userOpen, setUserOpen] = useState<boolean | null>(null)
   const input = inputOf(part)
   const task = String(input.message ?? input.prompt ?? "")
@@ -148,7 +154,7 @@ function SubagentNode({ group, last, active, childParts }: ToolNodeProps) {
     (p) => p.type === "dynamic-tool" || p.type === "reasoning"
   )
   const hasNested = (nestedSteps?.length ?? 0) > 0
-  const open = userOpen ?? live
+  const open = userOpen ?? false
 
   return (
     <ChainOfThoughtStep
@@ -173,7 +179,11 @@ function SubagentNode({ group, last, active, childParts }: ToolNodeProps) {
           {task}
         </div>
       )}
-      {hasNested && nestedSteps && (
+      {/* Gated on `open`, not just on having steps: the panel keeps its
+          children mounted when closed, so without this the nested timeline
+          would keep re-grouping and re-rendering on every streamed delta of a
+          subagent nobody has expanded. */}
+      {open && hasNested && nestedSteps && (
         // Recursion, but `nested` drops the inner "Research" header: the
         // subagent step is already the disclosure, and a second collapsed
         // header inside it buried the child's work behind two clicks.

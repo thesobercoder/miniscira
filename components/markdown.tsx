@@ -251,7 +251,22 @@ export function Markdown({
               // and defaults to 150; the value this was written with (4) is
               // below a frame, so the entrance never actually showed.
               duration: 150,
-              easing: "ease-out",
+              easing: "ease-in",
+              // No cascade. Streamdown's default staggers each *new* word by
+              // 40ms (`--sd-delay: newIndex * stagger`), and its rule is
+              // `animation: … both`, so a word sits at the keyframe's opacity:0
+              // for the whole of its delay. A word is only exempt from being
+              // "new" while the plugin's `prevContentLength` is non-zero — and
+              // that counter is a single shared value which `getLastRenderCharCount()`
+              // zeroes on read. Any render that reads it out of step re-staggers
+              // a whole block from index 0, so a 400-word answer hands its tail
+              // ~16s of delay and renders as blank space with a few words in it.
+              //
+              // The cascade was never worth that: tokens already arrive one at a
+              // time, so the stream paces the reveal by itself. At 0 the words
+              // still fade and slide in, they just do it when they arrive
+              // instead of queueing behind an artificial timeline.
+              stagger: 0,
             },
             isAnimating: true,
           }
