@@ -16,4 +16,7 @@ export default defineAgent({
   description:
     "Investigate ONE self-contained research sub-question in depth using firecrawl_search, exa_search, firecrawl_scrape, x_search, and reddit_search. Returns a tight Markdown brief with inline source-URL citations. For breadth, delegate independent sub-questions to several researcher calls at once, each with a specific, non-overlapping task.",
   model: chatModel(DEFAULT_CHAT_MODEL),
+  // CPA models carry no gateway metadata; provide the window so eve skips its
+  // build-time catalog lookup (same hatch as agent.ts).
+  modelContextWindowTokens: 200_000,
 })

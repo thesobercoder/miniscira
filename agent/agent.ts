@@ -134,8 +134,16 @@ export default defineAgent({
       },
     },
   }),
+
+  // CPA models carry no AI Gateway metadata, so eve would otherwise fail the
+  // build trying to look up a context window for the fallback model. Setting
+  // the window explicitly skips that lookup (eve's documented escape hatch for
+  // custom/unlisted models) and keeps the build fully self-hosted.
+  modelContextWindowTokens: 200_000,
+
   compaction: {
     thresholdPercent: 0.85,
+    modelContextWindowTokens: 200_000,
     // Run the summary pass on a fast, cheap, large-context model rather than the
     // active turn model (eve's default). Without this, every compaction bills
     // its summary at flagship rates; Gemini 3 Flash summarizes long transcripts
