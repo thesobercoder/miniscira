@@ -1,5 +1,5 @@
 import { defineSandbox } from "eve/sandbox"
-import { justbash } from "just-bash"
+import { justbash } from "eve/sandbox/just-bash"
 
 // The sandbox backs the `run_code` tool: an offline Python environment for
 // calculations and data analysis.
