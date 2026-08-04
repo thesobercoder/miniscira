@@ -64,13 +64,15 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# The eve sandbox backs `run_code` with the docker backend (self-hosted): eve
-# shells out to the docker CLI, which reaches the host daemon through the
-# /var/run/docker.sock mounted at runtime. Only the client is needed here — the
-# daemon runs on the host.
+# The eve sandbox backs `run_code` with the just-bash backend (this host does
+# not expose a docker socket to app containers): sandbox commands are plain
+# bash subprocesses, so the analysis stack must live in this image — pandas,
+# numpy, matplotlib get baked in at build time rather than installed at
+# bootstrap (which would need egress and would re-run on every start).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends docker.io \
- && rm -rf /var/lib/apt/lists/*
+ && apt-get install -y --no-install-recommends python3 python3-pip \
+ && rm -rf /var/lib/apt/lists/* \
+ && python3 -m pip install --no-cache-dir --break-system-packages pandas numpy matplotlib
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next

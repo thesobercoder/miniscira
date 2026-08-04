@@ -6,11 +6,11 @@ import { z } from "zod"
 import { db } from "@/lib/db"
 import { document } from "@/lib/db/schema"
 
-// The model sees this tool as `run_code`. It runs a Python script in the agent's
-// Docker-backed sandbox (containers on this host, see agent/sandbox.ts) — for
-// calculations, statistics, and data analysis over the
+// The model sees this tool as `run_code`. It runs a Python script in the
+// agent's sandbox — a local bash process on this deployment (see
+// agent/sandbox.ts) — for calculations, statistics, and data analysis over the
 // user's uploaded files — and returns stdout/stderr plus any charts it saved.
-// The sandbox is offline (network denied) with pandas / numpy / matplotlib
+// The sandbox is a local bash process with pandas / numpy / matplotlib
 // preinstalled; see agent/sandbox.ts. Paths resolve from /workspace, so a bare
 // filename addresses the working directory. Renders in the timeline as a code
 // cell with its output and any generated plots.
