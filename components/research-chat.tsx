@@ -118,6 +118,10 @@ export function ResearchChat({
   const router = useRouter()
   const chatIdRef = useRef<string | undefined>(chatId)
   const createdRef = useRef(false)
+  // Monotonic per-turn counter: the post-turn refresh only fires for the LATEST
+  // turn, so a second turn started before the first one's title generation
+  // resolves can't be interrupted mid-stream by the first turn's refresh.
+  const turnSeqRef = useRef(0)
 
   const {
     messages,
@@ -240,6 +244,44 @@ export function ResearchChat({
     setChatId(id)
     persistTurnBinding(attached, turnIndex)
 
+    // The chat row exists in the database now. Surface it in the sidebar
+    // immediately — WITHOUT router.refresh(): `ensureChat` changed the URL via
+    // replaceState, and a refresh mid-turn would re-fetch /chat/<id>, swap the
+    // home page for the chat-route page, remount this component and kill the
+    // live eve stream ("eve stream error: network error"). chat-list.tsx
+    // listens for these events and inserts/updates the row optimistically.
+    // The first event shows the row (question text as a placeholder title);
+    // the second swaps in the generated title, which is produced in parallel
+    // with the turn instead of waiting for the whole response to finish.
+    if (createdRef.current) {
+      createdRef.current = false
+      window.dispatchEvent(
+        new CustomEvent("miniscira:chat-created", {
+          detail: {
+            id,
+            title: text.slice(0, 80),
+            updatedAt: new Date().toISOString(),
+          },
+        })
+      )
+      void fetch(`/api/chats/${id}/title`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ message: text }),
+      })
+        .then((res) => res.json().catch(() => null))
+        .then((json: { title?: string } | null) => {
+          if (json?.title) {
+            window.dispatchEvent(
+              new CustomEvent("miniscira:chat-titled", {
+                detail: { id, title: json.title },
+              })
+            )
+          }
+        })
+        .catch(() => {})
+    }
+
     // Attachments ride to the model natively as file parts — eve's message
     // schema only accepts "text"/"file" (no separate "image" part type);
     // models with vision read image-mediaType file parts directly. Documents
@@ -274,6 +316,7 @@ export function ResearchChat({
     const recap = () =>
       messages.length === 0 ? null : conversationRecap(messages)
 
+    const myTurn = ++turnSeqRef.current
     const sent = await send({
       optimisticText: text,
       message:
@@ -287,15 +330,13 @@ export function ResearchChat({
     // retype — `send` has already explained what went wrong.
     if (!sent) setInput((current) => current || text)
 
-    if (sent && createdRef.current) {
-      createdRef.current = false
-      // Generate a short title from the question (non-blocking), then refresh
-      // the sidebar so it updates from "New research".
-      void fetch(`/api/chats/${id}/title`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ message: text }),
-      })
+    // Turn finished, stream complete — safe to re-sync the sidebar from the
+    // server now (title, ordering). For a brand-new chat this also swaps the
+    // home page onto the /chat/<id> route with the finished turn rendered.
+    // Guarded by the turn counter so this never fires while a NEWER turn is
+    // streaming (the refresh would remount the conversation mid-stream).
+    if (sent && myTurn === turnSeqRef.current) {
+      router.refresh()
     }
     return sent
   }
