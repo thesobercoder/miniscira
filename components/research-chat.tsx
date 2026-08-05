@@ -276,21 +276,41 @@ export function ResearchChat({
     persistTurnBinding(attached, turnIndex)
 
     // The chat row exists in the database now. Surface it in the sidebar
-    // immediately — `ensureChat` only changed the URL via replaceState, which
-    // never re-renders the layout's server-rendered chat list — and generate
-    // the title in parallel with the turn instead of waiting for the whole
-    // response to finish. The first refresh shows the row (question text as a
-    // placeholder title); the settle refresh swaps in the generated title.
-    // The refresh fires even when title generation fails: the chat must
-    // appear in the list either way.
+    // immediately — WITHOUT router.refresh(): `ensureChat` changed the URL via
+    // replaceState, and a refresh mid-turn would re-fetch /chat/<id>, swap the
+    // home page for the chat-route page, remount this component and kill the
+    // live eve stream ("eve stream error: network error"). chat-list.tsx
+    // listens for these events and inserts/updates the row optimistically.
+    // The first event shows the row (question text as a placeholder title);
+    // the second swaps in the generated title, which is produced in parallel
+    // with the turn instead of waiting for the whole response to finish.
     if (createdRef.current) {
       createdRef.current = false
-      router.refresh()
+      window.dispatchEvent(
+        new CustomEvent("miniscira:chat-created", {
+          detail: {
+            id,
+            title: text.slice(0, 80),
+            updatedAt: new Date().toISOString(),
+          },
+        })
+      )
       void fetch(`/api/chats/${id}/title`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ message: text }),
-      }).finally(() => router.refresh())
+      })
+        .then((res) => res.json().catch(() => null))
+        .then((json: { title?: string } | null) => {
+          if (json?.title) {
+            window.dispatchEvent(
+              new CustomEvent("miniscira:chat-titled", {
+                detail: { id, title: json.title },
+              })
+            )
+          }
+        })
+        .catch(() => {})
     }
 
     // Attachments ride to the model natively as file parts — eve's message
@@ -349,6 +369,12 @@ export function ResearchChat({
     // retype — `send` has already explained what went wrong.
     if (!sent) setInput((current) => current || text)
 
+    if (sent) {
+      // Turn finished, stream complete — safe to re-sync the sidebar from the
+      // server now (title, ordering). For a brand-new chat this also swaps the
+      // home page onto the /chat/<id> route with the finished turn rendered.
+      router.refresh()
+    }
     return sent
   }
 

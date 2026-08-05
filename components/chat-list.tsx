@@ -4,7 +4,7 @@ import { RiDeleteBinLine } from "@remixicon/react"
 import { isToday, isYesterday } from "date-fns"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 
 import {
@@ -96,8 +96,40 @@ function DeleteChat({ id, title }: { id: string; title: string }) {
 
 export function ChatList({ chats }: { chats: ChatRow[] }) {
   const pathname = usePathname()
+  const [rows, setRows] = useState<ChatRow[]>(chats)
 
-  if (chats.length === 0) {
+  // Server-rendered data wins whenever the layout re-renders.
+  useEffect(() => {
+    setRows(chats)
+  }, [chats])
+
+  // New chats are surfaced optimistically: research-chat dispatches these
+  // events the moment a chat row exists, so the sidebar updates without a
+  // router.refresh(). Refreshing mid-turn would re-fetch /chat/<id>, swap the
+  // home page for the chat-route page, remount the conversation component and
+  // kill the live eve stream ("eve stream error: network error").
+  useEffect(() => {
+    const created = (e: Event) => {
+      const detail = (e as CustomEvent<ChatRow>).detail
+      setRows((prev) =>
+        prev.some((c) => c.id === detail.id) ? prev : [detail, ...prev]
+      )
+    }
+    const titled = (e: Event) => {
+      const detail = (e as CustomEvent<{ id: string; title: string }>).detail
+      setRows((prev) =>
+        prev.map((c) => (c.id === detail.id ? { ...c, title: detail.title } : c))
+      )
+    }
+    window.addEventListener("miniscira:chat-created", created)
+    window.addEventListener("miniscira:chat-titled", titled)
+    return () => {
+      window.removeEventListener("miniscira:chat-created", created)
+      window.removeEventListener("miniscira:chat-titled", titled)
+    }
+  }, [])
+
+  if (rows.length === 0) {
     return (
       <p className="text-pretty px-2 py-1.5 text-muted-foreground text-xs">
         No research yet. Ask a question to start.
@@ -106,7 +138,7 @@ export function ChatList({ chats }: { chats: ChatRow[] }) {
   }
 
   const groups = new Map<string, ChatRow[]>()
-  for (const c of chats) {
+  for (const c of rows) {
     const key = bucket(new Date(c.updatedAt))
     const group = groups.get(key)
     if (group) group.push(c)
