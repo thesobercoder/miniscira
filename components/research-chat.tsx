@@ -79,14 +79,22 @@ async function buildFileParts(docs: UploadedDoc[]) {
         d.mimeType ?? (d.kind === "image" ? "image/png" : "application/pdf")
       const res = await fetch(d.url as string)
       if (!res.ok) throw new Error(`attachment fetch failed: ${res.status}`)
-      const bytes = new Uint8Array(await res.arrayBuffer())
-      let binary = ""
-      for (let i = 0; i < bytes.length; i += 0x8000) {
-        binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
-      }
+      // FileReader base64-encodes off the main thread; the chunked
+      // String.fromCharCode + btoa loop this replaced blocked the UI for the
+      // whole read on large files. The reader's data URL carries the blob's
+      // own content type, but the model-facing part keeps OUR mediaType, so
+      // rebuild the URL with it explicitly.
+      const blob = await res.blob()
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = () => reject(new Error("attachment read failed"))
+        reader.readAsDataURL(blob)
+      })
+      const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1)
       return {
         type: "file" as const,
-        data: new URL(`data:${mediaType};base64,${btoa(binary)}`),
+        data: new URL(`data:${mediaType};base64,${base64}`),
         mediaType,
         filename: d.filename,
       }
@@ -150,6 +158,10 @@ export function ResearchChat({
   const router = useRouter()
   const chatIdRef = useRef<string | undefined>(chatId)
   const createdRef = useRef(false)
+  // Monotonic per-turn counter: the post-turn refresh only fires for the LATEST
+  // turn, so a second turn started before the first one's title generation
+  // resolves can't be interrupted mid-stream by the first turn's refresh.
+  const turnSeqRef = useRef(0)
 
   const {
     messages,
@@ -239,9 +251,6 @@ export function ResearchChat({
         return
       }
       router.push(`/chat/${json.chat.id}`)
-      // Same stale-sidebar concern as a freshly created chat: the branch is a
-      // new row the layout hasn't rendered. Refresh so it appears in the list.
-      router.refresh()
     } catch {
       toast.error("Couldn't branch this chat")
     }
@@ -354,6 +363,7 @@ export function ResearchChat({
     const recap = () =>
       messages.length === 0 ? null : conversationRecap(messages)
 
+    const myTurn = ++turnSeqRef.current
     const sent = await send({
       optimisticText: text,
       message:
@@ -369,10 +379,12 @@ export function ResearchChat({
     // retype — `send` has already explained what went wrong.
     if (!sent) setInput((current) => current || text)
 
-    if (sent) {
+    if (sent && myTurn === turnSeqRef.current) {
       // Turn finished, stream complete — safe to re-sync the sidebar from the
       // server now (title, ordering). For a brand-new chat this also swaps the
       // home page onto the /chat/<id> route with the finished turn rendered.
+      // Guarded by the turn counter so this never fires while a NEWER turn is
+      // streaming (the refresh would remount the conversation mid-stream).
       router.refresh()
     }
     return sent
