@@ -1,9 +1,12 @@
 "use client"
 
+import { upload } from "@vercel/blob/client"
 import { useCallback, useRef, useState } from "react"
 import { toast } from "sonner"
 import { useMountEffect } from "@/hooks/use-mount-effect"
 import { mutateOrToast } from "@/lib/api-client"
+import { authClient } from "@/lib/auth-client"
+import { uploadPathname } from "@/lib/upload-limits"
 
 /**
  * Owns the attachment lifecycle for one chat: files staged in the composer for
@@ -31,6 +34,38 @@ export type UploadedDoc = {
 
 export const DOC_ACCEPT =
   "image/*,.png,.jpg,.jpeg,.webp,.gif,.avif,.pdf,.txt,.md,.markdown,.csv,.json,.log,.tsv,.html,.xml,.yaml,.yml,text/*,application/pdf"
+
+/**
+ * Above this, the upload is split into parts that go up in parallel and retry
+ * individually. Below it the extra round trips cost more than they save — most
+ * attachments here are a page or two of PDF.
+ */
+const MULTIPART_THRESHOLD_BYTES = 8 * 1024 * 1024
+
+/**
+ * This browser's user id, fetched once.
+ *
+ * Uploads land under `documents/<userId>/`, and that prefix is the only thing
+ * proving the file is yours when the row is created — so the destination can't
+ * be named without it. Shared across uploads rather than read per file, and
+ * cleared on failure so a request that ran while signed out doesn't poison
+ * every upload after it.
+ */
+let cachedUserId: Promise<string> | null = null
+function currentUserId(): Promise<string> {
+  cachedUserId ??= authClient
+    .getSession()
+    .then((result) => {
+      const id = result.data?.user?.id
+      if (!id) throw new Error("You need to be signed in to upload files.")
+      return id
+    })
+    .catch((err: unknown) => {
+      cachedUserId = null
+      throw err
+    })
+  return cachedUserId
+}
 
 type Options = {
   chatId?: string
@@ -88,7 +123,7 @@ export function useChatAttachments({
       // Concurrent: each file owns its own optimistic row (keyed by tempId), so
       // nothing here depends on ordering. Sequential awaits meant dropping four
       // files cost four round trips end to end.
-      const upload = async (file: File) => {
+      const uploadOne = async (file: File) => {
         const tempId = `tmp-${file.name}-${file.size}-${file.lastModified}`
         const isImage = file.type.startsWith("image/")
         const previewUrl = isImage ? URL.createObjectURL(file) : undefined
@@ -105,13 +140,37 @@ export function useChatAttachments({
           },
           ...prev.filter((d) => d.id !== tempId),
         ])
-        const body = new FormData()
-        body.set("file", file)
         const id = currentChatId()
-        if (id) body.set("chatId", id)
-        if (projectId) body.set("projectId", projectId)
         try {
-          const res = await fetch("/api/documents", { method: "POST", body })
+          // Straight to the blob store, not through /api/documents. Posting the
+          // file to a route handler put it in a Vercel Function's request body,
+          // which is capped at 4.5 MB, so anything larger failed with a
+          // platform 413 that never reached our own error handling. `multipart`
+          // splits big files, uploads the parts in parallel, and retries the
+          // ones that fail.
+          const owner = await currentUserId()
+          const blob = await upload(uploadPathname(owner, file.name), file, {
+            access: "public",
+            handleUploadUrl: "/api/documents/upload-token",
+            multipart: file.size > MULTIPART_THRESHOLD_BYTES,
+            clientPayload: JSON.stringify({
+              chatId: id,
+              contentType: file.type,
+              projectId,
+            }),
+          })
+          // The row is ours to create now that the bytes have landed. Until
+          // this returns the upload is a blob nothing references.
+          const res = await fetch("/api/documents", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              chatId: id,
+              filename: file.name,
+              projectId,
+              url: blob.url,
+            }),
+          })
           const json = (await res.json().catch(() => ({}))) as {
             document?: UploadedDoc
             error?: string
@@ -138,18 +197,23 @@ export function useChatAttachments({
             URL.revokeObjectURL(previewUrl)
           if (json.document.status === "error" && json.error)
             toast.error(json.error)
-        } catch {
+        } catch (err) {
+          // The refusals from the token route arrive here rather than as a
+          // response — unsupported type, too large, a parent that isn't yours —
+          // and each one already reads as a sentence. Showing them beats
+          // flattening every failure into "Network error" the way this did when
+          // the only thing that could go wrong was our own fetch.
+          const reason =
+            err instanceof Error && err.message ? err.message : "Network error"
           setDocuments((prev) =>
             prev.map((d) =>
-              d.id === tempId
-                ? { ...d, status: "error", error: "Network error" }
-                : d
+              d.id === tempId ? { ...d, status: "error", error: reason } : d
             )
           )
           toast.error(`Couldn't upload ${file.name}`)
         }
       }
-      await Promise.all(list.map(upload))
+      await Promise.all(list.map(uploadOne))
     },
     [projectId, currentChatId]
   )
