@@ -48,6 +48,13 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
   secret: process.env.BETTER_AUTH_SECRET,
+  // Self-hosted: BETTER_AUTH_URL is the canonical origin (umbrel.local), but
+  // LAN devices legitimately reach the app by host IP. Without this, better-auth
+  // rejects their requests with INVALID_ORIGIN. Comma-separated origins.
+  trustedOrigins: (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean),
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,
