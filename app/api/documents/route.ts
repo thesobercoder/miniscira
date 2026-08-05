@@ -8,8 +8,8 @@ import { db } from "@/lib/db"
 import { document } from "@/lib/db/schema"
 import { attachmentKind, extractDocumentText } from "@/lib/document-text"
 import { chunkText } from "@/lib/rag"
+import { MAX_UPLOAD_BYTES, uploadPathname } from "@/lib/upload-limits"
 
-const MAX_BYTES = 12 * 1024 * 1024 // 12 MB
 const MAX_CHUNKS = 400
 
 // GET /api/documents[?chatId=…] — list the user's documents. With a chatId,
@@ -87,9 +87,9 @@ export const POST = authed(async (request, { userId }) => {
       { status: 415 }
     )
   }
-  if (file.size > MAX_BYTES) {
+  if (file.size > MAX_UPLOAD_BYTES) {
     return NextResponse.json(
-      { error: "File is too large (max 12 MB)." },
+      { error: "File is too large (max 50 MB)." },
       { status: 413 }
     )
   }
@@ -122,9 +122,10 @@ export const POST = authed(async (request, { userId }) => {
   try {
     // `file.name` is attacker-controlled. `addRandomSuffix` already stops one
     // upload overwriting another, but path segments in the name would still
-    // move the object out of this user's prefix, so flatten it to a leaf.
-    const safeName = file.name.replace(/[/\\]/g, "_").slice(-200) || "upload"
-    const blob = await put(`documents/${userId}/${safeName}`, buffer, {
+    // move the object out of this user's prefix, so `uploadPathname` flattens
+    // it to a leaf under the user's own prefix (shared with upstream's
+    // lib/upload-limits so the trust boundary is defined in one place).
+    const blob = await put(uploadPathname(userId, file.name), buffer, {
       addRandomSuffix: true,
       contentType: file.type || "application/octet-stream",
     })

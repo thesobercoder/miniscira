@@ -68,7 +68,7 @@ Falls back to `http://127.0.0.1:4274`. Override the port with
 
 | Variable | Without it |
 | --- | --- |
-| `BLOB_READ_WRITE_TOKEN` | Document upload fails. Vercel Blob works from any host, being an HTTPS API rather than a platform binding. |
+| `BLOB_READ_WRITE_TOKEN` | **Not required in this fork.** Upstream uploads browser→store directly via Vercel Blob; this fork replaces that with a local volume-backed store (`lib/local-blob.ts`, `LOCAL_STORAGE_DIR`), so uploads work without any external blob account. |
 | `APP_URL` | Links in lookout emails fall back to `BETTER_AUTH_URL`, then `VERCEL_PROJECT_PRODUCTION_URL`, then `http://localhost:3000`. Since `BETTER_AUTH_URL` is required above, set this only when the two origins differ. |
 
 ### Optional, and each degrades gracefully

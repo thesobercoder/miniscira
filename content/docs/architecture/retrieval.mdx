@@ -14,12 +14,16 @@ reranking runs through the AI Gateway key that is already required.
 
 ## The pipeline
 
-Upload goes to Vercel Blob, metadata to the `document` table. Then, **at upload**:
+The browser uploads to Vercel Blob directly, then posts the resulting URL to
+`/api/documents`, which writes metadata to the `document` table. The bytes never
+pass through a route handler — see [The upload path](#the-upload-path) for why
+that matters. Then, **at upload**:
 
 1. **Extract** — `lib/document-text.ts`. `attachmentKind` classifies the file,
    `pdfText` handles PDFs, `extractDocumentText` is the entry point. Scanned
    PDFs raise `ScannedPdfError` rather than returning an empty string. The
-   result is cached whole on `document.content`.
+   result is cached whole on `document.content`. The bytes are fetched back from
+   the store for this, since the upload didn't bring them here.
 
 And **at query time**, all three in `agent/tools/search_documents.ts`:
 
@@ -56,6 +60,45 @@ And **at query time**, all three in `agent/tools/search_documents.ts`:
   `pdfText` copies with `buffer.slice(0)` before handing the data over. Without
   the copy the caller's buffer is detached and every later read sees zero bytes.
 </Callout>
+
+## The upload path
+
+The browser uploads straight to the blob store and only then tells the server
+about it. Files used to be posted to `/api/documents` as multipart and forwarded
+on, which put them in a Vercel Function's request body — capped at 4.5 MB. The
+route claimed 12 MB, so anything between the two failed with a platform 413
+before the handler ran, and because that response isn't JSON the composer showed
+a bare `Upload failed (413)`.
+
+Three pieces, in order:
+
+1. **`/api/documents/upload-token`** issues a short-lived upload token. Every
+   check that used to sit next to `put()` happens here, *before* the token
+   exists: session, file type, size, and whether the chat or project is yours.
+   It is deliberately not wrapped in `authed` — the store calls the same route
+   back on `onUploadCompleted` with no session cookie.
+2. **The browser uploads**, using `upload()` from `@vercel/blob/client`. Over
+   8 MB it goes multipart: parts in parallel, retried individually.
+3. **`/api/documents`** takes the resulting URL and creates the row.
+
+<Callout type="warn" title="The pathname is the proof of ownership">
+  Bytes arriving out of band means step 3 has to decide whether to believe a URL
+  the client hands it. Posting someone else's blob URL would otherwise attach
+  their file to your chat and read it straight back through the model.
+
+  So uploads land under `documents/<userId>/`, tokens are only issued for a path
+  inside the caller's own prefix, and `/api/documents` re-checks the pathname
+  against `head()` rather than trusting anything in the request body. Size and
+  content type come from `head()` too, so a caller can't describe a 2 KB text
+  file and attach a 400 MB one.
+
+  Both halves live in `lib/upload-limits.ts` so the two routes cannot drift into
+  answering the same question differently.
+</Callout>
+
+The ceiling is now 50 MB, and what bounds it is extraction rather than the
+request body: step 1 of the pipeline fetches the file back into a function and
+parses it there.
 
 ## When extraction fails
 
