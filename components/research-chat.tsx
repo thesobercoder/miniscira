@@ -25,7 +25,7 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller"
-import { useChatAttachments } from "@/hooks/use-chat-attachments"
+import { useChatAttachments, type UploadedDoc } from "@/hooks/use-chat-attachments"
 import { useChatModel } from "@/hooks/use-chat-model"
 import { useEveChat } from "@/hooks/use-eve-chat"
 import { buildClientContext, conversationRecap } from "@/lib/chat-context"
@@ -58,8 +58,40 @@ function sameEntries(
   if (keys.length !== Object.keys(b).length) return false
   // Values are part arrays compared by reference only. A deep compare here
   // would run on every render and trade one perf problem for another.
-  for (const k of keys) if (a[k] !== b[k]) return false
-  return true
+  return keys.every((key) => a[key] === b[key])
+}
+
+/**
+ * Inline attachments as base64 data: URLs for the model call.
+ *
+ * The AI SDK's model-call downloader validates attachment URLs against an
+ * SSRF allowlist that rejects localhost, *.local, and private IPs — and this
+ * self-hosted deployment is only reachable via umbrel.local / LAN addresses,
+ * so any http URL we hand it fails with "URL with hostname … is not allowed".
+ * data: URLs are explicitly allowed, so the bytes are fetched same-origin
+ * (uploaded-file names carry a random suffix and are unguessable) and inlined.
+ * The chip in the composer keeps the http URL for the user.
+ */
+async function buildFileParts(docs: UploadedDoc[]) {
+  return Promise.all(
+    docs.map(async (d) => {
+      const mediaType =
+        d.mimeType ?? (d.kind === "image" ? "image/png" : "application/pdf")
+      const res = await fetch(d.url as string)
+      if (!res.ok) throw new Error(`attachment fetch failed: ${res.status}`)
+      const bytes = new Uint8Array(await res.arrayBuffer())
+      let binary = ""
+      for (let i = 0; i < bytes.length; i += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+      }
+      return {
+        type: "file" as const,
+        data: new URL(`data:${mediaType};base64,${btoa(binary)}`),
+        mediaType,
+        filename: d.filename,
+      }
+    })
+  )
 }
 
 /**
@@ -244,17 +276,24 @@ export function ResearchChat({
     // schema only accepts "text"/"file" (no separate "image" part type);
     // models with vision read image-mediaType file parts directly. Documents
     // are ALSO indexed for search_documents, so they stay searchable across chats.
-    const fileParts = attached
-      .filter(
-        (d) => d.url && (d.kind === "image" || d.mimeType === "application/pdf")
-      )
-      .map((d) => ({
-        type: "file" as const,
-        data: new URL(d.url as string),
-        mediaType:
-          d.mimeType ?? (d.kind === "image" ? "image/png" : "application/pdf"),
-        filename: d.filename,
-      }))
+    // The model-facing part is a data: URL — buildFileParts inlines the bytes
+    // because the SDK refuses http attachments from private hosts (see above).
+    const attachable = attached.filter(
+      (d) => d.url && (d.kind === "image" || d.mimeType === "application/pdf")
+    )
+    let fileParts: Awaited<ReturnType<typeof buildFileParts>> | null = null
+    if (attachable.length > 0) {
+      try {
+        fileParts = await buildFileParts(attachable)
+      } catch {
+        abandonTurn()
+        setInput((current) => current || text)
+        toast.error(
+          "Couldn't read the attachment. Your question is back in the box."
+        )
+        return false
+      }
+    }
 
     const context = (recap: string | null) =>
       buildClientContext({
@@ -277,7 +316,9 @@ export function ResearchChat({
     const sent = await send({
       optimisticText: text,
       message:
-        fileParts.length > 0 ? [{ type: "text", text }, ...fileParts] : text,
+        fileParts && fileParts.length > 0
+          ? [{ type: "text", text }, ...fileParts]
+          : text,
       clientContext: context(hasSession() ? null : recap()),
       freshContext: () => context(recap()),
     })
