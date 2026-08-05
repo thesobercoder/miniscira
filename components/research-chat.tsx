@@ -239,6 +239,9 @@ export function ResearchChat({
         return
       }
       router.push(`/chat/${json.chat.id}`)
+      // Same stale-sidebar concern as a freshly created chat: the branch is a
+      // new row the layout hasn't rendered. Refresh so it appears in the list.
+      router.refresh()
     } catch {
       toast.error("Couldn't branch this chat")
     }
@@ -331,12 +334,16 @@ export function ResearchChat({
     if (sent && createdRef.current) {
       createdRef.current = false
       // Generate a short title from the question (non-blocking), then refresh
-      // the sidebar so it updates from "New research".
+      // the sidebar so it updates from "New research". `ensureChat` created the
+      // chat via history.replaceState — no navigation happened, so the layout's
+      // server-rendered chat list is stale until router.refresh() re-runs it.
+      // The refresh fires even when title generation fails: the chat must
+      // appear in the list either way.
       void fetch(`/api/chats/${id}/title`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ message: text }),
-      })
+      }).finally(() => router.refresh())
     }
     return sent
   }
