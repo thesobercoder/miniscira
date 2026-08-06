@@ -63,6 +63,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # values are supplied at `docker run`.
 ENV BETTER_AUTH_SECRET=build-time-placeholder-not-a-real-secret
 ENV BETTER_AUTH_URL=http://localhost:3000
+# eve build evaluates the agent module, whose import chain calls
+# gatewayBaseUrl() (fail-fast since Phase 0/1). A syntactically valid
+# placeholder satisfies module evaluation; the real value is supplied at run.
+ENV AI_GATEWAY_BASE_URL=http://localhost:3000/v1
 
 # Both halves. `next build` does NOT build the agent — skip the first line and
 # the app renders fine but every chat hangs on send.
