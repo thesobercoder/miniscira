@@ -106,6 +106,10 @@ COPY --from=builder /app/content ./content
 COPY --from=builder /app/agent ./agent
 COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
+# Manual schema bootstrap (Phase 2 will formalize this as a one-shot
+# migration service): `node node_modules/drizzle-kit/bin.cjs push` reads
+# drizzle.config.ts from the app root and DATABASE_URL from the environment.
+COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
 
 EXPOSE 3000
 
