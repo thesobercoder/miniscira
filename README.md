@@ -91,6 +91,35 @@ process, and why the Docker image has to be `linux/amd64`.
 Set `DEMO_MODE=true` to serve a landing page instead of the app; that is what
 miniscira.com runs.
 
+### Quickstart: Docker Compose
+
+The repo ships a complete self-hosted stack — app image, bundled Postgres +
+pgvector, a one-shot migration service, named volumes and healthchecks:
+
+```bash
+git clone <this-repo> && cd miniscira
+cp .env.example .env         # fill in the REQUIRED values (below)
+docker compose up -d --build
+docker compose --profile migrate run --rm migrate   # apply schema once
+curl http://localhost:3000/api/health               # {"ok":true}
+```
+
+REQUIRED in `.env`: `DATABASE_URL` (or the bundled `db` service),
+`AI_GATEWAY_BASE_URL` (any OpenAI-compatible endpoint — every model call goes
+through it, with no fallback), `BETTER_AUTH_SECRET`
+(`openssl rand -base64 32`), and `POSTGRES_PASSWORD` (must match
+`DATABASE_URL`). Everything else is optional; `.env.example` is the full
+matrix.
+
+Normal startup never mutates the schema — apply committed migrations with the
+one-shot `migrate` service, and pre-existing databases are adopted by
+baseline-stamping (no DDL). The live gateway `/v1/models` catalog is the
+authority for which models exist; `DEFAULT_CHAT_MODEL` and `AI_MODELS_JSON`
+only steer defaults and display metadata.
+
+Backups, restore, upgrades, rollback, health semantics, secrets, reverse
+proxying and troubleshooting: see **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), and [SECURITY.md](SECURITY.md) for
