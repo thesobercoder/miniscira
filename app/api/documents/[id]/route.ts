@@ -1,10 +1,9 @@
-import { del } from "@/lib/local-blob"
 import { and, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
-
 import { authedWithParams, forbidden, notFound } from "@/lib/api-auth"
 import { db } from "@/lib/db"
 import { document } from "@/lib/db/schema"
+import { del } from "@/lib/local-blob"
 
 // DELETE /api/documents/:id — remove a document, its chunks (cascade), and the blob.
 export const DELETE = authedWithParams<{ id: string }>(

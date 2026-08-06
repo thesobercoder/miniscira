@@ -34,7 +34,8 @@ export async function GET(
   }
   try {
     const buf = await fs.readFile(abs)
-    const mime = MIME[path.extname(abs).toLowerCase()] ?? "application/octet-stream"
+    const mime =
+      MIME[path.extname(abs).toLowerCase()] ?? "application/octet-stream"
     return new NextResponse(new Uint8Array(buf), {
       headers: {
         "content-type": mime,

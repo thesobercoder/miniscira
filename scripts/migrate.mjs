@@ -35,7 +35,9 @@ function log(msg) {
 
 const url = process.env.DATABASE_URL
 if (!url) {
-  console.error("[migrate] DATABASE_URL is not set — nothing to migrate against.")
+  console.error(
+    "[migrate] DATABASE_URL is not set — nothing to migrate against."
+  )
   process.exit(1)
 }
 if (!existsSync(JOURNAL_PATH)) {
@@ -55,7 +57,9 @@ const entries = journal.entries.map((entry) => {
     hash: createHash("sha256").update(sql).digest("hex"),
   }
 })
-log(`loaded ${entries.length} migration(s): ${entries.map((e) => e.tag).join(", ")}`)
+log(
+  `loaded ${entries.length} migration(s): ${entries.map((e) => e.tag).join(", ")}`
+)
 
 const pool = new Pool({ connectionString: url, max: 1 })
 

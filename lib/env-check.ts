@@ -36,7 +36,11 @@ export function assertRequiredEnv(): string[] {
   if (raw) {
     try {
       const parsed = JSON.parse(raw)
-      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      if (
+        typeof parsed !== "object" ||
+        parsed === null ||
+        Array.isArray(parsed)
+      ) {
         throw new Error("must be a JSON object keyed by model id")
       }
     } catch (err) {

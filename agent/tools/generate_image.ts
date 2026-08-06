@@ -48,10 +48,14 @@ export default defineTool({
     const mediaType = image.mediaType || "image/png"
     const ext = mediaType.split("/")[1]?.split("+")[0] || "png"
     try {
-      const blob = await put(`generated/${Date.now()}.${ext}`, Buffer.from(image.uint8Array), {
-        addRandomSuffix: true,
-        contentType: mediaType,
-      })
+      const blob = await put(
+        `generated/${Date.now()}.${ext}`,
+        Buffer.from(image.uint8Array),
+        {
+          addRandomSuffix: true,
+          contentType: mediaType,
+        }
+      )
       return { prompt, url: blob.url, mediaType }
     } catch (err) {
       return {

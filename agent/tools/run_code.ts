@@ -1,10 +1,9 @@
-import { put } from "@/lib/local-blob"
 import { and, eq, inArray } from "drizzle-orm"
 import { defineTool } from "eve/tools"
 import { z } from "zod"
-
 import { db } from "@/lib/db"
 import { document } from "@/lib/db/schema"
+import { put } from "@/lib/local-blob"
 
 // The model sees this tool as `run_code`. It runs a Python script in the
 // agent's sandbox — a local bash process on this deployment (see
@@ -107,18 +106,22 @@ export default defineTool({
     // Upload any newly-created charts so the UI can show them inline.
     const images: { name: string; url: string }[] = []
     for (const name of await listImages()) {
-        if (before.has(name)) continue
-        try {
-          const bytes = await sandbox.readBinaryFile({ path: name })
-          if (!bytes) continue
-          const blob = await put(`runcode/${Date.now()}-${name}`, Buffer.from(bytes), {
+      if (before.has(name)) continue
+      try {
+        const bytes = await sandbox.readBinaryFile({ path: name })
+        if (!bytes) continue
+        const blob = await put(
+          `runcode/${Date.now()}-${name}`,
+          Buffer.from(bytes),
+          {
             addRandomSuffix: true,
-          })
-          images.push({ name, url: blob.url })
-        } catch {
-          // A chart that fails to upload just doesn't render; the run still stands.
-        }
+          }
+        )
+        images.push({ name, url: blob.url })
+      } catch {
+        // A chart that fails to upload just doesn't render; the run still stands.
       }
+    }
 
     return {
       title,

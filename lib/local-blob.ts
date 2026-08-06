@@ -2,9 +2,9 @@
 // volume and are served by the /api/files route. Same put/del surface the app
 // used before, so call sites only changed their import.
 
+import crypto from "node:crypto"
 import { promises as fs } from "node:fs"
 import path from "node:path"
-import crypto from "node:crypto"
 
 import { appBaseUrl } from "@/lib/base-url"
 
@@ -23,7 +23,8 @@ export async function put(
 ): Promise<{ url: string; contentType?: string }> {
   // `name` can contain attacker-controlled path segments; flatten to a leaf so
   // one upload can never escape the storage root or overwrite another.
-  const leaf = path.basename(name).replace(/[/\\]/g, "_").slice(-200) || "upload"
+  const leaf =
+    path.basename(name).replace(/[/\\]/g, "_").slice(-200) || "upload"
   const stored = options.addRandomSuffix
     ? `${Date.now()}-${crypto.randomUUID()}-${leaf}`
     : leaf

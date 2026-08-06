@@ -1,5 +1,5 @@
-import { chatModel } from "@/lib/gateway"
 import { defineAgent, defineDynamic } from "eve"
+import { chatModel } from "@/lib/gateway"
 
 import {
   type GatewayCredential,

@@ -4,9 +4,8 @@ import { RiDeleteBinLine } from "@remixicon/react"
 import { isToday, isYesterday } from "date-fns"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { toast } from "sonner"
-
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +24,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { useMountEffect } from "@/hooks/use-mount-effect"
 
 type ChatRow = { id: string; title: string; updatedAt: string | Date }
 
@@ -98,17 +98,16 @@ export function ChatList({ chats }: { chats: ChatRow[] }) {
   const pathname = usePathname()
   const [rows, setRows] = useState<ChatRow[]>(chats)
 
-  // Server-rendered data wins whenever the layout re-renders.
-  useEffect(() => {
-    setRows(chats)
-  }, [chats])
+  // Server-rendered data wins whenever the layout re-renders (state
+  // adjustment during render — no effect needed).
+  if (rows !== chats) setRows(chats)
 
   // New chats are surfaced optimistically: research-chat dispatches these
   // events the moment a chat row exists, so the sidebar updates without a
   // router.refresh(). Refreshing mid-turn would re-fetch /chat/<id>, swap the
   // home page for the chat-route page, remount the conversation component and
   // kill the live eve stream ("eve stream error: network error").
-  useEffect(() => {
+  useMountEffect(() => {
     const created = (e: Event) => {
       const detail = (e as CustomEvent<ChatRow>).detail
       setRows((prev) =>
@@ -118,7 +117,9 @@ export function ChatList({ chats }: { chats: ChatRow[] }) {
     const titled = (e: Event) => {
       const detail = (e as CustomEvent<{ id: string; title: string }>).detail
       setRows((prev) =>
-        prev.map((c) => (c.id === detail.id ? { ...c, title: detail.title } : c))
+        prev.map((c) =>
+          c.id === detail.id ? { ...c, title: detail.title } : c
+        )
       )
     }
     window.addEventListener("miniscira:chat-created", created)
@@ -127,7 +128,7 @@ export function ChatList({ chats }: { chats: ChatRow[] }) {
       window.removeEventListener("miniscira:chat-created", created)
       window.removeEventListener("miniscira:chat-titled", titled)
     }
-  }, [])
+  })
 
   if (rows.length === 0) {
     return (

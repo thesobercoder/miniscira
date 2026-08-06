@@ -3,7 +3,7 @@
 // TEMPORARY — render target for .github/assets/banner.png (1200×600) and
 // app/opengraph-image.png (1200×630). Sized to the viewport so one page serves
 // both; the shot's --window-size decides which. Delete after shooting.
-import { RiGlobeLine, RiFileTextLine } from "@remixicon/react"
+import { RiFileTextLine, RiGlobeLine } from "@remixicon/react"
 
 import {
   ChainOfThoughtSearchResult,
@@ -19,12 +19,12 @@ export default function BannerShot() {
       <style>{`nextjs-portal { display: none }`}</style>
       <div className="flex h-screen w-screen items-center gap-10 overflow-hidden bg-background pl-[76px]">
         <div className="w-[46%] shrink-0">
-          <div className="flex items-center gap-2.5 font-[family-name:var(--font-be-vietnam-pro)] font-bold text-[27px] tracking-[-0.035em] text-foreground">
+          <div className="flex items-center gap-2.5 font-[family-name:var(--font-be-vietnam-pro)] font-bold text-[27px] text-foreground tracking-[-0.035em]">
             miniscira
             <span className="size-[7px] rounded-full bg-primary" />
           </div>
 
-          <h1 className="mt-10 text-pretty font-[family-name:var(--font-be-vietnam-pro)] font-semibold text-[63px] leading-[1.02] tracking-[-0.045em] text-foreground">
+          <h1 className="mt-10 text-pretty font-[family-name:var(--font-be-vietnam-pro)] font-semibold text-[63px] text-foreground leading-[1.02] tracking-[-0.045em]">
             Research that shows its{" "}
             <span className="text-primary">working</span>.
           </h1>
@@ -70,7 +70,10 @@ export default function BannerShot() {
               <ResultList
                 results={[
                   { url: "https://nature.com", title: "Cycle life at scale" },
-                  { url: "https://ieee.org", title: "Retention after 800 cycles" },
+                  {
+                    url: "https://ieee.org",
+                    title: "Retention after 800 cycles",
+                  },
                 ]}
               />
             </ChainOfThoughtStep>

@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test"
-
-import type { ChatEvent } from "@/lib/chat-events"
 import { drainUntilBoundary, shouldForgetSession } from "@/hooks/use-eve-chat"
+import type { ChatEvent } from "@/lib/chat-events"
 
 const response = { turnId: "turn_1" }
 
@@ -65,7 +64,11 @@ describe("drainUntilBoundary", () => {
   })
 
   test("reports the boundary for each kind eve ends a turn with", async () => {
-    for (const type of ["session.completed", "session.failed", "session.waiting"]) {
+    for (const type of [
+      "session.completed",
+      "session.failed",
+      "session.waiting",
+    ]) {
       async function* one() {
         yield event(type)
       }

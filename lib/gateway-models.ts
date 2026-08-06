@@ -30,7 +30,7 @@ export type GatewayModel = {
  */
 export function gatewayBaseUrl(): string {
   const raw = process.env.AI_GATEWAY_BASE_URL
-  if (!raw || !raw.trim()) {
+  if (!raw?.trim()) {
     throw new Error(
       "AI_GATEWAY_BASE_URL is not set. Point it at any OpenAI-compatible " +
         "endpoint (your own gateway/proxy). This variable is REQUIRED — every " +

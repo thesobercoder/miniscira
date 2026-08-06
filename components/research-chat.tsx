@@ -25,7 +25,10 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller"
-import { useChatAttachments, type UploadedDoc } from "@/hooks/use-chat-attachments"
+import {
+  type UploadedDoc,
+  useChatAttachments,
+} from "@/hooks/use-chat-attachments"
 import { useChatModel } from "@/hooks/use-chat-model"
 import { useEveChat } from "@/hooks/use-eve-chat"
 import { buildClientContext, conversationRecap } from "@/lib/chat-context"

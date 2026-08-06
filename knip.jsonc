@@ -50,11 +50,7 @@
   // These three back shadcn primitives under the ignored components/ui/**, so
   // knip cannot see the import and reports them as unused. They are not dead:
   // deleting one breaks the component that imports it.
-  "ignoreDependencies": [
-    "embla-carousel-react",
-    "input-otp",
-    "recharts"
-  ],
+  "ignoreDependencies": ["embla-carousel-react", "input-otp", "recharts"],
   // Loading drizzle.config.ts requires DATABASE_URL, which knip runs without.
   "drizzle": false
   // `bun run knip` enforces unused *value* exports only. Unused exported *types*
