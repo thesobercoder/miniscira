@@ -32,7 +32,9 @@ const DB_WAIT_TIMEOUT_MS = Number(process.env.DB_WAIT_TIMEOUT_MS ?? 90_000)
 const DB_WAIT_INTERVAL_MS = 2_000
 // Advisory lock key for the schema gate: 0x4D494E49 ("MINI").
 const PUSH_LOCK_KEY = 1_296_121_417
-const PUSH_LOCK_TIMEOUT_MS = Number(process.env.RUN_DB_PUSH_LOCK_TIMEOUT_MS ?? 60_000)
+const PUSH_LOCK_TIMEOUT_MS = Number(
+  process.env.RUN_DB_PUSH_LOCK_TIMEOUT_MS ?? 60_000
+)
 
 function log(msg) {
   console.log(`[entrypoint] ${msg}`)
@@ -126,12 +128,14 @@ if (process.env.RUN_DB_PUSH === "true") {
     )
     process.exit(result.code ?? 1)
   }
-  log(result.skipped ? "schema push skipped (lock busy)" : "schema push completed")
+  log(
+    result.skipped ? "schema push skipped (lock busy)" : "schema push completed"
+  )
 }
 
 log("starting eve (port 4274) and next (port 3000) under supervision")
 const code = await supervise([
-  "node node_modules/eve/bin/eve.js start --port 4274",
-  "node node_modules/next/dist/bin/next start",
+  ["node", "node_modules/eve/bin/eve.js", "start", "--port", "4274"],
+  ["node", "node_modules/next/dist/bin/next", "start"],
 ])
 process.exit(code)
