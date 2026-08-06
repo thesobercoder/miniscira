@@ -12,6 +12,10 @@
  * legitimately optional there — gatewayCredentialFor() accepts a user-stored
  * key, and lib/base-url.ts falls back to BETTER_AUTH_URL.
  */
+import { z } from "zod"
+
+import { aiModelsJsonSchema } from "./model-metadata"
+
 export function assertRequiredEnv(): string[] {
   const required = [
     "DATABASE_URL",
@@ -28,25 +32,21 @@ export function assertRequiredEnv(): string[] {
     )
   }
 
-  // AI_MODELS_JSON is reserved for the Phase-3 model-config work; it is not
-  // consumed yet, but a malformed value should fail at boot rather than
-  // surprising the first user of the picker. Must parse as a JSON object
-  // keyed by model id.
+  // AI_MODELS_JSON — metadata-only model config (labels/order/visibility/
+  // capability hints; see lib/model-metadata.ts). The live gateway catalog
+  // stays authoritative for availability. Schema-validated at boot so a
+  // malformed value fails here with an actionable message rather than
+  // surprising the first user of the picker.
   const raw = process.env.AI_MODELS_JSON
-  if (raw) {
+  if (raw?.trim()) {
     try {
-      const parsed = JSON.parse(raw)
-      if (
-        typeof parsed !== "object" ||
-        parsed === null ||
-        Array.isArray(parsed)
-      ) {
-        throw new Error("must be a JSON object keyed by model id")
-      }
+      aiModelsJsonSchema.parse(JSON.parse(raw))
     } catch (err) {
-      throw new Error(
-        `AI_MODELS_JSON is not valid JSON: ${(err as Error).message}`
-      )
+      const detail =
+        err instanceof z.ZodError
+          ? z.prettifyError(err)
+          : (err as Error).message
+      throw new Error(`AI_MODELS_JSON failed validation: ${detail}`)
     }
   }
 

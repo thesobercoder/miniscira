@@ -9,13 +9,49 @@ export type ChatModel = {
   hint: string
 }
 
+// The built-in default, used when neither DEFAULT_CHAT_MODEL nor
+// NEXT_PUBLIC_DEFAULT_CHAT_MODEL is set (or the value is invalid). The ONLY
+// hardcoded model id in the default-resolution path — every other literal was
+// replaced by this one resolution function (Phase 3).
+const BUILTIN_DEFAULT_CHAT_MODEL = "gpt-5.6-sol"
+
+// Loose shape check for a model id. The gateway serves bare ids (no
+// provider/ prefix), so a slash is optional.
+export const MODEL_ID_RE = /^[a-z0-9][a-z0-9._:-]*(\/[a-z0-9._:-]+)?$/i
+
+/**
+ * The single resolution point for the default chat model (Phase 3).
+ *
+ * Runtime `DEFAULT_CHAT_MODEL` wins on the server (eve agent, Next server,
+ * model router). `NEXT_PUBLIC_DEFAULT_CHAT_MODEL` is the build-time constant
+ * Next inlines into the client bundle, so the picker's default matches the
+ * server's even though client code cannot read runtime env. Checking the
+ * runtime value first keeps a deployment that only sets DEFAULT_CHAT_MODEL
+ * (no rebuild) in control of the server-side default.
+ *
+ * Invalid values fall back to the built-in with a warning instead of breaking
+ * boot — a bad env value must not take the whole app down.
+ */
+export function resolveDefaultChatModel(): string {
+  const fromEnv =
+    process.env.DEFAULT_CHAT_MODEL ?? process.env.NEXT_PUBLIC_DEFAULT_CHAT_MODEL
+  if (fromEnv && MODEL_ID_RE.test(fromEnv)) return fromEnv
+  if (fromEnv) {
+    console.warn(
+      `[models] DEFAULT_CHAT_MODEL "${fromEnv}" is not a valid model id — ` +
+        `using "${BUILTIN_DEFAULT_CHAT_MODEL}" instead`
+    )
+  }
+  return BUILTIN_DEFAULT_CHAT_MODEL
+}
+
 // Also the dynamic fallback in agent/agent.ts and the researcher subagent's
 // model, so it has to survive long multi-tool turns.
-export const DEFAULT_CHAT_MODEL = "gpt-5.6-sol"
+export const DEFAULT_CHAT_MODEL = resolveDefaultChatModel()
 
 export const CHAT_MODELS: ChatModel[] = [
   {
-    id: "gpt-5.6-sol",
+    id: BUILTIN_DEFAULT_CHAT_MODEL,
     name: "GPT-5.6 Sol",
     vendor: "openai",
     hint: "Flagship reasoning · default",
@@ -63,10 +99,6 @@ export const CHAT_MODELS: ChatModel[] = [
     hint: "Long context",
   },
 ]
-
-// Loose shape check for a model id. The gateway serves bare ids (no
-// provider/ prefix), so a slash is optional.
-export const MODEL_ID_RE = /^[a-z0-9][a-z0-9._:-]*(\/[a-z0-9._:-]+)?$/i
 
 // Bare model id -> provider slug, for ids the gateway serves without a
 // provider/ prefix. Everything CLIProxyAPI exposes maps to a real vendor.
