@@ -53,10 +53,9 @@ services:
     image: ${MINISCIRA_IMAGE:-miniscira:local}
     restart: unless-stopped
     # Real PID 1 (tini): forwards termination to the exec'd process and reaps
-    # zombies. NOTE: the CMD backgrounds eve next to `next start`; full
-    # two-process supervision (wait-for-either, kill-survivor, exit-code
-    # propagation) lands with the Phase-2 entrypoint. The healthcheck below
-    # probes BOTH processes so a dead eve still fails readiness.
+    # zombies. The Phase-2 entrypoint supervises both halves (wait-for-either,
+    # kill-survivor, exit-code propagation, signal forwarding). The healthcheck
+    # below probes BOTH processes so a dead eve still fails readiness.
     init: true
     depends_on:
       db:
@@ -86,6 +85,29 @@ services:
       # Cold starts are slow (Next boot + eve start; eve itself allows up to
       # 60s to reach production health). Don't mark unhealthy during that.
       start_period: 60s
+
+  # One-shot migration service (Phase 2 target path). Applies the COMMITTED
+  # migrations in lib/db/migrations to the database and exits. Fresh installs
+  # get the full schema; databases adopted from the pre-migration era are
+  # stamped as baseline (see scripts/migrate.mjs). Runs ONLY when requested —
+  # the profile keeps it out of `docker compose up`:
+  #   docker compose --profile migrate run --rm migrate
+  # Normal app startup never mutates the schema (the RUN_DB_PUSH gate below is
+  # the transitional alternative for adopted stacks).
+  migrate:
+    image: ${MINISCIRA_IMAGE:-miniscira:local}
+    profiles: ["migrate"]
+    restart: "no"
+    env_file: .env
+    environment:
+      # Interpolated from the SAME source as POSTGRES_PASSWORD so the URL and
+      # the db service can never disagree; env_file alone would suffice, this
+      # is belt-and-braces for the bundled-Postgres layout.
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["node", "scripts/migrate.mjs"]
 
 volumes:
   miniscira-db:

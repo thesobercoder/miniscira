@@ -114,6 +114,10 @@ COPY --from=builder /app/tsconfig.json ./tsconfig.json
 # migration service): `node node_modules/drizzle-kit/bin.cjs push` reads
 # drizzle.config.ts from the app root and DATABASE_URL from the environment.
 COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
+# Phase 2 runtime: supervised entrypoint (db wait + gated push + eve/next
+# supervision), the two-process supervisor, and the one-shot migration runner.
+# lib/ (with lib/db/migrations) is copied above; scripts/ must be too.
+COPY --from=builder /app/scripts ./scripts
 
 EXPOSE 3000
 
@@ -127,4 +131,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD node -e "Promise.all([fetch('http://localhost:3000/api/health'),fetch('http://localhost:3000/eve/v1/health')]).then(rs=>process.exit(rs.every(r=>r.ok)?0:1)).catch(()=>process.exit(1))"
 
 # Two processes. 4274 is the port withEve rewrites to when VERCEL is unset.
-CMD ["sh", "-c", "node node_modules/eve/bin/eve.js start --port 4274 & exec node node_modules/next/dist/bin/next start"]
+# Phase 2: the entrypoint waits for the database, honors the RUN_DB_PUSH gate,
+# then starts BOTH halves under two-process supervision — either half dying
+# takes the container down (with its exit code) so restart policies work.
+CMD ["node", "scripts/entrypoint.mjs"]
