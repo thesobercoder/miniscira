@@ -1,0 +1,92 @@
+# MiniScira — self-hosted deployment (zero SaaS)
+#
+#   cp .env.example .env        # fill in the REQUIRED values
+#   docker compose up -d --build
+#
+# Everything is driven by environment variables — nothing is hardcoded in the
+# image. The bundled `db` service is Postgres + pgvector (the schema requires
+# the vector extension). All AI calls go to whatever OpenAI-compatible
+# endpoint AI_GATEWAY_BASE_URL points at.
+#
+# POSTGRES_PASSWORD is read from COMPOSE'S interpolation environment (the
+# root .env, shell variables, or `--env-file`) — NOT from the app's
+# `env_file` — so it must be present in .env alongside the other values.
+# Keep it consistent with the password embedded in DATABASE_URL.
+#
+# External / managed Postgres? Use the provided override instead of editing
+# this file (needs Compose v2.20+):
+#   docker compose -f docker-compose.yml -f docker-compose.external-db.yml up -d --build
+name: miniscira
+
+services:
+  db:
+    # Pin a digest here for production reproducibility, e.g.
+    #   pgvector/pgvector:pg16@sha256:<digest>
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-miniscira}
+      # :? fails fast with this message when unset in the interpolation env.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-miniscira}
+    volumes:
+      - miniscira-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-miniscira} -d ${POSTGRES_DB:-miniscira}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  app:
+    build:
+      context: .
+      args:
+        # Build platform. Defaults to linux/amd64 — the only natively
+        # supported arch (see Dockerfile: @firecrawl/pdf-inspector ships no
+        # linux-arm64 NAPI binding). Other targets build under emulation;
+        # `platform:` below keeps the runtime arch in sync with the build.
+        IMAGE_PLATFORM: ${IMAGE_PLATFORM:-linux/amd64}
+    # Runtime arch — matches the build arg so the container executes on the
+    # same platform the image was built for (emulated on ARM hosts).
+    platform: ${IMAGE_PLATFORM:-linux/amd64}
+    image: ${MINISCIRA_IMAGE:-miniscira:local}
+    restart: unless-stopped
+    # Real PID 1 (tini): forwards termination to the exec'd process and reaps
+    # zombies. NOTE: the CMD backgrounds eve next to `next start`; full
+    # two-process supervision (wait-for-either, kill-survivor, exit-code
+    # propagation) lands with the Phase-2 entrypoint. The healthcheck below
+    # probes BOTH processes so a dead eve still fails readiness.
+    init: true
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    env_file: .env
+    environment:
+      # env_file values are overridden by this section.
+      NODE_ENV: production
+      # Pinned from the SAME interpolation source as the mount target below,
+      # so the in-container value and the volume target can never diverge.
+      LOCAL_STORAGE_DIR: ${LOCAL_STORAGE_DIR:-/data/uploads}
+    volumes:
+      # Uploads + generated artifacts land in LOCAL_STORAGE_DIR (default in
+      # .env.example); this named volume keeps them durable across recreates.
+      - miniscira-uploads:${LOCAL_STORAGE_DIR:-/data/uploads}
+    healthcheck:
+      # Readiness = BOTH halves answer: the app's /api/health (Next up AND
+      # database responds, SELECT 1) and eve's /eve/v1/health (agent runtime
+      # ready). A healthy container therefore means chat actually works.
+      # Uses node, which is present in the image.
+      test: ["CMD", "node", "-e", "Promise.all([fetch('http://localhost:3000/api/health'),fetch('http://localhost:3000/eve/v1/health')]).then(rs=>process.exit(rs.every(r=>r.ok)?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # Cold starts are slow (Next boot + eve start; eve itself allows up to
+      # 60s to reach production health). Don't mark unhealthy during that.
+      start_period: 60s
+
+volumes:
+  miniscira-db:
+  miniscira-uploads:

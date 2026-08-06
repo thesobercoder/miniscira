@@ -1,13 +1,17 @@
 # syntax=docker/dockerfile:1
 #
-#   docker build --platform linux/amd64 -t miniscira .
+#   docker build -t miniscira .
+#   docker build --build-arg IMAGE_PLATFORM=linux/amd64 -t miniscira .
 #
-# Two constraints shape this file:
+# Platform notes:
 #
-# 1. **amd64 only.** @firecrawl/pdf-inspector ships prebuilt NAPI addons for
-#    linux-x64-gnu, darwin-arm64 and win32-x64-msvc. There is no linux-arm64
-#    binary, so an arm64 image fails during `next build` with "Cannot find
-#    native binding".
+# 1. **Default target is amd64.** @firecrawl/pdf-inspector ships prebuilt NAPI
+#    addons for linux-x64-gnu, darwin-arm64 and win32-x64-msvc. There is no
+#    linux-arm64 binary, so a NATIVE arm64 build fails during `next build`
+#    with "Cannot find native binding". The platform is therefore a build arg
+#    (`IMAGE_PLATFORM`, default linux/amd64): on an ARM host, build amd64
+#    under emulation (which works) or build a different target if the native
+#    dependency situation ever changes upstream.
 #
 # 2. **Node runs the build, Bun only installs.** Under Docker's amd64 emulation
 #    on an Apple Silicon host, Bun crashes with SIGILL partway through
@@ -17,9 +21,15 @@
 
 # Node 24 or newer: the eve CLI refuses to run on anything older.
 ARG NODE_IMAGE=node:24-bookworm-slim
+# Target platform for the FROM lines. This is a MANUAL build arg (not BuildKit's
+# automatic $TARGETPLATFORM): plain `docker build` with no flags produces the
+# amd64 image on any host, and `--build-arg IMAGE_PLATFORM=...` overrides it.
+# docker-compose.yml passes the same value as a build arg AND as the service
+# `platform:`, keeping build and runtime arches in sync.
+ARG IMAGE_PLATFORM=linux/amd64
 
 # ---- deps ---------------------------------------------------------------
-FROM --platform=linux/amd64 ${NODE_IMAGE} AS deps
+FROM --platform=${IMAGE_PLATFORM} ${NODE_IMAGE} AS deps
 WORKDIR /app
 COPY --from=oven/bun:1 /usr/local/bin/bun /usr/local/bin/bun
 
@@ -33,13 +43,14 @@ COPY package.json bun.lock ./
 # takes the Vite branch and dies with "Cannot find package 'vite'".
 COPY source.config.ts next.config.ts ./
 COPY content ./content
-# deps stage: the lockfile is regenerated on first build because the self-hosted
-# patch adds deps (pg, @ai-sdk/openai, @types/pg) that are not in the shipped
-# bun.lock. Subsequent builds reuse the resolved lock.
-RUN bun install
+# deps stage: installs from the committed bun.lock, frozen so an inconsistent
+# lock fails the build instead of being silently re-resolved. The lock carries
+# the self-hosted patch deps (pg, @ai-sdk/openai, @types/pg); @vercel/blob is
+# no longer a root dependency (any remaining lock records are transitive).
+RUN bun install --frozen-lockfile
 
 # ---- builder ------------------------------------------------------------
-FROM --platform=linux/amd64 ${NODE_IMAGE} AS builder
+FROM --platform=${IMAGE_PLATFORM} ${NODE_IMAGE} AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -59,7 +70,7 @@ RUN node node_modules/eve/bin/eve.js build
 RUN node node_modules/next/dist/bin/next build
 
 # ---- runner -------------------------------------------------------------
-FROM --platform=linux/amd64 ${NODE_IMAGE} AS runner
+FROM --platform=${IMAGE_PLATFORM} ${NODE_IMAGE} AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -97,6 +108,15 @@ COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 EXPOSE 3000
+
+# Readiness = BOTH halves answer: /api/health (Next up AND database responds,
+# SELECT 1) and /eve/v1/health (eve agent runtime ready — returned by the
+# nitro health route, `{ok:true,status:"ready"}`). A healthy container means
+# chat actually works, not merely that Next is listening. Used by
+# docker-compose.yml and any orchestrator that reads the image HEALTHCHECK;
+# inert when run without a healthcheck config.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
+  CMD node -e "Promise.all([fetch('http://localhost:3000/api/health'),fetch('http://localhost:3000/eve/v1/health')]).then(rs=>process.exit(rs.every(r=>r.ok)?0:1)).catch(()=>process.exit(1))"
 
 # Two processes. 4274 is the port withEve rewrites to when VERCEL is unset.
 CMD ["sh", "-c", "node node_modules/eve/bin/eve.js start --port 4274 & exec node node_modules/next/dist/bin/next start"]

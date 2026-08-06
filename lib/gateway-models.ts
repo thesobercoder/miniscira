@@ -19,11 +19,40 @@ export type GatewayModel = {
   released: number
 }
 
-/** Base URL of the deployment's OpenAI-compatible gateway, no trailing slash. */
+/**
+ * Base URL of the deployment's OpenAI-compatible gateway, no trailing slash.
+ *
+ * REQUIRED — there is no fallback. Every model call (chat, image generation,
+ * the researcher subagent) and the model catalog go through this one endpoint,
+ * so the app cannot answer a single turn without it. Throwing here beats the
+ * confusing "connection refused to host.docker.internal" failures a silent
+ * default used to produce on hosts that do not run a local gateway.
+ */
 export function gatewayBaseUrl(): string {
-  return (
-    process.env.AI_GATEWAY_BASE_URL ?? "http://host.docker.internal:8317/v1"
-  ).replace(/\/+$/, "")
+  const raw = process.env.AI_GATEWAY_BASE_URL
+  if (!raw || !raw.trim()) {
+    throw new Error(
+      "AI_GATEWAY_BASE_URL is not set. Point it at any OpenAI-compatible " +
+        "endpoint (your own gateway/proxy). This variable is REQUIRED — every " +
+        "model call goes through it, so the app cannot answer without it."
+    )
+  }
+  let url: URL
+  try {
+    url = new URL(raw.trim())
+  } catch {
+    throw new Error(
+      `AI_GATEWAY_BASE_URL is not a valid URL: "${raw.trim()}". ` +
+        "Use an absolute http(s) URL such as http://gateway:8000/v1."
+    )
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error(
+      `AI_GATEWAY_BASE_URL must be http(s): got "${url.protocol}". ` +
+        "Use an absolute http(s) URL such as http://gateway:8000/v1."
+    )
+  }
+  return url.toString().replace(/\/+$/, "")
 }
 
 // Models the gateway exposes that are not chat models (image/video generators)
