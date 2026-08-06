@@ -110,6 +110,98 @@ if (!url) {
   )
   process.exit(1)
 }
+
+// Phase 3: coarse AI_MODELS_JSON pre-flight. The canonical zod schema lives
+// in lib/model-metadata.ts (enforced at Next boot); this mirror catches a
+// malformed value HERE so a config error takes the container down at the gate
+// instead of hiding inside Next's instrumentation logs (Next 16 logs a failed
+// instrumentation hook but keeps serving). Keep keys/types in sync with
+// lib/model-metadata.ts. Throws -> entrypoint exits non-zero -> restart loop
+// with the message visible in container logs.
+function assertAiModelsJsonShape(raw) {
+  if (!raw?.trim()) return
+  let parsed
+  try {
+    parsed = JSON.parse(raw)
+  } catch (err) {
+    throw new Error(`AI_MODELS_JSON failed validation: ${err.message}`)
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error(
+      "AI_MODELS_JSON failed validation: must be a JSON object keyed by model id"
+    )
+  }
+  const allowedKeys = new Set([
+    "name",
+    "hint",
+    "hidden",
+    "order",
+    "capabilities",
+  ])
+  for (const [id, entry] of Object.entries(parsed)) {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      throw new Error(
+        `AI_MODELS_JSON failed validation: entry "${id}" must be an object`
+      )
+    }
+    for (const key of Object.keys(entry)) {
+      if (!allowedKeys.has(key)) {
+        throw new Error(
+          `AI_MODELS_JSON failed validation: entry "${id}" has unknown key "${key}"`
+        )
+      }
+    }
+    if (
+      "name" in entry &&
+      (typeof entry.name !== "string" || entry.name.length === 0)
+    ) {
+      throw new Error(
+        `AI_MODELS_JSON failed validation: entry "${id}" name must be a non-empty string`
+      )
+    }
+    if ("hint" in entry && typeof entry.hint !== "string") {
+      throw new Error(
+        `AI_MODELS_JSON failed validation: entry "${id}" hint must be a string`
+      )
+    }
+    if ("hidden" in entry && typeof entry.hidden !== "boolean") {
+      throw new Error(
+        `AI_MODELS_JSON failed validation: entry "${id}" hidden must be a boolean`
+      )
+    }
+    if ("order" in entry && typeof entry.order !== "number") {
+      throw new Error(
+        `AI_MODELS_JSON failed validation: entry "${id}" order must be a number`
+      )
+    }
+    if ("capabilities" in entry) {
+      const caps = entry.capabilities
+      if (typeof caps !== "object" || caps === null || Array.isArray(caps)) {
+        throw new Error(
+          `AI_MODELS_JSON failed validation: entry "${id}" capabilities must be an object`
+        )
+      }
+      for (const key of Object.keys(caps)) {
+        if (!["vision", "fileInput"].includes(key)) {
+          throw new Error(
+            `AI_MODELS_JSON failed validation: entry "${id}" capabilities has unknown key "${key}"`
+          )
+        }
+        if (typeof caps[key] !== "boolean") {
+          throw new Error(
+            `AI_MODELS_JSON failed validation: entry "${id}" capabilities.${key} must be a boolean`
+          )
+        }
+      }
+    }
+  }
+}
+try {
+  assertAiModelsJsonShape(process.env.AI_MODELS_JSON)
+} catch (err) {
+  console.error(`[entrypoint] ${err.message}`)
+  process.exit(1)
+}
 process.env.NODE_ENV ??= "production"
 
 try {

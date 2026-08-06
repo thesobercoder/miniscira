@@ -1,10 +1,13 @@
 /**
  * Startup-time environment validation for self-hosted deployments.
  *
- * Called from instrumentation.ts when the Next server boots (and, in Phase 2,
- * from the container entrypoint). The goal: fail fast with an actionable
- * message when a REQUIRED variable is missing, instead of surfacing a
- * confusing failure on the first model call.
+ * Called from instrumentation.ts when the Next server boots. The goal: fail
+ * fast with an actionable message when a REQUIRED variable is missing, instead
+ * of surfacing a confusing failure on the first model call. (The container
+ * entrypoint, scripts/entrypoint.mjs, independently gates DATABASE_URL and
+ * runs a coarse AI_MODELS_JSON pre-flight so a grossly malformed value takes
+ * the container down before eve/next start — Next 16 logs a failed
+ * instrumentation hook but keeps serving.)
  *
  * These four are the runtime-required set (the strict subset every deployment
  * needs regardless of BYOK or origin configuration). The full REQUIRED /
