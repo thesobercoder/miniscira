@@ -169,9 +169,12 @@ function assertAiModelsJsonShape(raw) {
         `AI_MODELS_JSON failed validation: entry "${id}" hidden must be a boolean`
       )
     }
-    if ("order" in entry && typeof entry.order !== "number") {
+    if (
+      "order" in entry &&
+      (typeof entry.order !== "number" || !Number.isFinite(entry.order))
+    ) {
       throw new Error(
-        `AI_MODELS_JSON failed validation: entry "${id}" order must be a number`
+        `AI_MODELS_JSON failed validation: entry "${id}" order must be a finite number`
       )
     }
     if ("capabilities" in entry) {

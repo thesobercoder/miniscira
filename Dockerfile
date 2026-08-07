@@ -70,10 +70,10 @@ ENV AI_GATEWAY_BASE_URL=http://localhost:3000/v1
 
 # Phase 3: build-time default chat model, inlined by Next into the CLIENT
 # bundle as NEXT_PUBLIC_DEFAULT_CHAT_MODEL (the picker's initial selection).
-# Server-side defaults read DEFAULT_CHAT_MODEL from the RUNTIME environment,
-# which wins over this build-time value — a deployment that only sets
-# DEFAULT_CHAT_MODEL at run time needs no rebuild. Unset arg = built-in
-# default (gpt-5.6-sol) baked in.
+# Server-side defaults read DEFAULT_CHAT_MODEL from the runtime environment.
+# Docker Compose forwards the same .env value as this build argument so the
+# browser and server agree. Changing the browser default requires rebuilding
+# the image. Unset arg = built-in default (gpt-5.6-sol) baked in.
 ARG DEFAULT_CHAT_MODEL=gpt-5.6-sol
 ENV NEXT_PUBLIC_DEFAULT_CHAT_MODEL=${DEFAULT_CHAT_MODEL}
 

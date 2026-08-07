@@ -115,9 +115,9 @@ export function orderWithMetadata(
 }
 
 // Warn once per process: a default the gateway does not serve is a
-// deployment-config error worth surfacing, but not fatal — the router falls
-// back to the first available catalog model when the picker default is
-// unavailable.
+// deployment-config error worth surfacing, but not fatal to startup. The
+// picker cannot select it from the catalog, and a stale explicit selection
+// will fail loudly rather than silently running on a different model.
 let warned = false
 
 export function warnIfDefaultMissing(models: CatalogModel[]): void {
@@ -126,8 +126,8 @@ export function warnIfDefaultMissing(models: CatalogModel[]): void {
     warned = true
     console.warn(
       `[models] DEFAULT_CHAT_MODEL "${DEFAULT_CHAT_MODEL}" is not served by ` +
-        "the live gateway catalog. The picker default will not be selectable " +
-        "and the agent falls back to another catalog model. Fix " +
+        "the live gateway catalog. The picker default will not be selectable, " +
+        "and an explicit stale selection will fail loudly. Fix " +
         "DEFAULT_CHAT_MODEL or the gateway's model list."
     )
   }

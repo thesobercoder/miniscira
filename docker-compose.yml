@@ -50,6 +50,10 @@ services:
         # linux-arm64 NAPI binding). Other targets build under emulation;
         # `platform:` below keeps the runtime arch in sync with the build.
         IMAGE_PLATFORM: ${IMAGE_PLATFORM:-linux/amd64}
+        # Next inlines the browser's initial model selection at build time.
+        # Forward the same .env value used by the runtime so client and server
+        # defaults agree after a normal `docker compose build`.
+        DEFAULT_CHAT_MODEL: ${DEFAULT_CHAT_MODEL:-gpt-5.6-sol}
     # Runtime arch — matches the build arg so the container executes on the
     # same platform the image was built for (emulated on ARM hosts).
     platform: ${IMAGE_PLATFORM:-linux/amd64}

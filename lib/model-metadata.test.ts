@@ -98,6 +98,10 @@ describe("parseAiModelsJson", () => {
       parseAiModelsJson('{"gpt-5.6-sol":{"capabilities":{"vision":"yes"}}}')
     ).toThrow()
   })
+
+  test("rejects a non-finite order", () => {
+    expect(() => parseAiModelsJson('{"gpt-5.6-sol":{"order":1e309}}')).toThrow()
+  })
 })
 
 describe("decorateCatalog", () => {

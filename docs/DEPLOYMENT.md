@@ -6,10 +6,9 @@ ships the full stack: app image, bundled Postgres + pgvector, a one-shot
 migration service, named volumes, and healthchecks. External/managed Postgres
 is supported via the `docker-compose.external-db.yml` override.
 
-> **One-line rule**: everything is driven by environment variables. Nothing is
-> hardcoded in the image. The only hard runtime requirement is
-> `AI_GATEWAY_BASE_URL` — every model call goes through that single endpoint,
-> with no fallback.
+> **One-line rule**: deployment configuration is environment-driven. Every
+> model call goes through the mandatory `AI_GATEWAY_BASE_URL`, with no baked-in
+> gateway fallback. See the matrix below for the other required settings.
 
 ## Quickstart
 
