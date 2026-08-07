@@ -88,7 +88,10 @@ single source of truth for deployment configuration.
   unless you specifically need it.
 - **External Postgres**: use the override (Compose v2.20+):
   ```bash
-  docker compose -f docker-compose.yml -f docker-compose.external-db.yml up -d --build
+  docker compose -f docker-compose.yml -f docker-compose.external-db.yml build
+  docker compose -f docker-compose.yml -f docker-compose.external-db.yml \
+    --profile migrate run --rm migrate
+  docker compose -f docker-compose.yml -f docker-compose.external-db.yml up -d app
   ```
   It removes the bundled `db` service and requires `DATABASE_URL` to point at
   your own pgvector-capable database (Neon, Supabase, RDS, vanilla + vector

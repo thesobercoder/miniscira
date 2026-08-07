@@ -1,6 +1,9 @@
 # MiniScira — external / managed Postgres override (no bundled database).
 #
-#   docker compose -f docker-compose.yml -f docker-compose.external-db.yml up -d --build
+#   docker compose -f docker-compose.yml -f docker-compose.external-db.yml build
+#   docker compose -f docker-compose.yml -f docker-compose.external-db.yml \
+#     --profile migrate run --rm migrate
+#   docker compose -f docker-compose.yml -f docker-compose.external-db.yml up -d app
 #
 # Merged on top of docker-compose.yml (Compose v2.20+): removes the bundled
 # `db` service and its dependency, and requires DATABASE_URL to point at your
@@ -10,15 +13,19 @@
 # POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB are then unused — only
 # DATABASE_URL matters.
 #
-# NOTE: `db: null` below is the Compose v2.20+ override-merge way to REMOVE
-# a service from the base file (compose-go merge semantics). If your compose
-# version rejects it, fall back to editing docker-compose.yml directly:
-# delete the whole `db:` service block and the app's `depends_on:` block.
+# Compose's `!reset` tag removes base values during override merge. It requires
+# Compose v2.20+; older versions must be upgraded before using this override.
+# Some generic YAML editors do not recognize this Compose-specific tag; Docker
+# Compose does, and `docker compose ... config` is the authoritative validator.
 services:
   app:
-    depends_on: []
+    depends_on: !reset []
     environment:
       # `:?` fails fast with this message when unset in the interpolation env.
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must point at your external Postgres}
-  # `null` removes the bundled db service from the merged model.
-  db: null
+  migrate:
+    # The base service waits on the bundled db; remove that dependency along
+    # with the db service when DATABASE_URL points at managed Postgres.
+    depends_on: !reset []
+  # Remove the bundled db service from the merged model.
+  db: !reset null
