@@ -68,9 +68,9 @@ function sameEntries(
  * Inline attachments as base64 data: URLs for the model call.
  *
  * The AI SDK's model-call downloader validates attachment URLs against an
- * SSRF allowlist that rejects localhost, *.local, and private IPs — and this
- * self-hosted deployment is only reachable via umbrel.local / LAN addresses,
- * so any http URL we hand it fails with "URL with hostname … is not allowed".
+ * SSRF allowlist that rejects localhost, *.local, and private IPs — a local
+ * self-hosted deployment is commonly reachable only through such addresses,
+ * so an http attachment URL can fail with "URL with hostname … is not allowed".
  * data: URLs are explicitly allowed, so the bytes are fetched same-origin
  * (uploaded-file names carry a random suffix and are unguessable) and inlined.
  * The chip in the composer keeps the http URL for the user.

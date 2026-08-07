@@ -119,11 +119,10 @@ COPY --from=builder /app/content ./content
 COPY --from=builder /app/agent ./agent
 COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
-# Manual schema bootstrap (Phase 2 will formalize this as a one-shot
-# migration service): `node node_modules/drizzle-kit/bin.cjs push` reads
+# Manual schema tooling and the transitional RUN_DB_PUSH gate read
 # drizzle.config.ts from the app root and DATABASE_URL from the environment.
 COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
-# Phase 2 runtime: supervised entrypoint (db wait + gated push + eve/next
+# Runtime: supervised entrypoint (db wait + gated push + eve/next
 # supervision), the two-process supervisor, and the one-shot migration runner.
 # lib/ (with lib/db/migrations) is copied above; scripts/ must be too.
 COPY --from=builder /app/scripts ./scripts

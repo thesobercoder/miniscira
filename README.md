@@ -97,19 +97,21 @@ The repo ships a complete self-hosted stack — app image, bundled Postgres +
 pgvector, a one-shot migration service, named volumes and healthchecks:
 
 ```bash
-git clone <this-repo> && cd miniscira
+git clone https://github.com/thesobercoder/miniscira.git && cd miniscira
 cp .env.example .env         # fill in the REQUIRED values (below)
-docker compose up -d --build
+docker compose build
+docker compose up -d db
 docker compose --profile migrate run --rm migrate   # apply schema once
+docker compose up -d app
 curl http://localhost:3000/api/health               # {"ok":true}
 ```
 
-REQUIRED in `.env`: `DATABASE_URL` (or the bundled `db` service),
+REQUIRED in `.env`: `DATABASE_URL` (use host `db` for the bundled service),
 `AI_GATEWAY_BASE_URL` (any OpenAI-compatible endpoint — every model call goes
 through it, with no fallback), `BETTER_AUTH_SECRET`
-(`openssl rand -base64 32`), and `POSTGRES_PASSWORD` (must match
-`DATABASE_URL`). Everything else is optional; `.env.example` is the full
-matrix.
+(`openssl rand -base64 32`), `BETTER_AUTH_URL` (the browser-facing origin),
+and `POSTGRES_PASSWORD` (must match `DATABASE_URL`). Everything else is
+optional; `.env.example` is the full matrix.
 
 Normal startup never mutates the schema — apply committed migrations with the
 one-shot `migrate` service, and pre-existing databases are adopted by

@@ -14,16 +14,19 @@ is supported via the `docker-compose.external-db.yml` override.
 ## Quickstart
 
 ```bash
-git clone <this-repo> && cd miniscira
+git clone https://github.com/thesobercoder/miniscira.git && cd miniscira
 cp .env.example .env          # fill in the REQUIRED values (below)
-docker compose up -d --build  # builds the image, starts db + app
+docker compose build
+docker compose up -d db
 docker compose --profile migrate run --rm migrate   # apply schema once
+docker compose up -d app
 curl http://localhost:3000/api/health               # {"ok":true}
 ```
 
-If you already have a database (e.g. you are adopting a running stack), skip
-the migrate step — the service detects an existing schema and **stamps** the
-committed migrations as applied without executing DDL (baseline adoption).
+If you already have a database (e.g. you are adopting a running stack), still
+run the migrate step once — the service detects the existing schema and
+**stamps** the committed migrations as applied without executing DDL
+(baseline adoption).
 
 ## Environment matrix
 
@@ -38,13 +41,13 @@ missing. Everything else is optional — off or defaulted unless set.
 | `DATABASE_URL` | Postgres connection string. The database MUST have pgvector — the bundled `db` service (`pgvector/pgvector:pg16`) includes it. With the compose file, the host is `db` and `POSTGRES_PASSWORD` must match the password in this URL. |
 | `AI_GATEWAY_BASE_URL` | Any OpenAI-compatible endpoint (`http://gateway:8000/v1` on the compose network, a LAN host, or a remote `https://…/v1`). All AI traffic — chat, tools, images, the model catalog — goes here. No fallback. |
 | `BETTER_AUTH_SECRET` | Auth secret: `openssl rand -base64 32`. |
+| `BETTER_AUTH_URL` | Browser-facing public origin of the app, such as `http://localhost:3000`, a LAN URL, or the external HTTPS URL behind a reverse proxy. |
 | `POSTGRES_PASSWORD` | Read by compose from ITS interpolation environment (the root `.env`), not the app's `env_file`. Must match `DATABASE_URL`. |
 
 ### OPTIONAL (the ones that matter most)
 
 | Variable | Purpose |
 | --- | --- |
-| `BETTER_AUTH_URL` | Public origin of the app (browser-facing). Behind a reverse proxy use the external URL. |
 | `APP_URL` | Public origin for absolute links; defaults to `BETTER_AUTH_URL`. |
 | `BETTER_AUTH_TRUSTED_ORIGINS` | Extra origins better-auth accepts callbacks from, comma-separated (e.g. a LAN IP alongside the hostname). |
 | `AI_GATEWAY_API_KEY` | Shared gateway key for the shared-key path and the model catalog. Users may instead save their own key in Settings (sealed at rest). |

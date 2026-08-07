@@ -25,8 +25,8 @@ export type GatewayModel = {
  * REQUIRED — there is no fallback. Every model call (chat, image generation,
  * the researcher subagent) and the model catalog go through this one endpoint,
  * so the app cannot answer a single turn without it. Throwing here beats the
- * confusing "connection refused to host.docker.internal" failures a silent
- * default used to produce on hosts that do not run a local gateway.
+ * confusing connection-refused failures a silent deployment-specific default
+ * used to produce on hosts that do not run that gateway.
  */
 export function gatewayBaseUrl(): string {
   const raw = process.env.AI_GATEWAY_BASE_URL

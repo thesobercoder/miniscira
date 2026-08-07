@@ -1,7 +1,10 @@
 # MiniScira — self-hosted deployment (zero SaaS)
 #
 #   cp .env.example .env        # fill in the REQUIRED values
-#   docker compose up -d --build
+#   docker compose build
+#   docker compose up -d db
+#   docker compose --profile migrate run --rm migrate
+#   docker compose up -d app
 #
 # Everything is driven by environment variables — nothing is hardcoded in the
 # image. The bundled `db` service is Postgres + pgvector (the schema requires
