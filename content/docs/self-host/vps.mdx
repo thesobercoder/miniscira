@@ -1,120 +1,37 @@
 ---
 title: VPS
-description: Two systemd units behind a reverse proxy, and the one thing you must not scale.
+description: Run the Docker Compose stack on a local server or VPS.
 ---
 
-A plain box: Hetzner, DigitalOcean, an old laptop under a desk. Same two
-processes, managed by systemd instead of a container runtime.
+A VPS, home server, or spare amd64 machine can run the same canonical Docker
+Compose deployment. There is no separate systemd-only architecture to maintain.
 
 ## Prerequisites
 
-```bash
-curl -fsSL https://bun.sh/install | bash
-```
+Install Docker Engine and Docker Compose v2.20 or newer. On ARM hardware, enable
+amd64 emulation because the current image cannot build natively for Linux ARM64.
 
-Node 24+ if you run the built output with Node instead — eve's CLI declares
-`"node": ">=24"` and refuses to start below it. Bun is what the scripts assume.
-
-## Build
+## Deploy
 
 ```bash
-git clone https://github.com/zaidmukaddam/miniscira /srv/miniscira
+git clone https://github.com/thesobercoder/miniscira.git /srv/miniscira
 cd /srv/miniscira
-bun install --frozen-lockfile
+cp .env.example .env
 
-# Both halves. `next build` does not build the agent.
-bunx eve build
-bun run build
+# Configure the required environment values.
+docker compose build
+docker compose up -d db
+docker compose --profile migrate run --rm migrate
+docker compose up -d app
 ```
 
-Put the environment in `/srv/miniscira/.env.production` with `chmod 600`.
-See [the environment matrix](/docs/self-host#environment-variables).
-
-<Callout type="error" title="Sort the sandbox out before you start the agent unit">
-  `eve start` initializes the sandbox template before it listens and exits if it
-  can't. Without `VERCEL_TOKEN` / `VERCEL_TEAM_ID` / `VERCEL_PROJECT_ID`, or a
-  different backend configured in `agent/sandbox.ts`, `miniscira-agent` will
-  restart-loop while `miniscira-web` serves a UI whose every chat 500s. The
-  details, and the alternatives, are in
-  [the Docker notes](/docs/self-host/docker#the-sandbox-is-a-hard-startup-dependency).
-</Callout>
-
-## systemd
-
-<Tabs items={['Agent', 'Web']}>
-<Tab value="Agent">
-
-```ini title="/etc/systemd/system/miniscira-agent.service"
-[Unit]
-Description=MiniScira eve agent
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=miniscira
-WorkingDirectory=/srv/miniscira
-Environment=NODE_ENV=production
-EnvironmentFile=/srv/miniscira/.env.production
-ExecStart=/home/miniscira/.bun/bin/bunx eve start --port 4274
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-</Tab>
-<Tab value="Web">
-
-```ini title="/etc/systemd/system/miniscira-web.service"
-[Unit]
-Description=MiniScira web
-After=network-online.target miniscira-agent.service
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=miniscira
-WorkingDirectory=/srv/miniscira
-Environment=NODE_ENV=production
-EnvironmentFile=/srv/miniscira/.env.production
-ExecStart=/home/miniscira/.bun/bin/bun run start
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-</Tab>
-</Tabs>
-
-```bash
-sudo systemctl enable --now miniscira-agent miniscira-web
-```
-
-<Callout>
-  No `EVE_NEXT_PRODUCTION_ORIGIN` needed here. Both units are on the same host,
-  so `withEve`'s default rewrite to `127.0.0.1:4274` is already correct. If that
-  port is taken, change it in two different places: `EVE_NEXT_PRODUCTION_PORT`
-  on the Next unit, which only moves where the rewrite points, and `--port` on
-  the agent's `eve start`, which is what actually moves the listener.
-</Callout>
-
-<Callout type="error" title="`NODE_ENV=production` on the agent unit is a security control">
-  `next start` sets `NODE_ENV` itself, but `eve start` is a separate process
-  and does not. The agent's auth chain in `agent/channels/eve.ts` drops eve's
-  `localDev()` entry only when `NODE_ENV === "production"`.
-
-  That entry authenticates **any request whose Host is loopback** — and on this
-  exact topology every proxied request reaches the agent as `127.0.0.1`. Leave
-  it in and an anonymous request to `https://your-host/eve/v1/*` gets a full
-  agent principal. `Environment=NODE_ENV=production` on the agent unit is what
-  closes it. See [Verifying the agent is not open](#verifying-the-agent-is-not-open).
-</Callout>
+The bundled `pgvector/pgvector:pg16` service is suitable for a single-host
+installation. For managed PostgreSQL, use `docker-compose.external-db.yml` as
+described in the Docker guide.
 
 ## Reverse proxy
+
+Expose only port 3000 from the app. Do not publish Eve's internal port 4274.
 
 ```text title="/etc/caddy/Caddyfile"
 miniscira.example.com {
@@ -123,102 +40,57 @@ miniscira.example.com {
 }
 ```
 
-Caddy handles TLS on its own. Set `BETTER_AUTH_URL` and `APP_URL` to
-`https://miniscira.example.com`.
+Set `BETTER_AUTH_URL` and `APP_URL` to the public HTTPS origin and add any other
+trusted browser origins to `BETTER_AUTH_TRUSTED_ORIGINS`.
 
-<Callout type="warn" title="Do not proxy port 4274">
-  Only expose the Next.js port. The agent is reached *through* the app's rewrite,
-  which is what carries the session cookie into `agent/channels/eve.ts`. A
-  publicly routable agent port bypasses the first link of that auth chain.
-</Callout>
-
-### Streaming
-
-Research turns stream for minutes. If you use nginx instead of Caddy:
+For nginx, disable response buffering and allow long-lived streams:
 
 ```nginx
 proxy_buffering off;
 proxy_read_timeout 900s;
 ```
 
-Without the first line the timeline arrives in one lump at the end, which looks
-exactly like the agent being broken.
+## Persistence and backups
 
-## Database
+Back up both named volumes before upgrades:
 
-Use Neon, or a Neon HTTP proxy in front of your own Postgres. The app's driver
-is `drizzle-orm/neon-http` and does not speak the Postgres wire protocol. A
-local `apt install postgresql` will not work until you swap the driver for
-`drizzle-orm/node-postgres` in `lib/db/index.ts`.
+- PostgreSQL: use `pg_dump -Fc` against the `db` service.
+- Uploads: archive `/data/uploads` from the app service.
+- Save the current Compose configuration and image digest for rollback.
 
-Then once:
+The full commands and restore order are documented in
+[`docs/DEPLOYMENT.md`](https://github.com/thesobercoder/miniscira/blob/main/docs/DEPLOYMENT.md).
 
-```bash
-bun run db:setup
-bun run db:push
-```
-
-## Updating
+## Upgrade
 
 ```bash
 cd /srv/miniscira
 git pull
-bun install --frozen-lockfile
-bunx eve build && bun run build
-sudo systemctl restart miniscira-agent miniscira-web
+docker compose build
+docker compose --profile migrate run --rm migrate
+docker compose up -d app
 ```
 
-Restart the agent **first, or restart both together**. The web service holds no
-agent state, but a rewrite to a dead port fails fast and confusingly.
+Do not run `db:push` as a routine upgrade step. The one-shot migration service
+uses the committed migration history.
 
-## Scaling
-
-The web process is stateless; run as many as you like behind a load balancer.
-
-<Callout title="Several agent processes are safe for lookouts">
-  Lookout scheduling is a minute-tick eve schedule in
-  `agent/schedules/lookouts.ts`, and `claimDueLookouts` in
-  `lib/lookout-schedule.ts` leases due rows in a single
-  `UPDATE … WHERE leased_until IS NULL OR leased_until <= now … RETURNING`. A
-  second process ticking at the same moment re-evaluates that predicate after
-  the first commits, finds the lease in the future, and gets nothing back. No
-  external queue is needed, and a lookout is not delivered twice.
-
-  What a lease cannot cover is a process that dies mid-run: the row stays leased
-  until `LEASE_MS` expires, and the run is retried after that rather than
-  resumed.
-</Callout>
-
-## Checking it works
+## Verify
 
 ```bash
-systemctl status miniscira-agent miniscira-web
-journalctl -u miniscira-agent -f
-curl -sS -o /dev/null -w '%{http_code}\n' https://miniscira.example.com/docs
+docker compose ps
+docker compose logs --tail=200 app
+curl -fsS https://miniscira.example.com/api/health
+curl -fsS https://miniscira.example.com/eve/v1/health
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  https://miniscira.example.com/eve/v1/info
 ```
 
-`/docs` is the useful probe: it is unauthenticated and server-rendered, so a 200
-means Next.js is healthy without needing a session. (`/sign-in` qualifies too;
-`/docs` is the one that also proves the MDX build landed.) Neither exercises the
-agent.
+The health endpoints should return `200`. The unauthenticated info endpoint
+should return `401`.
 
-## Verifying the agent is not open
+## Security boundary
 
-Run this from a machine that is **not** the server, with no session cookie:
-
-```bash
-curl -sS -o /dev/null -w '%{http_code}\n' https://miniscira.example.com/eve/v1/info
-```
-
-| Result | Meaning |
-| --- | --- |
-| `401` | Correct. Anonymous callers are rejected. |
-| `200` | **The agent is open to the internet.** `NODE_ENV=production` is not reaching the agent process. |
-
-A `200` here means anyone can run turns on your gateway key. Check
-`systemctl show miniscira-agent -p Environment` and restart the unit after
-fixing it.
-
-Do this once after the first deploy and again after any change to the units —
-it is a two-second check for the one misconfiguration on this page that is
-silently exploitable rather than merely broken.
+`NODE_ENV=production` is set by the container image and must not be overridden.
+The local `just-bash` sandbox executes inside the app container and is not a
+security boundary for hostile multi-tenant use. Keep the service behind trusted
+authentication and do not mount a Docker socket into the app container.

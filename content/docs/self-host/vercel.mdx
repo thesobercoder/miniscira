@@ -1,91 +1,27 @@
 ---
 title: Vercel
-description: One project, both processes, no rewrite configuration.
+description: Hosted deployment considerations for this self-host-first fork.
 ---
 
-This is the path the app is built for. `withEve()` writes a Vercel output
-configuration at build time that deploys the agent alongside the Next.js app, so
-`/eve/v1/*` stays same-origin with no rewrite target to configure.
+This fork's verified production path is Docker Compose. Vercel deployment is not
+the local deployment target documented or continuously validated here.
 
-## Deploy
+The current code no longer assumes Neon HTTP, Vercel Blob, or Vercel Sandbox:
 
-<Steps>
-<Step>
-### Link the project
+- the database driver is `drizzle-orm/node-postgres`;
+- uploads use local volume-backed storage;
+- `run_code` uses the local `just-bash` backend;
+- model traffic uses the configured OpenAI-compatible `AI_GATEWAY_BASE_URL`.
 
-```bash
-bunx vercel link
-```
+A Vercel deployment would therefore need separate decisions for persistent file
+storage, a PostgreSQL wire-protocol database reachable from functions, migration
+execution, long-running Eve turns, and the local sandbox's filesystem/process
+assumptions. Those adaptations are not part of the verified Docker contract.
 
-This also pulls AI Gateway credentials, so `AI_GATEWAY_API_KEY` may already be
-satisfied by OIDC in preview and production.
-</Step>
+For a supported self-hosted deployment, use the [Docker guide](/docs/self-host/docker)
+or the repository's
+[operations runbook](https://github.com/thesobercoder/miniscira/blob/main/docs/DEPLOYMENT.md).
 
-<Step>
-### Create the database
-
-Add a [Neon](https://neon.tech) integration (or a Neon HTTP proxy) and set
-`DATABASE_URL`. `lib/db/index.ts` uses `drizzle-orm/neon-http`, so a plain
-Postgres server needs the `drizzle-orm/node-postgres` driver instead. Then, from your machine with that URL in `.env.local`:
-
-```bash
-bun run db:setup
-bun run db:push
-```
-</Step>
-
-<Step>
-### Create a Blob store
-
-Storage → Blob in the dashboard. Copy the token into `BLOB_READ_WRITE_TOKEN`.
-</Step>
-
-<Step>
-### Set the remaining environment variables
-
-At minimum `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`. Set `APP_URL` to your
-production origin so lookout emails link correctly, or leave it unset and let
-the `BETTER_AUTH_URL` you just set cover it. `VERCEL_PROJECT_PRODUCTION_URL` is
-reached only when neither is set.
-</Step>
-
-<Step>
-### Ship
-
-```bash
-bunx vercel --prod
-```
-</Step>
-</Steps>
-
-## What differs from every other target
-
-| | On Vercel | Elsewhere |
-| --- | --- | --- |
-| Agent process | Deployed automatically by `withEve` | You start `eve start` yourself |
-| Rewrite target | Same-origin | `127.0.0.1:4274` or `EVE_NEXT_PRODUCTION_ORIGIN` |
-| `run_code` credentials | OIDC, automatic | `VERCEL_TOKEN` + team + project |
-| Sandbox prewarm | Part of the build | At `eve start`, before the agent listens |
-
-`withEve` short-circuits on `process.env.VERCEL`: it returns the config
-untouched and never installs the localhost rewrite. That one branch is the whole
-difference.
-
-## Function duration
-
-Deep research turns run long. The default function duration on Hobby will cut
-them off. Raise it in your project settings, or on the relevant route:
-
-```ts
-export const maxDuration = 800
-```
-
-<Callout type="warn" title="A cut-off turn is not lost, but it is truncated">
-  The transcript is durable: events are persisted to `chat_event` as they
-  arrive, and reloading re-attaches at the cursor. But the *agent* stops when
-  the function does, so the turn ends mid-research. Raise the limit rather than
-  relying on the resume path.
-</Callout>
-
-Set `BETTER_AUTH_URL` per-environment, or OAuth callbacks on preview
-deployments will redirect to production.
+Vercel OAuth remains an optional identity provider when configured with
+`VERCEL_CLIENT_ID` and `VERCEL_CLIENT_SECRET`; using it for sign-in does not make
+the application itself dependent on Vercel hosting.
