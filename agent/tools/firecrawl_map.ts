@@ -30,24 +30,28 @@ export default defineTool({
   }),
   async execute({ url, search, limit = 50 }) {
     const key = process.env.FIRECRAWL_API_KEY
-    if (!key)
+    const configuredBase = process.env.FIRECRAWL_API_URL?.trim()
+    if (!key && !configuredBase)
       return {
         url,
-        error: "FIRECRAWL_API_KEY is not configured.",
+        error:
+          "Firecrawl is not configured. Set FIRECRAWL_API_KEY for Firecrawl Cloud or FIRECRAWL_API_URL for a self-hosted server.",
         results: [],
       }
 
     let res: Response
     try {
-      const base = (
-        process.env.FIRECRAWL_API_URL ?? "https://api.firecrawl.dev"
-      ).replace(/\/+$/, "")
+      const base = (configuredBase ?? "https://api.firecrawl.dev").replace(
+        /\/+$/,
+        ""
+      )
+      const headers: Record<string, string> = {
+        "content-type": "application/json",
+      }
+      if (key) headers.authorization = `Bearer ${key}`
       res = await fetch(`${base}/v2/map`, {
         method: "POST",
-        headers: {
-          authorization: `Bearer ${key}`,
-          "content-type": "application/json",
-        },
+        headers,
         body: JSON.stringify({ url, search, limit }),
       })
     } catch (err) {
