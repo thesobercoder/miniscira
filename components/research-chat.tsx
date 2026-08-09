@@ -31,6 +31,7 @@ import {
 } from "@/hooks/use-chat-attachments"
 import { useChatModel } from "@/hooks/use-chat-model"
 import { useEveChat } from "@/hooks/use-eve-chat"
+import { useMountEffect } from "@/hooks/use-mount-effect"
 import { buildClientContext, conversationRecap } from "@/lib/chat-context"
 import { type ChatEvent, partText } from "@/lib/chat-events"
 import { cn } from "@/lib/utils"
@@ -147,6 +148,7 @@ export function ResearchChat({
   chatId,
   initialEvents = [],
   initialSession,
+  initialPrompt,
   projectId,
   projectInstructions,
   projectLinks,
@@ -154,6 +156,7 @@ export function ResearchChat({
   chatId?: string
   initialEvents?: readonly ChatEvent[]
   initialSession?: SessionState
+  initialPrompt?: string
   projectId?: string
   projectInstructions?: string | null
   projectLinks?: string[]
@@ -161,6 +164,8 @@ export function ResearchChat({
   const router = useRouter()
   const chatIdRef = useRef<string | undefined>(chatId)
   const createdRef = useRef(false)
+  const initialPromptRef = useRef(initialPrompt)
+  const initialPromptSubmittedRef = useRef(false)
   // Monotonic per-turn counter: the post-turn refresh only fires for the LATEST
   // turn, so a second turn started before the first one's title generation
   // resolves can't be interrupted mid-stream by the first turn's refresh.
@@ -400,6 +405,17 @@ export function ResearchChat({
   const submitRef = useRef(submit)
   submitRef.current = submit
   const onSubmit = useCallback(() => void submitRef.current(), [])
+
+  useMountEffect(() => {
+    const prompt = initialPromptRef.current
+    if (!prompt || initialPromptSubmittedRef.current) return
+    initialPromptSubmittedRef.current = true
+    // Consume the query before `submit` reaches its first await. A remount or
+    // refresh during chat creation therefore cannot submit the shared URL a
+    // second time. `submit` itself restores the prompt if creation/send fails.
+    window.history.replaceState(null, "", window.location.pathname)
+    void submitRef.current(prompt)
+  })
 
   // Index of the last question asked, or -1. Both retry and edit rewind to here.
   let lastQuestion = -1

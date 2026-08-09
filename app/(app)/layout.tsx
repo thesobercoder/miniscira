@@ -11,8 +11,16 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode
 }) {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session) redirect("/sign-in")
+  const requestHeaders = await headers()
+  const session = await auth.api.getSession({ headers: requestHeaders })
+  if (!session) {
+    const pathname = requestHeaders.get("x-next-pathname")
+    const search = requestHeaders.get("x-next-search")
+    const target = pathname ? `${pathname}${search ?? ""}` : undefined
+    redirect(
+      target ? `/sign-in?redirect=${encodeURIComponent(target)}` : "/sign-in"
+    )
+  }
 
   const cookieStore = await cookies()
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false"

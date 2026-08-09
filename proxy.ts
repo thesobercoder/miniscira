@@ -8,7 +8,7 @@ import { isDemoMode, LANDING_PATH } from "@/lib/demo-mode"
 // validation still happens in each server component / route handler via
 // `auth.api.getSession`, and on the eve channel via its route-auth walk.
 export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl
+  const { pathname, search } = request.nextUrl
 
   // Demo mode short-circuits the whole app shell, before the session check:
   // the landing page has to be readable signed out, and a signed-in visitor
@@ -31,11 +31,17 @@ export function proxy(request: NextRequest) {
 
   if (!sessionCookie) {
     const signInUrl = new URL("/sign-in", request.url)
-    signInUrl.searchParams.set("redirect", pathname)
+    signInUrl.searchParams.set("redirect", `${pathname}${search}`)
     return NextResponse.redirect(signInUrl)
   }
 
-  return NextResponse.next()
+  // The cookie check above is intentionally optimistic. Preserve the current
+  // target in request headers too, so the layout can keep it if server-side
+  // session validation rejects a stale or invalid cookie.
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set("x-next-pathname", pathname)
+  requestHeaders.set("x-next-search", search)
+  return NextResponse.next({ request: { headers: requestHeaders } })
 }
 
 export const config = {

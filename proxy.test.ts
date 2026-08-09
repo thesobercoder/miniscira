@@ -38,8 +38,29 @@ describe("demo mode off (the self-host default)", () => {
     expect(to.searchParams.get("redirect")).toBe("/settings")
   })
 
+  test("anonymous query links preserve the complete return target", () => {
+    const res = at("/?q=Who%20won%20the%20most%20oscars%3F")
+    const to = new URL(res.headers.get("location") ?? "")
+
+    expect(to.pathname).toBe("/sign-in")
+    expect(to.searchParams.get("redirect")).toBe(
+      "/?q=Who%20won%20the%20most%20oscars%3F"
+    )
+  })
+
   test("signed-in visitors reach the app", () => {
     expect(at("/", { signedIn: true }).headers.get("location")).toBeNull()
+  })
+
+  test("signed-in requests carry the return target for server validation", () => {
+    const res = at("/?q=Who%20won%20the%20most%20oscars%3F", {
+      signedIn: true,
+    })
+
+    expect(res.headers.get("x-middleware-request-x-next-pathname")).toBe("/")
+    expect(res.headers.get("x-middleware-request-x-next-search")).toBe(
+      "?q=Who%20won%20the%20most%20oscars%3F"
+    )
   })
 })
 

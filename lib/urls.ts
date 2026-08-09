@@ -5,6 +5,18 @@
  * renderer and the timeline don't have to import from each other.
  */
 
+/** Maximum prompt accepted from the root page's `q` query parameter. */
+export const MAX_QUERY_LENGTH = 8_000
+
+/**
+ * Normalizes Next.js's already-decoded search-param value for one chat turn.
+ * Repeated parameters are deterministic: the first value wins.
+ */
+export function initialQuery(value: string | string[] | undefined): string {
+  const first = Array.isArray(value) ? value[0] : value
+  return first?.trim().slice(0, MAX_QUERY_LENGTH) ?? ""
+}
+
 /**
  * A post-login redirect target that cannot leave this origin.
  *

@@ -1,6 +1,32 @@
 import { describe, expect, test } from "bun:test"
 
-import { safeRedirect } from "@/lib/urls"
+import { initialQuery, MAX_QUERY_LENGTH, safeRedirect } from "@/lib/urls"
+
+describe("initialQuery", () => {
+  test("normalizes a single query", () => {
+    expect(initialQuery(undefined)).toBe("")
+    expect(initialQuery("")).toBe("")
+    expect(initialQuery("   ")).toBe("")
+    expect(initialQuery("  Who won the most oscars?  ")).toBe(
+      "Who won the most oscars?"
+    )
+  })
+
+  test("uses the first repeated value", () => {
+    expect(initialQuery(["first", "second"])).toBe("first")
+    expect(initialQuery([])).toBe("")
+  })
+
+  test("caps oversized queries", () => {
+    expect(initialQuery("x".repeat(MAX_QUERY_LENGTH + 1))).toHaveLength(
+      MAX_QUERY_LENGTH
+    )
+  })
+
+  test("does not decode an already decoded value again", () => {
+    expect(initialQuery("100%25 complete")).toBe("100%25 complete")
+  })
+})
 
 describe("safeRedirect", () => {
   test("keeps in-app paths", () => {
