@@ -17,6 +17,13 @@ export function initialQuery(value: string | string[] | undefined): string {
   return first?.trim().slice(0, MAX_QUERY_LENGTH) ?? ""
 }
 
+/** Removes the consumed prompt while preserving unrelated search and hash. */
+export function withoutInitialQuery(value: string): string {
+  const url = new URL(value)
+  url.searchParams.delete("q")
+  return `${url.pathname}${url.search}${url.hash}`
+}
+
 /**
  * A post-login redirect target that cannot leave this origin.
  *

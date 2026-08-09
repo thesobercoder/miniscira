@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
 
-import { initialQuery, MAX_QUERY_LENGTH, safeRedirect } from "@/lib/urls"
+import {
+  initialQuery,
+  MAX_QUERY_LENGTH,
+  safeRedirect,
+  withoutInitialQuery,
+} from "@/lib/urls"
 
 describe("initialQuery", () => {
   test("normalizes a single query", () => {
@@ -25,6 +30,22 @@ describe("initialQuery", () => {
 
   test("does not decode an already decoded value again", () => {
     expect(initialQuery("100%25 complete")).toBe("100%25 complete")
+  })
+})
+
+describe("withoutInitialQuery", () => {
+  test("removes every q value and preserves unrelated URL state", () => {
+    expect(
+      withoutInitialQuery(
+        "https://app.example.com/?q=first&other=value&q=second#results"
+      )
+    ).toBe("/?other=value#results")
+  })
+
+  test("leaves URLs without q unchanged", () => {
+    expect(
+      withoutInitialQuery("https://app.example.com/chat/abc?tab=sources#2")
+    ).toBe("/chat/abc?tab=sources#2")
   })
 })
 

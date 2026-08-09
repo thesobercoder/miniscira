@@ -34,6 +34,7 @@ import { useEveChat } from "@/hooks/use-eve-chat"
 import { useMountEffect } from "@/hooks/use-mount-effect"
 import { buildClientContext, conversationRecap } from "@/lib/chat-context"
 import { type ChatEvent, partText } from "@/lib/chat-events"
+import { withoutInitialQuery } from "@/lib/urls"
 import { cn } from "@/lib/utils"
 
 /**
@@ -413,7 +414,11 @@ export function ResearchChat({
     // Consume the query before `submit` reaches its first await. A remount or
     // refresh during chat creation therefore cannot submit the shared URL a
     // second time. `submit` itself restores the prompt if creation/send fails.
-    window.history.replaceState(null, "", window.location.pathname)
+    window.history.replaceState(
+      null,
+      "",
+      withoutInitialQuery(window.location.href)
+    )
     void submitRef.current(prompt)
   })
 
