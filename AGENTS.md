@@ -12,6 +12,30 @@
 
 ## Non-obvious invariants
 
+- `docs/UMBREL_SANDBOX_OPERATIONS.md` is the canonical operations and
+  maintenance runbook for Soham's Umbrel/Portainer Stack 30 deployment. Read it
+  before changing Docker/Eve integration, Compose, the middleware, egress,
+  deployment scripts, or accepting upstream changes.
+- The production sandbox is **not DinD**. Eve creates sibling containers on the
+  Umbrel Docker Engine through a private default-deny middleware. Only the
+  middleware mounts `/data/docker.sock`; the app receives `DOCKER_HOST` and no
+  Portainer credential. Never mount the Docker socket into the app or publish a
+  Docker API port.
+- Sandbox file writes depend on a bidirectional attached Docker Exec stream. A
+  spawn-only test is not enough. Every middleware/Docker integration change
+  must prove `writeTextFile({path: "main.py", ...})` followed by execution. A
+  persistent `cat > /workspace/main.py` process means the upload stream is
+  deadlocked and the Agent UI will remain busy.
+- Sandbox containers must carry exact label `eve.sandbox=1`, use an allowlisted
+  image, and attach only to `miniscira_sandbox-egress`. The app and Docker
+  middleware use `miniscira_docker-control`; Sandboxes must never reach it.
+- The middleware's fixed root base-setup command is coupled to Eve internals.
+  When upgrading `eve`, inspect Docker create/Exec/archive/Template/network
+  request shapes before widening policy, then run the full scratch acceptance
+  suite on port 8326.
+- Local image tags are mutable. Record and compare immutable Docker image IDs,
+  and recreate the Stack service after rebuilding a local tag.
+
 - `agent/channels/eve.ts` — the `auth:` array is an **ordered** chain
   (app session → internal run secret → Vercel OIDC → local-dev loopback).
   The first entry that resolves wins, so reordering it changes which principal

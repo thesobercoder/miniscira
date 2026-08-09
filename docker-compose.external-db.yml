@@ -19,7 +19,12 @@
 # Compose does, and `docker compose ... config` is the authoritative validator.
 services:
   app:
-    depends_on: !reset []
+    # Keep the socket-proxy dependency while removing only the bundled db.
+    depends_on: !override
+      docker-socket-proxy:
+        condition: service_healthy
+      sandbox-egress-proxy:
+        condition: service_healthy
     environment:
       # `:?` fails fast with this message when unset in the interpolation env.
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must point at your external Postgres}

@@ -1,27 +1,20 @@
 import { defineSandbox } from "eve/sandbox"
-import { justbash } from "eve/sandbox/just-bash"
+import { docker } from "eve/sandbox/docker"
+import { resolveDockerSandboxConfig } from "@/lib/sandbox-config"
 
-// The sandbox backs the `run_code` tool: an offline Python environment for
-// calculations and data analysis.
-//
-// This host (umbrelOS) does not expose the Docker daemon socket to app
-// containers, so eve's container backends cannot run here. just-bash is eve's
-// official local backend: sandbox commands run as plain bash subprocesses of
-// this container. There is no container isolation and no live network-policy
-// enforcement (just-bash accepts network config only at creation and eve
-// throws on setNetworkPolicy for it) — sessions therefore run with this
-// container's own network access. Acceptable for a private LAN deployment
-// where the app container itself is trusted; revisit if this ever serves
-// untrusted users.
-//
-// The analysis stack (pandas, numpy, matplotlib) is baked into the image at
-// build time (see Dockerfile), so no egress is needed at bootstrap.
+// run_code executes in a sibling Docker container through the private
+// docker-socket-proxy service. MiniScira never receives the host socket itself.
+// The sandbox image is prebuilt. Eve still requests deny-all; the deployment's
+// Docker CLI wrapper replaces that isolated network with the internal
+// sandbox-egress network and injects an HTTP(S) proxy. Squid then permits only
+// package registries and source hosts documented by the deployment.
 export default defineSandbox({
-  backend: justbash(),
+  backend: docker(resolveDockerSandboxConfig()),
   async bootstrap({ use: openSandbox }) {
     const sandbox = await openSandbox()
     await sandbox.run({
-      command: "python3 --version && pip --version || true",
+      command:
+        "python3 --version && python3 -c 'import pandas, numpy, matplotlib'",
     })
   },
 })

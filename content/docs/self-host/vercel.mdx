@@ -10,13 +10,13 @@ The current code no longer assumes Neon HTTP, Vercel Blob, or Vercel Sandbox:
 
 - the database driver is `drizzle-orm/node-postgres`;
 - uploads use local volume-backed storage;
-- `run_code` uses the local `just-bash` backend;
+- `run_code` uses Eve's Docker backend through a private socket proxy;
 - model traffic uses the configured OpenAI-compatible `AI_GATEWAY_BASE_URL`.
 
 A Vercel deployment would therefore need separate decisions for persistent file
 storage, a PostgreSQL wire-protocol database reachable from functions, migration
-execution, long-running Eve turns, and the local sandbox's filesystem/process
-assumptions. Those adaptations are not part of the verified Docker contract.
+execution, long-running Eve turns, and the Docker sandbox controller. Those
+adaptations are not part of the verified Docker contract.
 
 For a supported self-hosted deployment, use the [Docker guide](/docs/self-host/docker)
 or the repository's

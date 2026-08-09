@@ -6,11 +6,11 @@ import { document } from "@/lib/db/schema"
 import { put } from "@/lib/local-blob"
 
 // The model sees this tool as `run_code`. It runs a Python script in the
-// agent's sandbox — a local bash process on this deployment (see
-// agent/sandbox.ts) — for calculations, statistics, and data analysis over the
+// agent's sandbox — a sibling Docker container with allowlisted package/source
+// egress on this deployment (see agent/sandbox.ts) — for data analysis over the
 // user's uploaded files — and returns stdout/stderr plus any charts it saved.
-// The sandbox is a local bash process with pandas / numpy / matplotlib
-// preinstalled; see agent/sandbox.ts. Paths resolve from /workspace, so a bare
+// The sandbox image has pandas / numpy / matplotlib preinstalled. Paths resolve
+// from /workspace, so a bare
 // filename addresses the working directory. Renders in the timeline as a code
 // cell with its output and any generated plots.
 const IMAGE_RE = /\.(png|jpe?g|svg|gif|webp)$/i

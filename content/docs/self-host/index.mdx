@@ -79,10 +79,10 @@ Malformed metadata fails at the container entrypoint before Eve or Next starts.
 
 ## Sandbox
 
-`run_code` and the Bash tool use Eve's `just-bash` backend. Commands execute as
-ordinary subprocesses inside the application container. This is deliberately
-local and requires no Vercel account or Docker socket, but it is **not**
-container-level isolation from the application.
+`run_code` and the Bash tool use Eve's Docker backend through a private socket
+proxy. Commands execute in sibling containers rather than in the application
+container. Their egress is forced through an internal allowlisting proxy for
+common package registries and source hosts; arbitrary destinations are denied.
 
 ## Optional capabilities
 

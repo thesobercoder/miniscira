@@ -22,6 +22,27 @@
 name: miniscira
 
 services:
+  docker-socket-proxy:
+    # Private default-deny middleware for Portainer's own Docker Engine. It
+    # mounts Portainer's real socket directly, so Docker exec streams remain
+    # standard and MiniScira needs no Portainer credential.
+    image: miniscira-docker-api-proxy:local
+    restart: unless-stopped
+    environment:
+      DOCKER_SOCKET: /var/run/docker.sock
+      SANDBOX_DOCKER_NETWORK: miniscira_sandbox-egress
+      SANDBOX_DOCKER_IMAGES: ${SANDBOX_DOCKER_IMAGE:-miniscira:local}
+    volumes:
+      - /data/docker.sock:/var/run/docker.sock
+    networks:
+      - docker-control
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/_ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
   db:
     # Pin a digest here for production reproducibility, e.g.
     #   pgvector/pgvector:pg16@sha256:<digest>
@@ -40,6 +61,19 @@ services:
       timeout: 5s
       retries: 6
       start_period: 10s
+
+  sandbox-egress-proxy:
+    image: miniscira-sandbox-egress-proxy:local
+    restart: unless-stopped
+    networks:
+      - default
+      - sandbox-egress
+    healthcheck:
+      test: ["CMD", "squidclient", "-h", "127.0.0.1", "-p", "3128", "mgr:info"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
 
   app:
     build:
@@ -67,6 +101,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      docker-socket-proxy:
+        condition: service_healthy
+      sandbox-egress-proxy:
+        condition: service_healthy
     ports:
       - "${APP_PORT:-3000}:3000"
     env_file: .env
@@ -76,10 +114,21 @@ services:
       # Pinned from the SAME interpolation source as the mount target below,
       # so the in-container value and the volume target can never diverge.
       LOCAL_STORAGE_DIR: ${LOCAL_STORAGE_DIR:-/data/uploads}
+      DOCKER_HOST: tcp://docker-socket-proxy:80
+      EVE_DOCKER_PATH: /usr/local/bin/docker-wrapper
+      EVE_REAL_DOCKER_PATH: /usr/local/bin/docker-real
+      SANDBOX_DOCKER_NETWORK: miniscira_sandbox-egress
+      SANDBOX_EGRESS_PROXY_URL: ${SANDBOX_EGRESS_PROXY_URL:-http://sandbox-egress-proxy:3128}
+      # Default to this exact deployment image. A separately pinned compatible
+      # sandbox image may be selected without changing the app image.
+      SANDBOX_DOCKER_IMAGE: ${SANDBOX_DOCKER_IMAGE:-miniscira:local}
     volumes:
       # Uploads + generated artifacts land in LOCAL_STORAGE_DIR (default in
       # .env.example); this named volume keeps them durable across recreates.
       - miniscira-uploads:${LOCAL_STORAGE_DIR:-/data/uploads}
+    networks:
+      - default
+      - docker-control
     healthcheck:
       # Readiness = BOTH halves answer: the app's /api/health (Next up AND
       # database responds, SELECT 1) and eve's /eve/v1/health (agent runtime
@@ -119,3 +168,9 @@ services:
 volumes:
   miniscira-db:
   miniscira-uploads:
+
+networks:
+  docker-control:
+    internal: true
+  sandbox-egress:
+    internal: true

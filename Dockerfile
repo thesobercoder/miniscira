@@ -88,13 +88,17 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# The eve sandbox backs `run_code` with the just-bash backend (this host does
-# not expose a docker socket to app containers): sandbox commands are plain
-# bash subprocesses, so the analysis stack must live in this image — pandas,
-# numpy, matplotlib get baked in at build time rather than installed at
-# bootstrap (which would need egress and would re-run on every start).
+# The same image is also the default Eve Docker-sandbox image. It therefore
+# carries both the Docker CLI (which talks only to the private socket proxy) and
+# the offline Python analysis stack used inside sibling sandbox containers.
+# Baking pandas/numpy/matplotlib here avoids network access during bootstrap.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends python3 python3-pip \
+ && apt-get install -y --no-install-recommends ca-certificates curl python3 python3-pip \
+ && docker_arch="$(dpkg --print-architecture)" \
+ && case "$docker_arch" in amd64) docker_arch=x86_64 ;; arm64) docker_arch=aarch64 ;; esac \
+ && curl -fsSL "https://download.docker.com/linux/static/stable/${docker_arch}/docker-27.5.1.tgz" \
+    | tar -xz --strip-components=1 -C /usr/local/bin docker/docker \
+ && mv /usr/local/bin/docker /usr/local/bin/docker-real \
  && rm -rf /var/lib/apt/lists/* \
  && python3 -m pip install --no-cache-dir --break-system-packages pandas numpy matplotlib
 
@@ -126,6 +130,9 @@ COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
 # supervision), the two-process supervisor, and the one-shot migration runner.
 # lib/ (with lib/db/migrations) is copied above; scripts/ must be too.
 COPY --from=builder /app/scripts ./scripts
+RUN chmod 0755 /app/scripts/eve-docker-wrapper.mjs \
+ && ln -sf /app/scripts/eve-docker-wrapper.mjs /usr/local/bin/docker \
+ && ln -sf /app/scripts/eve-docker-wrapper.mjs /usr/local/bin/docker-wrapper
 
 EXPOSE 3000
 

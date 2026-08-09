@@ -91,6 +91,7 @@ should return `401`.
 ## Security boundary
 
 `NODE_ENV=production` is set by the container image and must not be overridden.
-The local `just-bash` sandbox executes inside the app container and is not a
-security boundary for hostile multi-tenant use. Keep the service behind trusted
-authentication and do not mount a Docker socket into the app container.
+The app talks to the host Docker daemon through a private socket-proxy sidecar;
+the raw socket is never mounted into MiniScira and the proxy port is not
+published. Sandbox containers start with Docker networking disabled. This is a
+practical personal-deployment boundary, not a hardened multi-tenant runtime.

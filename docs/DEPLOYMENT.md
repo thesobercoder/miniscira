@@ -6,6 +6,12 @@ ships the full stack: app image, bundled Postgres + pgvector, a one-shot
 migration service, named volumes, and healthchecks. External/managed Postgres
 is supported via the `docker-compose.external-db.yml` override.
 
+For Soham's concrete Umbrel/Portainer Stack 30 deployment—including the direct
+Docker-socket middleware, Squid egress policy, image IDs, scratch/production
+acceptance gates, upstream-sync policy, UI-stall diagnosis, and rollback—use
+[`docs/UMBREL_SANDBOX_OPERATIONS.md`](./UMBREL_SANDBOX_OPERATIONS.md) as the
+canonical operator runbook.
+
 > **One-line rule**: deployment configuration is environment-driven. Every
 > model call goes through the mandatory `AI_GATEWAY_BASE_URL`, with no baked-in
 > gateway fallback. See the matrix below for the other required settings.
@@ -282,11 +288,27 @@ The app depends on an OpenAI-compatible endpoint. Capabilities are exercised
 
 ## Sandbox & platform notes
 
-- **The sandbox is `just-bash` by design**: `run_code` and the bash tool
-  execute as plain bash subprocesses inside the app container (the image
-  bakes in python3 + pandas/numpy/matplotlib). There is **no Docker-level
-  isolation** — do not describe it as such. The container needs no docker
-  socket and no docker CLI. A configurable docker backend is future work.
+- **The sandbox uses Eve's Docker backend** through a private Docker-API
+  middleware sidecar. On the validated Umbrel deployment, only that middleware
+  mounts Portainer's Engine socket (`/data/docker.sock` on the host,
+  `/var/run/docker.sock` inside the middleware). MiniScira receives only
+  `DOCKER_HOST`; it gets neither the raw socket nor a Portainer token. The
+  Portainer endpoint proxy is intentionally not in the attached-exec data path:
+  it did not preserve Docker's required upgraded bidirectional stream. Each
+  session runs as a sibling container attached only to `sandbox-egress`,
+  separate from `docker-control`; HTTP(S) is injected through the
+  internal `sandbox-egress-proxy`. Its Squid domain ACL permits npm, PyPI, Go,
+  Rust, GitHub, Node, Bun, Deno/JSR, and GitLab distribution hosts and denies
+  everything else. This is not DinD and neither private proxy publishes a LAN
+  port. The middleware is default deny and validates Sandbox labels, images,
+  networks, container options, resource ownership, Exec, archive, Template
+  commit, and cleanup operations.
+- **Critical stream invariant**: Sandbox file writes use an attached Docker Exec
+  upload. The middleware must forward both directions concurrently and send EOF
+  toward Docker when the client upload finishes. A regression leaves the Agent
+  UI busy and a Sandbox process stuck at `cat > /workspace/main.py`. Every
+  middleware release must test `writeTextFile` followed by code execution; a
+  spawn-only smoke test is insufficient.
 - **Platform**: the image builds `linux/amd64` — the only natively supported
   arch, because `@firecrawl/pdf-inspector` ships no Linux ARM64 NAPI binding.
   ARM64 hosts build and run under emulation (`IMAGE_PLATFORM` keeps build and
