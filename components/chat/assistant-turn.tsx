@@ -12,6 +12,10 @@ import {
   ArtifactChip,
   type PanelArtifact,
 } from "@/components/ai-elements/artifact"
+import {
+  MESSAGE_ACTION_CLASS,
+  MessageAction,
+} from "@/components/chat/message-action"
 import { Markdown } from "@/components/markdown"
 import { ModelPickerDialog } from "@/components/model-picker"
 import {
@@ -232,44 +236,6 @@ function renderBody(
   return { nodes, answered, hasCalls, hasText: lastTextIdx >= 0 }
 }
 
-// Icon-only, outlined, no labels: the row sits under every answer, so the words
-// were repeated down the whole transcript for affordances people learn once.
-const ACTION_BUTTON =
-  "text-muted-foreground border-border/70 hover:text-foreground hover:bg-accent"
-
-function IconAction({
-  label,
-  onClick,
-  disabled,
-  children,
-}: {
-  label: string
-  onClick: () => void
-  disabled?: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            aria-label={label}
-            disabled={disabled}
-            onClick={onClick}
-            className={ACTION_BUTTON}
-          />
-        }
-      >
-        {children}
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
-  )
-}
-
 // Quiet afterlife for a completed answer: copy it, re-run it (optionally on a
 // different model), or branch the conversation from here into a new chat.
 function AnswerActions({
@@ -298,7 +264,7 @@ function AnswerActions({
 
   return (
     <div className="flex items-center gap-1">
-      <IconAction
+      <MessageAction
         label={copied ? "Copied" : "Copy"}
         onClick={() => void copy(partText(message.parts, "text"))}
       >
@@ -321,7 +287,7 @@ function AnswerActions({
             )}
           />
         </span>
-      </IconAction>
+      </MessageAction>
       {onRetry && (
         <>
           <DropdownMenu>
@@ -332,11 +298,11 @@ function AnswerActions({
                     render={
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="ghost"
                         size="icon-sm"
                         aria-label="Retry"
                         disabled={busy}
-                        className={ACTION_BUTTON}
+                        className={MESSAGE_ACTION_CLASS}
                       />
                     }
                   />
@@ -364,7 +330,7 @@ function AnswerActions({
         </>
       )}
       {onBranch && (
-        <IconAction
+        <MessageAction
           label={branching ? "Branching…" : "Branch"}
           disabled={busy || branching}
           onClick={() => void branch()}
@@ -372,7 +338,7 @@ function AnswerActions({
           <RiGitBranchLine
             className={cn("size-3.5", branching && "animate-pulse")}
           />
-        </IconAction>
+        </MessageAction>
       )}
     </div>
   )

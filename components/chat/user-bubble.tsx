@@ -10,6 +10,7 @@ import {
   RiRestartLine,
 } from "@remixicon/react"
 import { memo, useState } from "react"
+import { MessageAction } from "@/components/chat/message-action"
 import {
   Attachment,
   AttachmentAction,
@@ -30,11 +31,6 @@ import {
 } from "@/components/ui/dialog"
 import { Message, MessageContent } from "@/components/ui/message"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import type { UploadedDoc } from "@/hooks/use-chat-attachments"
 import { useCopyFeedback } from "@/hooks/use-copy-feedback"
 
@@ -263,66 +259,28 @@ export const UserBubble = memo(function UserBubble({
         </div>
         <div className="flex items-center justify-end gap-0.5 pr-1">
           {onRetry && (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    aria-label="Retry from this message"
-                    className="size-7 text-muted-foreground hover:text-foreground"
-                    onClick={onRetry}
-                    size="icon-sm"
-                    type="button"
-                    variant="ghost"
-                  />
-                }
-              >
-                <RiRestartLine className="size-3.5" />
-              </TooltipTrigger>
-              <TooltipContent>Retry from here</TooltipContent>
-            </Tooltip>
+            <MessageAction label="Retry from here" onClick={onRetry}>
+              <RiRestartLine className="size-3.5" />
+            </MessageAction>
           )}
           {onEdit && (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    aria-label="Edit question"
-                    className="size-7 text-muted-foreground hover:text-foreground"
-                    onClick={() => setEditing(true)}
-                    size="icon-sm"
-                    type="button"
-                    variant="ghost"
-                  />
-                }
-              >
-                <RiPencilLine className="size-3.5" />
-              </TooltipTrigger>
-              <TooltipContent>Edit question</TooltipContent>
-            </Tooltip>
-          )}
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  aria-label={copied ? "Copied question" : "Copy question"}
-                  className="size-7 text-muted-foreground hover:text-foreground"
-                  onClick={() => void copy(text)}
-                  size="icon-sm"
-                  type="button"
-                  variant="ghost"
-                />
-              }
+            <MessageAction
+              label="Edit question"
+              onClick={() => setEditing(true)}
             >
-              {copied ? (
-                <RiCheckLine className="size-3.5" />
-              ) : (
-                <RiFileCopyLine className="size-3.5" />
-              )}
-            </TooltipTrigger>
-            <TooltipContent>
-              {copied ? "Copied" : "Copy question"}
-            </TooltipContent>
-          </Tooltip>
+              <RiPencilLine className="size-3.5" />
+            </MessageAction>
+          )}
+          <MessageAction
+            label={copied ? "Copied" : "Copy question"}
+            onClick={() => void copy(text)}
+          >
+            {copied ? (
+              <RiCheckLine className="size-3.5" />
+            ) : (
+              <RiFileCopyLine className="size-3.5" />
+            )}
+          </MessageAction>
         </div>
       </MessageContent>
       <AttachmentPreviewDialog
