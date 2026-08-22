@@ -225,6 +225,19 @@ export function useChatAttachments({
     [currentChatId]
   )
 
+  /** Move a retried question's existing attachment bindings to its new turn. */
+  const rebindTurnAttachments = useCallback(
+    (attached: readonly UploadedDoc[], turnIndex: number) => {
+      if (attached.length === 0) return
+      setAttachmentsByTurn((prev) => ({
+        ...prev,
+        [turnIndex]: [...attached],
+      }))
+      persistTurnBinding(attached, turnIndex)
+    },
+    [persistTurnBinding]
+  )
+
   return {
     documents,
     attachmentsByTurn,
@@ -235,5 +248,6 @@ export function useChatAttachments({
     removeDocument,
     attachToTurn,
     persistTurnBinding,
+    rebindTurnAttachments,
   }
 }

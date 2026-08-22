@@ -324,6 +324,17 @@ export function useEveChat({
   }, [clearCursor])
 
   /**
+   * Start the next send on a fresh durable session.
+   *
+   * Replacing an earlier message rewinds the visible conversation, so continuing
+   * the current append-only eve session would still expose the discarded future
+   * to the agent. The caller supplies a recap of only the retained prefix.
+   */
+  const resetSession = useCallback(async () => {
+    await forgetSession()
+  }, [forgetSession])
+
+  /**
    * Paint the user's turn straight away.
    *
    * Callers usually have work to do before they can call `send` — creating the
@@ -511,6 +522,7 @@ export function useEveChat({
     send,
     answer,
     stop,
+    resetSession,
     supersede: projection.supersede,
     resolveSupersede,
   }

@@ -1,10 +1,13 @@
 "use client"
 
 import {
+  RiCheckLine,
   RiExternalLinkLine,
+  RiFileCopyLine,
   RiFileTextLine,
   RiImageLine,
   RiPencilLine,
+  RiRestartLine,
 } from "@remixicon/react"
 import { useState } from "react"
 import {
@@ -204,15 +207,25 @@ function QuestionEditor({
 export function UserBubble({
   text,
   attachments,
+  onRetry,
   onEdit,
 }: {
   text: string
   attachments?: UploadedDoc[]
-  /** Present only on the last question, and only while nothing is streaming. */
+  /** Present while no turn is streaming. Rewinds from this question forward. */
+  onRetry?: () => void
   onEdit?: (text: string) => void
 }) {
   const [previewDoc, setPreviewDoc] = useState<UploadedDoc | null>(null)
   const [editing, setEditing] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const copy = () => {
+    void navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1500)
+    })
+  }
 
   if (editing && onEdit) {
     return (
@@ -247,14 +260,38 @@ export function UserBubble({
         )}
         {/* Full-width row so the bubble's percentage max-width resolves against
             the available space, not its own shrink-to-fit content width. */}
-        <div className="flex w-full items-center justify-end gap-1">
+        <div className="flex w-full justify-end">
+          <Bubble variant="tinted" align="end">
+            <BubbleContent className="text-pretty">{text}</BubbleContent>
+          </Bubble>
+        </div>
+        <div className="flex items-center justify-end gap-0.5 pr-1">
+          {onRetry && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    aria-label="Retry from this message"
+                    className="size-7 text-muted-foreground hover:text-foreground"
+                    onClick={onRetry}
+                    size="icon-sm"
+                    type="button"
+                    variant="ghost"
+                  />
+                }
+              >
+                <RiRestartLine className="size-3.5" />
+              </TooltipTrigger>
+              <TooltipContent>Retry from here</TooltipContent>
+            </Tooltip>
+          )}
           {onEdit && (
             <Tooltip>
               <TooltipTrigger
                 render={
                   <Button
                     aria-label="Edit question"
-                    className="size-7 shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/question:opacity-100"
+                    className="size-7 text-muted-foreground hover:text-foreground"
                     onClick={() => setEditing(true)}
                     size="icon-sm"
                     type="button"
@@ -267,9 +304,29 @@ export function UserBubble({
               <TooltipContent>Edit question</TooltipContent>
             </Tooltip>
           )}
-          <Bubble variant="tinted" align="end">
-            <BubbleContent className="text-pretty">{text}</BubbleContent>
-          </Bubble>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  aria-label={copied ? "Copied question" : "Copy question"}
+                  className="size-7 text-muted-foreground hover:text-foreground"
+                  onClick={copy}
+                  size="icon-sm"
+                  type="button"
+                  variant="ghost"
+                />
+              }
+            >
+              {copied ? (
+                <RiCheckLine className="size-3.5" />
+              ) : (
+                <RiFileCopyLine className="size-3.5" />
+              )}
+            </TooltipTrigger>
+            <TooltipContent>
+              {copied ? "Copied" : "Copy question"}
+            </TooltipContent>
+          </Tooltip>
         </div>
       </MessageContent>
       <AttachmentPreviewDialog

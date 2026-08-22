@@ -34,6 +34,11 @@ import { useEveChat } from "@/hooks/use-eve-chat"
 import { useMountEffect } from "@/hooks/use-mount-effect"
 import { buildClientContext, conversationRecap } from "@/lib/chat-context"
 import { type ChatEvent, partText } from "@/lib/chat-events"
+import {
+  messagesBeforeReplacement,
+  nextReplacementTurnIndex,
+  replacementMessageIds,
+} from "@/lib/replace-turn"
 import { withoutInitialQuery } from "@/lib/urls"
 import { cn } from "@/lib/utils"
 
@@ -188,6 +193,7 @@ export function ResearchChat({
     send,
     answer,
     stop,
+    resetSession,
     supersede,
     resolveSupersede,
   } = useEveChat({ chatId, initialEvents, initialSession })
@@ -211,6 +217,7 @@ export function ResearchChat({
     removeDocument,
     attachToTurn,
     persistTurnBinding,
+    rebindTurnAttachments,
   } = useChatAttachments({
     chatId,
     projectId,
@@ -267,7 +274,12 @@ export function ResearchChat({
 
   async function submit(
     submitText?: string,
-    modelOverride?: string
+    modelOverride?: string,
+    replacement?: {
+      retainedMessages: readonly EveMessage[]
+      attachments: readonly UploadedDoc[]
+      turnIndex: number
+    }
   ): Promise<boolean> {
     const text = (submitText ?? input).trim()
     if (!text || isBusy) return false
@@ -278,8 +290,11 @@ export function ResearchChat({
     beginTurn(text)
 
     // Staged attachments ride along with THIS message.
-    const turnIndex = messages.filter((m) => m.role === "user").length
-    const attached = attachToTurn(turnIndex)
+    const turnIndex =
+      replacement?.turnIndex ?? messages.filter((m) => m.role === "user").length
+    const attached = replacement
+      ? [...replacement.attachments]
+      : attachToTurn(turnIndex)
 
     const id = await ensureChat(text)
     if (!id) {
@@ -291,7 +306,8 @@ export function ResearchChat({
       return false
     }
     setChatId(id)
-    persistTurnBinding(attached, turnIndex)
+    if (replacement) rebindTurnAttachments(attached, replacement.turnIndex)
+    else persistTurnBinding(attached, turnIndex)
 
     // The chat row exists in the database now. Surface it in the sidebar
     // immediately — WITHOUT router.refresh(): `ensureChat` changed the URL via
@@ -369,8 +385,9 @@ export function ResearchChat({
     // one that was branched from another, or a fresh one replacing a session
     // that turned out to be gone. eve sessions can't be forked, so it's the
     // only way the agent knows about history the reader can still see.
+    const recapMessages = replacement?.retainedMessages ?? messages
     const recap = () =>
-      messages.length === 0 ? null : conversationRecap(messages)
+      recapMessages.length === 0 ? null : conversationRecap(recapMessages)
 
     const myTurn = ++turnSeqRef.current
     const sent = await send({
@@ -422,34 +439,44 @@ export function ResearchChat({
     void submitRef.current(prompt)
   })
 
-  // Index of the last question asked, or -1. Both retry and edit rewind to here.
-  let lastQuestion = -1
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    if (messages[i].role === "user") {
-      lastQuestion = i
-      break
-    }
-  }
-
   /**
-   * Replace the trailing turn: hide the last question and everything after it,
-   * then ask again. Passing `text` edits the question; omitting it retries the
-   * same one on `modelId`.
+   * Replace a turn from any user message: hide that question and every visible
+   * message after it, reset eve's append-only session, then ask again from the
+   * retained prefix. Passing `text` edits the question; omitting it retries it.
    *
    * eve sessions are append-only, so "delete" here means marking those messages
    * superseded (persisted once the new turn starts) rather than stacking a
    * second answer under the first.
    */
-  const replaceLastTurn = async (text?: string, modelId?: string) => {
-    if (isBusy || lastQuestion === -1) return
-    const question = messages[lastQuestion]
+  const replaceTurn = async (
+    questionIndex: number,
+    text?: string,
+    modelId?: string
+  ) => {
+    if (isBusy) return
+    const question = messages[questionIndex]
+    if (question?.role !== "user") return
     const next = text ?? partText(question.parts, "text")
     if (!next) return
-    // Everything from the question onward: the question and its answer, plus a
-    // second assistant message if the turn produced one.
-    const ids = messages.slice(lastQuestion).map((m) => m.id)
+    const ids = replacementMessageIds(messages, questionIndex, supersededIds)
+    const retainedMessages = messagesBeforeReplacement(
+      messages,
+      questionIndex,
+      supersededIds
+    )
+    const sourceTurnIndex = userTurnOf[questionIndex]
+    const turnIndex = nextReplacementTurnIndex(messages, userTurnOf)
+    const attachments = attachmentsByTurn[sourceTurnIndex] ?? []
     supersede(ids)
-    resolveSupersede(ids, await submit(next, modelId))
+    await resetSession()
+    resolveSupersede(
+      ids,
+      await submit(next, modelId, {
+        retainedMessages,
+        attachments,
+        turnIndex,
+      })
+    )
   }
 
   // Answering a question mid-turn has to repeat the model marker and the project
@@ -567,11 +594,14 @@ export function ResearchChat({
                               <UserBubble
                                 text={partText(message.parts, "text")}
                                 attachments={attachmentsByTurn[userTurnOf[i]]}
-                                // Only the latest question can be edited: an
-                                // earlier one would orphan every answer after it.
+                                onRetry={
+                                  !isBusy
+                                    ? () => void replaceTurn(i)
+                                    : undefined
+                                }
                                 onEdit={
-                                  i === lastQuestion && !isBusy
-                                    ? (next) => void replaceLastTurn(next)
+                                  !isBusy
+                                    ? (next) => void replaceTurn(i, next)
                                     : undefined
                                 }
                               />
@@ -585,7 +615,11 @@ export function ResearchChat({
                                   i === messages.length - 1 &&
                                   messages[i - 1]?.role === "user"
                                     ? (modelId) =>
-                                        void replaceLastTurn(undefined, modelId)
+                                        void replaceTurn(
+                                          i - 1,
+                                          undefined,
+                                          modelId
+                                        )
                                     : undefined
                                 }
                                 onBranch={
