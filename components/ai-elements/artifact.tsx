@@ -17,6 +17,7 @@ import { createElement, useEffect, useRef, useState } from "react"
 import type { Highlighter } from "shiki"
 import { Markdown } from "@/components/markdown"
 import { Button } from "@/components/ui/button"
+import { useCopyFeedback } from "@/hooks/use-copy-feedback"
 import { cn } from "@/lib/utils"
 
 const GenUiPreview = dynamic(
@@ -277,18 +278,13 @@ export function ArtifactChip({
 /* ------------------------------- the panel -------------------------------- */
 
 function CopyButton({ content }: { content: string }) {
-  const [copied, setCopied] = useState(false)
+  const { copied, copy } = useCopyFeedback("Couldn't copy that artifact")
   return (
     <Button
       variant="ghost"
       size="icon-sm"
       aria-label={copied ? "Copied" : "Copy"}
-      onClick={() => {
-        void navigator.clipboard.writeText(content).then(() => {
-          setCopied(true)
-          setTimeout(() => setCopied(false), 1600)
-        })
-      }}
+      onClick={() => void copy(content)}
       className="rounded-md text-muted-foreground hover:text-foreground"
     >
       <span className="relative size-4">
