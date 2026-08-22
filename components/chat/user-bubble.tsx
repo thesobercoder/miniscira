@@ -9,7 +9,7 @@ import {
   RiPencilLine,
   RiRestartLine,
 } from "@remixicon/react"
-import { useState } from "react"
+import { memo, useState } from "react"
 import {
   Attachment,
   AttachmentAction,
@@ -205,18 +205,20 @@ function QuestionEditor({
   )
 }
 
-export function UserBubble({
-  text,
-  attachments,
-  onRetry,
-  onEdit,
-}: {
+type UserBubbleProps = {
   text: string
   attachments?: UploadedDoc[]
   /** Present while no turn is streaming. Rewinds from this question forward. */
   onRetry?: () => void
   onEdit?: (text: string) => void
-}) {
+}
+
+export const UserBubble = memo(function UserBubble({
+  text,
+  attachments,
+  onRetry,
+  onEdit,
+}: UserBubbleProps) {
   const [previewDoc, setPreviewDoc] = useState<UploadedDoc | null>(null)
   const [editing, setEditing] = useState(false)
   const { copied, copy } = useCopyFeedback("Couldn't copy that question")
@@ -328,5 +330,14 @@ export function UserBubble({
         onOpenChange={(open) => !open && setPreviewDoc(null)}
       />
     </Message>
+  )
+}, userBubblePropsEqual)
+
+function userBubblePropsEqual(prev: UserBubbleProps, next: UserBubbleProps) {
+  return (
+    prev.text === next.text &&
+    prev.attachments === next.attachments &&
+    Boolean(prev.onRetry) === Boolean(next.onRetry) &&
+    Boolean(prev.onEdit) === Boolean(next.onEdit)
   )
 }

@@ -58,6 +58,8 @@ export type SendInput = {
    * this is where a recap of the visible history belongs.
    */
   freshContext?: () => Record<string, string | string[]> | undefined
+  /** Runs once Eve accepts the message, before following the streamed turn. */
+  onAccepted?: () => void
 }
 
 type Options = {
@@ -141,7 +143,7 @@ export function useEveChat({
   // memo below it. The individual callbacks are stable.
   const { enqueue, enqueueNow, flush, patchCursor, clearCursor, setChatId } =
     queue
-  const { project, unsupersede } = projection
+  const { project } = projection
   const { attach, ingestChild, markDone } = subagents
 
   const ingest = useCallback(
@@ -200,7 +202,7 @@ export function useEveChat({
    * the caller should start a fresh one rather than keep retrying a dead id.
    */
   const consume = useCallback(
-    async (iterable: AsyncIterable<ChatEvent>) => {
+    async (iterable: AsyncIterable<ChatEvent>, onStarted?: () => void) => {
       setTurn(beginStreaming)
       // A turn ends when a boundary event says so — not when this iterator
       // stops. eve reconnects within one stream() call, but once its retries
@@ -209,11 +211,18 @@ export function useEveChat({
       // render as "Research stopped".
       let settled = false
       let received = 0
+      let started = false
       let stream = iterable
       try {
         for (let attempt = 0; ; attempt += 1) {
           try {
-            const drained = await drainUntilBoundary(stream, ingest)
+            const drained = await drainUntilBoundary(stream, (event) => {
+              if (!started) {
+                started = true
+                onStarted?.()
+              }
+              ingest(event)
+            })
             received += drained.received
             if (drained.settled) settled = true
           } catch (err) {
@@ -296,7 +305,8 @@ export function useEveChat({
       turnResponse: {
         sessionId?: string
         continuationToken?: string
-      } & AsyncIterable<ChatEvent>
+      } & AsyncIterable<ChatEvent>,
+      onStarted?: () => void
     ) => {
       cursorRef.current = {
         sessionId: turnResponse.sessionId,
@@ -304,7 +314,7 @@ export function useEveChat({
         streamIndex: cursorRef.current.streamIndex,
       }
       void patchCursor(cursorRef.current)
-      return await consume(turnResponse)
+      return await consume(turnResponse, onStarted)
     },
     [patchCursor, consume]
   )
@@ -372,6 +382,7 @@ export function useEveChat({
       clientContext,
       optimisticText,
       freshContext,
+      onAccepted,
     }: SendInput): Promise<boolean> => {
       // A no-op when the caller already announced this turn via beginTurn.
       setTurn(submit(optimisticText))
@@ -397,7 +408,11 @@ export function useEveChat({
       // produced nothing" evidence of a dead session rather than a dead network.
       const hadSession = cursorRef.current.sessionId != null
       const response = await attempt(clientContext)
-      const followed = response != null && (await followTurn(response))
+      const followed =
+        response != null &&
+        (await followTurn(response, () => {
+          onAccepted?.()
+        }))
       if (followed) return true
 
       if (!shouldForgetSession({ response, followed, hadSession })) {
@@ -426,8 +441,9 @@ export function useEveChat({
         setTurn(READY)
         return false
       }
-      await followTurn(retry)
-      return true
+      return await followTurn(retry, () => {
+        onAccepted?.()
+      })
     },
     [getSession, followTurn, forgetSession]
   )
@@ -497,17 +513,10 @@ export function useEveChat({
     else abortRef.current?.abort()
   }, [])
 
-  /**
-   * Commit or roll back an optimistic supersede: on success persist the marker
-   * so the collapse survives reload, on failure bring the old turn back rather
-   * than losing the answer.
-   */
-  const resolveSupersede = useCallback(
-    (ids: readonly string[], sent: boolean) => {
-      if (sent) enqueueNow({ type: SUPERSEDE_EVENT, ids })
-      else unsupersede(ids)
-    },
-    [enqueueNow, unsupersede]
+  /** Persist an accepted replacement so the collapse survives reload. */
+  const commitSupersede = useCallback(
+    (ids: readonly string[]) => enqueueNow({ type: SUPERSEDE_EVENT, ids }),
+    [enqueueNow]
   )
 
   return {
@@ -536,6 +545,7 @@ export function useEveChat({
     resetSession,
     restoreSession,
     supersede: projection.supersede,
-    resolveSupersede,
+    commitSupersede,
+    unsupersede: projection.unsupersede,
   }
 }

@@ -200,7 +200,8 @@ export function ResearchChat({
     resetSession,
     restoreSession,
     supersede,
-    resolveSupersede,
+    commitSupersede,
+    unsupersede,
   } = useEveChat({ chatId, initialEvents, initialSession })
 
   const [input, setInput] = useState("")
@@ -294,6 +295,7 @@ export function ResearchChat({
       retainedMessages: readonly EveMessage[]
       attachments: readonly UploadedDoc[]
       turnIndex: number
+      ids: readonly string[]
     }
   ): Promise<boolean> {
     const text = (submitText ?? input).trim()
@@ -409,6 +411,7 @@ export function ResearchChat({
       recapMessages.length === 0 ? null : conversationRecap(recapMessages)
 
     const myTurn = ++turnSeqRef.current
+    let accepted = false
     const sent = await send({
       optimisticText: text,
       message:
@@ -417,15 +420,24 @@ export function ResearchChat({
           : text,
       clientContext: context(hasSession() ? null : recap()),
       freshContext: () => context(recap()),
+      onAccepted: replacement
+        ? () => {
+            if (accepted) return
+            accepted = true
+            commitSupersede(replacement.ids)
+            rebindTurnAttachments(
+              replacement.attachments,
+              replacement.turnIndex
+            )
+          }
+        : undefined,
     })
 
     // A send that never landed leaves the reader with an empty composer and no
     // answer coming. Put the question back so retrying is one keystroke, not a
     // retype — `send` has already explained what went wrong.
     if (!sent) setInput((current) => current || text)
-    if (!sent) await restoreReplacedSession()
-    if (sent && replacement)
-      rebindTurnAttachments(attached, replacement.turnIndex)
+    if (!accepted) await restoreReplacedSession()
 
     if (sent && myTurn === turnSeqRef.current) {
       // Turn finished, stream complete — safe to re-sync the sidebar from the
@@ -496,8 +508,9 @@ export function ResearchChat({
         retainedMessages,
         attachments,
         turnIndex,
+        ids,
       })
-      resolveSupersede(ids, sent)
+      if (!sent) unsupersede(ids)
     } finally {
       replacementLockRef.current = false
     }

@@ -13,7 +13,7 @@ import {
   type PanelArtifact,
 } from "@/components/ai-elements/artifact"
 import { Markdown } from "@/components/markdown"
-import { ProviderIcon } from "@/components/model-picker"
+import { ModelPickerDialog } from "@/components/model-picker"
 import {
   type AnswerInput,
   ResearchTimeline,
@@ -25,7 +25,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Message, MessageContent } from "@/components/ui/message"
@@ -36,7 +35,6 @@ import {
 } from "@/components/ui/tooltip"
 import { useCopyFeedback } from "@/hooks/use-copy-feedback"
 import { partText } from "@/lib/chat-events"
-import { CHAT_MODELS, providerOf } from "@/lib/models"
 import {
   EMPTY_ANNOTATION,
   SESSION_SCOPE,
@@ -287,6 +285,7 @@ function AnswerActions({
 }) {
   const { copied, copy } = useCopyFeedback("Couldn't copy that answer")
   const [branching, setBranching] = useState(false)
+  const [modelPickerOpen, setModelPickerOpen] = useState(false)
 
   const branch = async () => {
     setBranching(true)
@@ -324,48 +323,45 @@ function AnswerActions({
         </span>
       </IconAction>
       {onRetry && (
-        <DropdownMenu>
-          <Tooltip>
-            {/* Nested render props: the tooltip renders the menu trigger,
-                which in turn renders the button. Base UI's documented way of
-                composing two triggers onto one element. */}
-            <TooltipTrigger
-              render={
-                <DropdownMenuTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon-sm"
-                      aria-label="Retry"
-                      disabled={busy}
-                      className={ACTION_BUTTON}
-                    />
-                  }
-                />
-              }
-            >
-              <RiRestartLine className="size-3.5" />
-            </TooltipTrigger>
-            <TooltipContent>Retry</TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent align="start" className="w-52">
-            <DropdownMenuItem onSelect={() => onRetry()}>
-              <RiRestartLine className="size-4 text-muted-foreground" /> Same
-              model
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {CHAT_MODELS.map((m) => (
-              <DropdownMenuItem key={m.id} onSelect={() => onRetry(m.id)}>
-                <ProviderIcon
-                  provider={providerOf(m.id)}
-                  className="size-4 shrink-0"
-                />
-                {m.name}
+        <>
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-sm"
+                        aria-label="Retry"
+                        disabled={busy}
+                        className={ACTION_BUTTON}
+                      />
+                    }
+                  />
+                }
+              >
+                <RiRestartLine className="size-3.5" />
+              </TooltipTrigger>
+              <TooltipContent>Retry</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onSelect={() => onRetry()}>
+                Retry with the same model
               </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <DropdownMenuItem onSelect={() => setModelPickerOpen(true)}>
+                Choose another model…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <ModelPickerDialog
+            open={modelPickerOpen}
+            onOpenChange={setModelPickerOpen}
+            value=""
+            onPick={(modelId) => onRetry(modelId)}
+          />
+        </>
       )}
       {onBranch && (
         <IconAction

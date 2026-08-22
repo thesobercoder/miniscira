@@ -33,6 +33,7 @@ export function useEventQueue(initialChatId?: string) {
   const chatIdRef = useRef<string | undefined>(initialChatId)
   const bufferRef = useRef<ChatEvent[]>([])
   const flushingRef = useRef(false)
+  const flushPromiseRef = useRef<Promise<void> | null>(null)
   // Retries already scheduled for the current run of failures. Reset the moment
   // a batch lands, so an unrelated blip later starts from the shortest delay.
   const retriesRef = useRef(0)
@@ -54,49 +55,55 @@ export function useEventQueue(initialChatId?: string) {
    * `finally`, so a rejection here would either surface as an unhandled
    * rejection or swallow the caller's return value.
    */
-  const flush = useCallback(async (): Promise<void> => {
+  const flush = useCallback((): Promise<void> => {
+    if (flushPromiseRef.current) return flushPromiseRef.current
     const id = chatIdRef.current
-    if (!id || flushingRef.current || bufferRef.current.length === 0) return
+    if (!id || bufferRef.current.length === 0) return Promise.resolve()
     flushingRef.current = true
-    try {
-      while (bufferRef.current.length > 0) {
-        const batch = bufferRef.current.splice(0, bufferRef.current.length)
-        let ok = false
-        try {
-          const res = await fetch(`/api/chats/${id}/events`, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ events: batch }),
-          })
-          ok = res.ok
-        } catch {
-          ok = false
-        }
-        if (ok) {
-          // Confirmed persisted — only now is dropping the batch safe.
-          retriesRef.current = 0
-          continue
-        }
-        // Put it back where it came from and stop; the events are still ours.
-        bufferRef.current.unshift(...batch)
-        const delay = nextFlushDelay(retriesRef.current)
-        if (delay == null) {
-          console.error(
-            `event flush failed ${retriesRef.current} times; ${bufferRef.current.length} event(s) still buffered`
-          )
+    const running = (async () => {
+      try {
+        while (bufferRef.current.length > 0) {
+          const batch = bufferRef.current.splice(0, bufferRef.current.length)
+          let ok = false
+          try {
+            const res = await fetch(`/api/chats/${id}/events`, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ events: batch }),
+            })
+            ok = res.ok
+          } catch {
+            ok = false
+          }
+          if (ok) {
+            // Confirmed persisted — only now is dropping the batch safe.
+            retriesRef.current = 0
+            continue
+          }
+          // Put it back where it came from and stop; the events are still ours.
+          bufferRef.current.unshift(...batch)
+          const delay = nextFlushDelay(retriesRef.current)
+          if (delay == null) {
+            console.error(
+              `event flush failed ${retriesRef.current} times; ${bufferRef.current.length} event(s) still buffered`
+            )
+            break
+          }
+          retriesRef.current += 1
+          if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
+          retryTimerRef.current = setTimeout(() => {
+            retryTimerRef.current = null
+            void flush()
+          }, delay)
           break
         }
-        retriesRef.current += 1
-        if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
-        retryTimerRef.current = setTimeout(() => {
-          retryTimerRef.current = null
-          void flush()
-        }, delay)
-        break
+      } finally {
+        flushingRef.current = false
+        flushPromiseRef.current = null
       }
-    } finally {
-      flushingRef.current = false
-    }
+    })()
+    flushPromiseRef.current = running
+    return running
   }, [])
 
   /**
