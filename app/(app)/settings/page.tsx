@@ -7,6 +7,7 @@ import { SettingsPersonalization } from "@/components/settings-personalization"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
 import { auth } from "@/lib/auth"
+import { userGatewayKeysEnabled } from "@/lib/gateway-credentials"
 import { getUserActivity } from "@/lib/user-activity"
 
 function initialsOf(name: string, email: string) {
@@ -37,6 +38,7 @@ export default async function SettingsPage() {
 
   const user = session.user
   const activity = await getUserActivity(user.id)
+  const showGatewayKey = userGatewayKeysEnabled()
   const memberSince = user.createdAt
     ? new Date(user.createdAt).toLocaleDateString(undefined, {
         month: "long",
@@ -109,11 +111,14 @@ export default async function SettingsPage() {
 
         <Separator />
 
-        {/* Billing credential. First after the account block on purpose: with
-            no key saved, nothing else on this page has any effect. */}
-        <SettingsGatewayKey />
-
-        <Separator />
+        {showGatewayKey && (
+          <>
+            {/* BYOK-only. Self-hosted deployments with a shared gateway keep
+                infrastructure credentials out of the ordinary user surface. */}
+            <SettingsGatewayKey />
+            <Separator />
+          </>
+        )}
 
         {/* Personalization */}
         <section>

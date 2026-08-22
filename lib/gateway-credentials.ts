@@ -34,8 +34,19 @@ export class NoGatewayCredentialError extends Error {
 }
 
 /** Whether falling back to the deployment's own key is permitted at all. */
-function sharedKeyAllowed(): boolean {
+export function sharedKeyAllowed(): boolean {
   return process.env.ALLOW_SHARED_GATEWAY_KEY === "true"
+}
+
+/**
+ * Whether this deployment asks individual users to bring their own key.
+ *
+ * A self-hosted household deployment with a configured shared gateway should
+ * keep provider credentials behind the product surface. The Settings key form
+ * remains useful only for BYOK deployments where that fallback is unavailable.
+ */
+export function userGatewayKeysEnabled(): boolean {
+  return !(sharedKeyAllowed() && Boolean(process.env.AI_GATEWAY_API_KEY))
 }
 
 /**
