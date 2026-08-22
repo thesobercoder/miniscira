@@ -8,6 +8,7 @@ import { appBaseUrl } from "@/lib/base-url"
 import { db } from "@/lib/db"
 import { chat, chatEvent, lookout, project, user } from "@/lib/db/schema"
 import { sendLookoutEmail } from "@/lib/email"
+import { lookoutRecipient } from "@/lib/lookout-recipient"
 
 // Reduce the persisted stream into the final assistant answer text (for email).
 function extractAnswerText(events: MessageStreamEvent[]): string {
@@ -125,11 +126,10 @@ export async function runLookout(
     .from(user)
     .where(eq(user.id, lk.userId))
     .limit(1)
-  if (u?.email) {
+  const recipient = lookoutRecipient(u?.email)
+  if (recipient) {
     await sendLookoutEmail({
-      // Self-hosted operators may keep their login/profile email separate from
-      // the mailbox that receives automated research digests.
-      to: process.env.LOOKOUT_EMAIL_TO || u.email,
+      to: recipient,
       name: u.name,
       lookoutName: lk.name,
       answer: extractAnswerText(events),
