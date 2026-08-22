@@ -1,14 +1,19 @@
 "use client"
 
-import { RiCheckLine, RiFileCopyLine, RiGitBranchLine } from "@remixicon/react"
+import {
+  RiCheckLine,
+  RiFileCopyLine,
+  RiGitBranchLine,
+  RiRestartLine,
+} from "@remixicon/react"
 import type { EveMessage, EveMessagePart } from "eve/client"
-import { memo, useRef, useState } from "react"
-import { toast } from "sonner"
+import { memo, useState } from "react"
 import {
   ArtifactChip,
   type PanelArtifact,
 } from "@/components/ai-elements/artifact"
 import { Markdown } from "@/components/markdown"
+import { ProviderIcon } from "@/components/model-picker"
 import {
   type AnswerInput,
   ResearchTimeline,
@@ -16,14 +21,22 @@ import {
 import { TurnStatusNote, TurnUsage } from "@/components/turn-status"
 import { Button } from "@/components/ui/button"
 import { DotmHex3 } from "@/components/ui/dotm-hex-3"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Message, MessageContent } from "@/components/ui/message"
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useMountEffect } from "@/hooks/use-mount-effect"
+import { useCopyFeedback } from "@/hooks/use-copy-feedback"
 import { partText } from "@/lib/chat-events"
+import { CHAT_MODELS, providerOf } from "@/lib/models"
 import {
   EMPTY_ANNOTATION,
   SESSION_SCOPE,
@@ -259,36 +272,21 @@ function IconAction({
   )
 }
 
-// Quiet afterlife for a completed answer: copy it or branch the conversation
-// from here into a new chat. Retrying belongs to the originating user message.
+// Quiet afterlife for a completed answer: copy it, re-run it (optionally on a
+// different model), or branch the conversation from here into a new chat.
 function AnswerActions({
   message,
+  onRetry,
   onBranch,
   busy,
 }: {
   message: EveMessage
+  onRetry?: (modelId?: string) => void
   onBranch?: () => void
   busy?: boolean
 }) {
-  const [copied, setCopied] = useState(false)
+  const { copied, copy } = useCopyFeedback("Couldn't copy that answer")
   const [branching, setBranching] = useState(false)
-  // Held so the reset can be cancelled: a turn can be unmounted (retry, branch,
-  // supersede) well inside the 1.5s window.
-  const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useMountEffect(() => () => {
-    if (copyTimer.current) clearTimeout(copyTimer.current)
-  })
-
-  const copy = () => {
-    void navigator.clipboard
-      .writeText(partText(message.parts, "text"))
-      .then(() => {
-        setCopied(true)
-        if (copyTimer.current) clearTimeout(copyTimer.current)
-        copyTimer.current = setTimeout(() => setCopied(false), 1500)
-      })
-      .catch(() => toast.error("Couldn't copy that"))
-  }
 
   const branch = async () => {
     setBranching(true)
@@ -301,7 +299,10 @@ function AnswerActions({
 
   return (
     <div className="flex items-center gap-1">
-      <IconAction label={copied ? "Copied" : "Copy"} onClick={copy}>
+      <IconAction
+        label={copied ? "Copied" : "Copy"}
+        onClick={() => void copy(partText(message.parts, "text"))}
+      >
         {/* Cross-fade the icon swap instead of hard-toggling it. */}
         <span className="relative size-3.5 shrink-0">
           <RiFileCopyLine
@@ -322,6 +323,50 @@ function AnswerActions({
           />
         </span>
       </IconAction>
+      {onRetry && (
+        <DropdownMenu>
+          <Tooltip>
+            {/* Nested render props: the tooltip renders the menu trigger,
+                which in turn renders the button. Base UI's documented way of
+                composing two triggers onto one element. */}
+            <TooltipTrigger
+              render={
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label="Retry"
+                      disabled={busy}
+                      className={ACTION_BUTTON}
+                    />
+                  }
+                />
+              }
+            >
+              <RiRestartLine className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>Retry</TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="start" className="w-52">
+            <DropdownMenuItem onSelect={() => onRetry()}>
+              <RiRestartLine className="size-4 text-muted-foreground" /> Same
+              model
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {CHAT_MODELS.map((m) => (
+              <DropdownMenuItem key={m.id} onSelect={() => onRetry(m.id)}>
+                <ProviderIcon
+                  provider={providerOf(m.id)}
+                  className="size-4 shrink-0"
+                />
+                {m.name}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
       {onBranch && (
         <IconAction
           label={branching ? "Branching…" : "Branch"}
@@ -351,6 +396,7 @@ type AssistantTurnProps = {
   streaming: boolean
   onAnswer: AnswerInput
   busy: boolean
+  onRetry?: (modelId?: string) => void
   onBranch?: () => void
   onOpenArtifact: (id: string) => void
   activeArtifactId: string | null
@@ -379,6 +425,7 @@ function turnPropsEqual(prev: AssistantTurnProps, next: AssistantTurnProps) {
     // turn.failed), so a settled turn must still re-render when they change.
     prev.annotation === next.annotation &&
     prev.childParts === next.childParts &&
+    Boolean(prev.onRetry) === Boolean(next.onRetry) &&
     Boolean(prev.onBranch) === Boolean(next.onBranch)
   )
 }
@@ -388,6 +435,7 @@ export const AssistantTurn = memo(function AssistantTurn({
   streaming,
   onAnswer,
   busy,
+  onRetry,
   onBranch,
   onOpenArtifact,
   activeArtifactId,
@@ -419,6 +467,7 @@ export const AssistantTurn = memo(function AssistantTurn({
         <TurnStatusNote
           annotation={annotation}
           streaming={streaming}
+          onRetry={onRetry}
           busy={busy}
         />
         {/* Compaction is worth showing even mid-stream — it explains a sudden
@@ -431,11 +480,28 @@ export const AssistantTurn = memo(function AssistantTurn({
         {stopped && (
           <div className="fade-in flex animate-in items-center gap-2 text-muted-foreground text-sm">
             <span>Stopped before finishing.</span>
+            {onRetry && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => onRetry()}
+                disabled={busy}
+                className="h-7 gap-1.5 px-2 text-muted-foreground text-xs hover:text-foreground"
+              >
+                <RiRestartLine className="size-3.5" /> Retry
+              </Button>
+            )}
           </div>
         )}
         {!streaming && hasText && (
           <div className="flex items-center gap-2">
-            <AnswerActions message={message} onBranch={onBranch} busy={busy} />
+            <AnswerActions
+              message={message}
+              onRetry={onRetry}
+              onBranch={onBranch}
+              busy={busy}
+            />
             <TurnUsage annotation={annotation} />
           </div>
         )}

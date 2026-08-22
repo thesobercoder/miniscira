@@ -36,6 +36,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import type { UploadedDoc } from "@/hooks/use-chat-attachments"
+import { useCopyFeedback } from "@/hooks/use-copy-feedback"
 
 // A sent attachment reads as a distinct bordered chip (icon + filename) so the
 // user can tell at a glance it's what they attached. Clicking anywhere opens
@@ -218,14 +219,7 @@ export function UserBubble({
 }) {
   const [previewDoc, setPreviewDoc] = useState<UploadedDoc | null>(null)
   const [editing, setEditing] = useState(false)
-  const [copied, setCopied] = useState(false)
-
-  const copy = () => {
-    void navigator.clipboard.writeText(text).then(() => {
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1500)
-    })
-  }
+  const { copied, copy } = useCopyFeedback("Couldn't copy that question")
 
   if (editing && onEdit) {
     return (
@@ -310,7 +304,7 @@ export function UserBubble({
                 <Button
                   aria-label={copied ? "Copied question" : "Copy question"}
                   className="size-7 text-muted-foreground hover:text-foreground"
-                  onClick={copy}
+                  onClick={() => void copy(text)}
                   size="icon-sm"
                   type="button"
                   variant="ghost"

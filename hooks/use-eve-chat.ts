@@ -324,15 +324,26 @@ export function useEveChat({
   }, [clearCursor])
 
   /**
-   * Start the next send on a fresh durable session.
+   * Rewind onto a fresh session while keeping a rollback point.
    *
-   * Replacing an earlier message rewinds the visible conversation, so continuing
-   * the current append-only eve session would still expose the discarded future
-   * to the agent. The caller supplies a recap of only the retained prefix.
+   * Retry/edit cannot continue the append-only session that saw the discarded
+   * future. If the replacement never lands, the caller restores this snapshot
+   * so the original conversation remains fully resumable.
    */
   const resetSession = useCallback(async () => {
+    const previous = { ...cursorRef.current }
     await forgetSession()
+    return previous
   }, [forgetSession])
+
+  const restoreSession = useCallback(
+    async (previous: SessionState) => {
+      cursorRef.current = previous
+      sessionRef.current = null
+      await patchCursor(previous)
+    },
+    [patchCursor]
+  )
 
   /**
    * Paint the user's turn straight away.
@@ -523,6 +534,7 @@ export function useEveChat({
     answer,
     stop,
     resetSession,
+    restoreSession,
     supersede: projection.supersede,
     resolveSupersede,
   }

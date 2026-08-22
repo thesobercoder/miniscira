@@ -177,6 +177,9 @@ export function ResearchChat({
   // turn, so a second turn started before the first one's title generation
   // resolves can't be interrupted mid-stream by the first turn's refresh.
   const turnSeqRef = useRef(0)
+  // Synchronous guard for the gap before React commits the optimistic turn.
+  // This prevents double Retry/Edit and concurrent composer submissions.
+  const replacementLockRef = useRef(false)
 
   const {
     messages,
@@ -195,6 +198,7 @@ export function ResearchChat({
     answer,
     stop,
     resetSession,
+    restoreSession,
     supersede,
     resolveSupersede,
   } = useEveChat({ chatId, initialEvents, initialSession })
@@ -293,12 +297,21 @@ export function ResearchChat({
     }
   ): Promise<boolean> {
     const text = (submitText ?? input).trim()
-    if (!text || isBusy) return false
+    const blockedByReplacement = replacementLockRef.current && !replacement
+    if (!text || isBusy || blockedByReplacement) return false
     setInput("")
     // Before any await: on a chat's first message `ensureChat` is a round trip,
     // and until this lands the question has vanished from the composer with
     // nothing to show it was received.
     beginTurn(text)
+
+    // Replacement turns must start on a fresh append-only Eve session. Keep
+    // the old cursor until the new send is known to have landed so every early
+    // failure below can restore the original conversation exactly.
+    const previousSession = replacement ? await resetSession() : null
+    const restoreReplacedSession = async () => {
+      if (previousSession) await restoreSession(previousSession)
+    }
 
     // Staged attachments ride along with THIS message.
     const turnIndex =
@@ -313,12 +326,12 @@ export function ResearchChat({
       // composer empty with a pending bubble that will never resolve.
       abandonTurn()
       setInput((current) => current || text)
+      await restoreReplacedSession()
       toast.error("Couldn't start this chat. Your question is back in the box.")
       return false
     }
     setChatId(id)
-    if (replacement) rebindTurnAttachments(attached, replacement.turnIndex)
-    else persistTurnBinding(attached, turnIndex)
+    if (!replacement) persistTurnBinding(attached, turnIndex)
 
     // The chat row exists in the database now. Surface it in the sidebar
     // immediately — WITHOUT router.refresh(): `ensureChat` changed the URL via
@@ -368,6 +381,7 @@ export function ResearchChat({
       } catch {
         abandonTurn()
         setInput((current) => current || text)
+        await restoreReplacedSession()
         toast.error(
           "Couldn't read the attachment. Your question is back in the box."
         )
@@ -409,6 +423,9 @@ export function ResearchChat({
     // answer coming. Put the question back so retrying is one keystroke, not a
     // retype — `send` has already explained what went wrong.
     if (!sent) setInput((current) => current || text)
+    if (!sent) await restoreReplacedSession()
+    if (sent && replacement)
+      rebindTurnAttachments(attached, replacement.turnIndex)
 
     if (sent && myTurn === turnSeqRef.current) {
       // Turn finished, stream complete — safe to re-sync the sidebar from the
@@ -458,7 +475,7 @@ export function ResearchChat({
     text?: string,
     modelId?: string
   ) => {
-    if (isBusy) return
+    if (isBusy || replacementLockRef.current) return
     const question = messages[questionIndex]
     if (question?.role !== "user") return
     const next = text ?? partText(question.parts, "text")
@@ -472,16 +489,18 @@ export function ResearchChat({
     const sourceTurnIndex = userTurnOf[questionIndex]
     const turnIndex = nextReplacementTurnIndex(messages, userTurnOf)
     const attachments = attachmentsByTurn[sourceTurnIndex] ?? []
+    replacementLockRef.current = true
     supersede(ids)
-    await resetSession()
-    resolveSupersede(
-      ids,
-      await submit(next, modelId, {
+    try {
+      const sent = await submit(next, modelId, {
         retainedMessages,
         attachments,
         turnIndex,
       })
-    )
+      resolveSupersede(ids, sent)
+    } finally {
+      replacementLockRef.current = false
+    }
   }
 
   // Answering a question mid-turn has to repeat the model marker and the project
@@ -616,6 +635,17 @@ export function ResearchChat({
                                 streaming={isBusy && i === messages.length - 1}
                                 onAnswer={answerInput}
                                 busy={isBusy}
+                                onRetry={
+                                  i === messages.length - 1 &&
+                                  messages[i - 1]?.role === "user"
+                                    ? (modelId) =>
+                                        void replaceTurn(
+                                          i - 1,
+                                          undefined,
+                                          modelId
+                                        )
+                                    : undefined
+                                }
                                 onBranch={
                                   i === messages.length - 1
                                     ? branchChat
