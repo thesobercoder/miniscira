@@ -35,6 +35,7 @@ import { useMountEffect } from "@/hooks/use-mount-effect"
 import { buildClientContext, conversationRecap } from "@/lib/chat-context"
 import { type ChatEvent, partText } from "@/lib/chat-events"
 import { chatCreatedEvent, chatTitledEvent } from "@/lib/chat-list-events"
+import { replaceWithChatPath } from "@/lib/chat-route"
 import {
   messagesBeforeReplacement,
   nextReplacementTurnIndex,
@@ -249,7 +250,7 @@ export function ResearchChat({
       if (!res.ok || !json.chat) return null
       chatIdRef.current = json.chat.id
       createdRef.current = true
-      window.history.replaceState(null, "", `/chat/${json.chat.id}`)
+      replaceWithChatPath(json.chat.id)
       return json.chat.id
     } catch {
       return null
