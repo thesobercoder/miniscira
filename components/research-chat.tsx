@@ -34,6 +34,7 @@ import { useEveChat } from "@/hooks/use-eve-chat"
 import { useMountEffect } from "@/hooks/use-mount-effect"
 import { buildClientContext, conversationRecap } from "@/lib/chat-context"
 import { type ChatEvent, partText } from "@/lib/chat-events"
+import { chatCreatedEvent, chatTitledEvent } from "@/lib/chat-list-events"
 import {
   messagesBeforeReplacement,
   nextReplacementTurnIndex,
@@ -259,13 +260,23 @@ export function ResearchChat({
         method: "POST",
       })
       const json = (await res.json()) as {
-        chat?: { id: string }
+        chat?: { id: string; title: string }
         error?: string
       }
       if (!res.ok || !json.chat) {
         toast.error(json.error ?? "Couldn't branch this chat")
         return
       }
+      // A client-side route transition preserves the existing layout, so its
+      // server-rendered chat list is not fetched again. Surface the newly
+      // persisted branch through the same optimistic event used for a new chat.
+      window.dispatchEvent(
+        chatCreatedEvent({
+          id: json.chat.id,
+          title: json.chat.title,
+          updatedAt: new Date().toISOString(),
+        })
+      )
       router.push(`/chat/${json.chat.id}`)
     } catch {
       toast.error("Couldn't branch this chat")
@@ -321,12 +332,10 @@ export function ResearchChat({
     if (createdRef.current) {
       createdRef.current = false
       window.dispatchEvent(
-        new CustomEvent("miniscira:chat-created", {
-          detail: {
-            id,
-            title: text.slice(0, 80),
-            updatedAt: new Date().toISOString(),
-          },
+        chatCreatedEvent({
+          id,
+          title: text.slice(0, 80),
+          updatedAt: new Date().toISOString(),
         })
       )
       void fetch(`/api/chats/${id}/title`, {
@@ -337,11 +346,7 @@ export function ResearchChat({
         .then((res) => res.json().catch(() => null))
         .then((json: { title?: string } | null) => {
           if (json?.title) {
-            window.dispatchEvent(
-              new CustomEvent("miniscira:chat-titled", {
-                detail: { id, title: json.title },
-              })
-            )
+            window.dispatchEvent(chatTitledEvent(id, json.title))
           }
         })
         .catch(() => {})
@@ -611,17 +616,6 @@ export function ResearchChat({
                                 streaming={isBusy && i === messages.length - 1}
                                 onAnswer={answerInput}
                                 busy={isBusy}
-                                onRetry={
-                                  i === messages.length - 1 &&
-                                  messages[i - 1]?.role === "user"
-                                    ? (modelId) =>
-                                        void replaceTurn(
-                                          i - 1,
-                                          undefined,
-                                          modelId
-                                        )
-                                    : undefined
-                                }
                                 onBranch={
                                   i === messages.length - 1
                                     ? branchChat

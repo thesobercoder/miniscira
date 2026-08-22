@@ -25,8 +25,13 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { useMountEffect } from "@/hooks/use-mount-effect"
+import {
+  CHAT_CREATED_EVENT,
+  CHAT_TITLED_EVENT,
+  type ChatListRow,
+} from "@/lib/chat-list-events"
 
-type ChatRow = { id: string; title: string; updatedAt: string | Date }
+type ChatRow = ChatListRow
 
 function bucket(date: Date) {
   if (isToday(date)) return "Today"
@@ -122,11 +127,11 @@ export function ChatList({ chats }: { chats: ChatRow[] }) {
         )
       )
     }
-    window.addEventListener("miniscira:chat-created", created)
-    window.addEventListener("miniscira:chat-titled", titled)
+    window.addEventListener(CHAT_CREATED_EVENT, created)
+    window.addEventListener(CHAT_TITLED_EVENT, titled)
     return () => {
-      window.removeEventListener("miniscira:chat-created", created)
-      window.removeEventListener("miniscira:chat-titled", titled)
+      window.removeEventListener(CHAT_CREATED_EVENT, created)
+      window.removeEventListener(CHAT_TITLED_EVENT, titled)
     }
   })
 
