@@ -1,18 +1,20 @@
 import { defineTool } from "eve/tools"
 import { z } from "zod"
+import { redditQuery } from "../../lib/reddit-search"
 
-type YouComWebResult = {
+type SearxResult = {
   url?: string
   title?: string
-  description?: string
-  page_age?: string
-  snippets?: string[]
+  content?: string
+  publishedDate?: string
+  engine?: string
+  engines?: string[]
 }
 
 // The model sees this tool as `reddit_search`, from the filename.
 export default defineTool({
   description:
-    "Search Reddit discussions using the You.com API with multiple queries. Great for opinions, lived experiences, and community consensus.",
+    "Search public Reddit discussions through the configured SearXNG instance. Great for opinions, lived experiences, and community consensus.",
   inputSchema: z.object({
     queries: z
       .array(z.string().max(200))
@@ -27,72 +29,60 @@ export default defineTool({
     timeRange: z
       .array(z.enum(["day", "week", "month", "year"]))
       .optional()
-      .describe("Optional per-query time range (maps to You.com freshness)."),
+      .describe("Optional per-query time range."),
   }),
   async execute({ queries, maxResults, timeRange }) {
-    const key = process.env.YOU_COM_API_KEY
-    if (!key)
+    const baseUrl = process.env.SEARXNG_URL?.trim()
+    if (!baseUrl)
       return {
         queries,
-        error: "YOU_COM_API_KEY is not configured.",
+        error: "SEARXNG_URL is not configured.",
         results: [],
       }
 
     const perQuery = await Promise.all(
       queries.map(async (query, i) => {
         const count = Math.min(
-          Math.max(maxResults?.[i] ?? maxResults?.[0] ?? 20, 10),
+          Math.max(maxResults?.[i] ?? maxResults?.[0] ?? 20, 1),
           25
         )
-        const freshness = timeRange?.[i] ?? timeRange?.[0]
+        const params = new URLSearchParams({
+          q: redditQuery(query),
+          format: "json",
+          language: "en",
+          safesearch: "0",
+        })
+        const range = timeRange?.[i] ?? timeRange?.[0]
+        if (range) params.set("time_range", range)
+
         try {
-          const body: Record<string, unknown> = {
-            query,
-            crawl_timeout: 10,
-            language: "EN",
-            safesearch: "off",
-            include_domains: ["reddit.com"],
-            count,
-            offset: 0,
-          }
-          if (freshness) body.freshness = freshness
-
-          const res = await fetch("https://ydc-index.io/v1/search", {
-            method: "POST",
-            headers: {
-              "X-API-KEY": key,
-              "content-type": "application/json",
-              accept: "application/json",
-            },
-            body: JSON.stringify(body),
-          })
+          const res = await fetch(
+            `${baseUrl.replace(/\/$/, "")}/search?${params.toString()}`,
+            { headers: { accept: "application/json" } }
+          )
           if (!res.ok) return []
-
-          const data = (await res.json()) as {
-            results?: { web?: YouComWebResult[] }
-          }
-          return (data.results?.web ?? [])
-            .map((r) => {
-              const m =
-                typeof r.url === "string"
-                  ? r.url.match(/reddit\.com\/r\/([^/]+)/i)
-                  : null
-              const subreddit = m?.[1] ?? "unknown"
-              const snippets = (r.snippets ?? []).filter(
-                (s): s is string => typeof s === "string" && s.length > 0
-              )
-              const text = [r.description, ...snippets]
-                .filter(Boolean)
-                .join("\n\n")
+          const data = (await res.json()) as { results?: SearxResult[] }
+          return (data.results ?? [])
+            .filter(
+              (result) =>
+                typeof result.url === "string" &&
+                /https?:\/\/(?:www\.)?reddit\.com\//i.test(result.url)
+            )
+            .slice(0, count)
+            .map((result) => {
+              const subreddit =
+                result.url?.match(/reddit\.com\/r\/([^/]+)/i)?.[1] ?? "unknown"
               return {
-                url: r.url ?? "",
-                title: r.title ?? r.url ?? "",
-                text,
+                url: result.url ?? "",
+                title: result.title ?? result.url ?? "",
+                text: result.content ?? "",
                 subreddit,
-                publishedDate: r.page_age,
+                publishedDate: result.publishedDate,
+                engines:
+                  result.engines ??
+                  (result.engine ? [result.engine] : undefined),
               }
             })
-            .filter((r) => r.url)
         } catch (err) {
           console.error(`reddit_search failed for "${query}"`, err)
           return []
@@ -103,7 +93,7 @@ export default defineTool({
     const seen = new Set<string>()
     const results = perQuery
       .flat()
-      .filter((r) => !seen.has(r.url) && seen.add(r.url))
+      .filter((result) => !seen.has(result.url) && seen.add(result.url))
     return { queries, results }
   },
 })

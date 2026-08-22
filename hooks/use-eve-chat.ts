@@ -19,6 +19,7 @@ import {
   SUPERSEDE_EVENT,
   subagentCallId,
 } from "@/lib/chat-events"
+import { consumeDurableTurn } from "@/lib/eve-stream-consume"
 import { EVE_LONG_RUNNING_STREAM_POLICY } from "@/lib/eve-stream-policy"
 import { segmentedMessageReducer } from "@/lib/message-reducer"
 import { collectSubagentCalls, subagentChild } from "@/lib/subagent-stream"
@@ -205,50 +206,35 @@ export function useEveChat({
   const consume = useCallback(
     async (iterable: AsyncIterable<ChatEvent>, onStarted?: () => void) => {
       setTurn(beginStreaming)
-      // A turn ends when a boundary event says so — not when this iterator
-      // stops. eve reconnects within one stream() call, but once its retries
-      // are spent the iterator simply returns while the durable turn keeps
-      // running server-side. Settling on iterator-end is what made a live turn
-      // render as "Research stopped".
+      // A turn ends when a boundary event says so — not when an iterator stops.
+      // Each Eve iterator has a bounded retry budget; once spent, reopen from
+      // the persisted cursor for as long as this durable turn remains active.
       let settled = false
       let received = 0
       let started = false
-      let stream = iterable
       try {
-        for (let attempt = 0; ; attempt += 1) {
-          try {
-            const drained = await drainUntilBoundary(stream, (event) => {
-              if (!started) {
-                started = true
-                onStarted?.()
-              }
-              ingest(event)
-            })
-            received += drained.received
-            if (drained.settled) settled = true
-          } catch (err) {
-            if ((err as Error)?.name === "AbortError") break
-            console.error("eve stream error", err)
-          }
-          // Stop pressed, turn finished, or we've re-attached enough times.
-          if (settled || abortRef.current?.signal.aborted) break
-          if (attempt >= 3) {
-            // Out of reattempts while the durable turn is very likely still
-            // running (and billing) server-side. Say so instead of dropping to
-            // `ready`, which reads as "the answer is finished".
-            setTurn(detach)
-            break
-          }
-          // Re-open from where this session left off. Without an explicit
-          // startIndex the durable stream replays from event 0, which is how a
-          // reload used to re-persist an entire session and render it as a
-          // second copy of the same turn.
-          stream = getSession().stream({
-            startIndex: cursorRef.current.streamIndex,
-            signal: abortRef.current?.signal ?? undefined,
-            streamReconnectPolicy: EVE_LONG_RUNNING_STREAM_POLICY,
-          })
-        }
+        const consumed = await consumeDurableTurn({
+          initialStream: iterable,
+          reopen: () =>
+            getSession().stream({
+              startIndex: cursorRef.current.streamIndex,
+              signal: abortRef.current?.signal ?? undefined,
+              streamReconnectPolicy: EVE_LONG_RUNNING_STREAM_POLICY,
+            }),
+          isBoundary: isTurnBoundary,
+          onEvent: (event) => {
+            if (!started) {
+              started = true
+              onStarted?.()
+            }
+            ingest(event)
+          },
+          signal: abortRef.current?.signal,
+          reconnectPolicy: EVE_LONG_RUNNING_STREAM_POLICY,
+        })
+        settled = consumed.settled
+        received = consumed.received
+        if (!settled && !abortRef.current?.signal.aborted) setTurn(detach)
       } finally {
         // `settle`, not `READY`: it drops the optimistic bubble and any
         // "Stopping…" affordance but carries `detached` across. Resetting to a

@@ -62,7 +62,7 @@ missing. Everything else is optional — off or defaulted unless set.
 | `IMAGE_MODEL` | Image model for the `generate_image` tool (default `gpt-image-2`). |
 | `LOCAL_STORAGE_DIR` | Where uploads land (`/data/uploads`; the compose mounts a named volume there). |
 | `RUN_DB_PUSH` | TRANSITIONAL: `"true"` runs `drizzle-kit push` at container start under a Postgres advisory lock. Default off — normal startup never mutates the schema. |
-| `EXA_API_KEY`, `FIRECRAWL_API_KEY`, `FIRECRAWL_API_URL`, `XAI_API_KEY`, `YOU_COM_API_KEY` | Search providers — the agent's only web access. With none set, the agent cannot reach the web. |
+| `EXA_API_KEY`, `FIRECRAWL_API_KEY`, `FIRECRAWL_API_URL`, `XAI_API_KEY`, `SEARXNG_URL` | Search providers — the agent's only web access. `reddit_search` uses `SEARXNG_URL` with `site:reddit.com` queries. With none set, the agent cannot reach the web. |
 | `LOOKOUT_RUN_SECRET` | Secret for scheduled-research internal auth: `openssl rand -hex 32`. |
 | `RATE_LIMIT_PER_MINUTE` | Per-user requests/minute on `/api/*` (in-memory, per process). |
 | `APP_PORT`, `IMAGE_PLATFORM`, `MINISCIRA_IMAGE` | Compose/build knobs. `APP_PORT` is the published host port (default `3000`). |
