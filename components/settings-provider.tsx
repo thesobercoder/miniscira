@@ -1,6 +1,7 @@
 "use client"
 
-import { createContext, useCallback, useContext, useState } from "react"
+import { createContext, useCallback, useContext, useRef, useState } from "react"
+import { toast } from "sonner"
 
 import { normalizeTone, type UserSettings } from "@/lib/tones"
 
@@ -13,7 +14,7 @@ type SettingsPatch = Partial<{
 type SettingsContextValue = {
   settings: UserSettings
   saving: boolean
-  save: (patch: SettingsPatch) => Promise<void>
+  save: (patch: SettingsPatch) => Promise<boolean>
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
@@ -30,8 +31,14 @@ export function SettingsProvider({
 }) {
   const [settings, setSettings] = useState<UserSettings>(initial)
   const [saving, setSaving] = useState(false)
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
+  const saveVersionRef = useRef(0)
 
   const save = useCallback(async (patch: SettingsPatch) => {
+    const version = saveVersionRef.current + 1
+    saveVersionRef.current = version
+    const previous = settingsRef.current
     setSaving(true)
     setSettings((prev) => ({
       nickname:
@@ -50,10 +57,23 @@ export function SettingsProvider({
         headers: { "content-type": "application/json" },
         body: JSON.stringify(patch),
       })
-      const json = (await res.json()) as { settings?: UserSettings }
-      if (json.settings) setSettings(json.settings)
+      const json = (await res.json().catch(() => ({}))) as {
+        settings?: UserSettings
+        error?: string
+      }
+      if (!res.ok || !json.settings) {
+        if (version === saveVersionRef.current) setSettings(previous)
+        toast.error(json.error ?? "Couldn't save your settings.")
+        return false
+      }
+      if (version === saveVersionRef.current) setSettings(json.settings)
+      return true
+    } catch {
+      if (version === saveVersionRef.current) setSettings(previous)
+      toast.error("Couldn't save your settings.")
+      return false
     } finally {
-      setSaving(false)
+      if (version === saveVersionRef.current) setSaving(false)
     }
   }, [])
 

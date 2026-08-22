@@ -46,19 +46,25 @@ export function SettingsPersonalization() {
   if (!ctx) return null
   const { settings, saving, save } = ctx
 
-  const persist = (patch: Parameters<typeof save>[0]) => {
-    setEverSaved(true)
-    void save(patch)
+  const persist = async (patch: Parameters<typeof save>[0]) => {
+    const previous = settings
+    const saved = await save(patch)
+    setEverSaved(saved)
+    if (saved) return
+    if (patch.nickname !== undefined) setNickname(previous.nickname ?? "")
+    if (patch.instructions !== undefined)
+      setInstructions(previous.instructions ?? "")
   }
 
   // Persist a field on blur only when it actually changed.
   const commitNickname = () => {
     const next = nickname.trim()
-    if (next !== (settings.nickname ?? "")) persist({ nickname: next })
+    if (next !== (settings.nickname ?? "")) void persist({ nickname: next })
   }
   const commitInstructions = () => {
     const next = instructions.trim()
-    if (next !== (settings.instructions ?? "")) persist({ instructions: next })
+    if (next !== (settings.instructions ?? ""))
+      void persist({ instructions: next })
   }
 
   return (
@@ -119,7 +125,7 @@ export function SettingsPersonalization() {
               <button
                 key={tone}
                 type="button"
-                onClick={() => !active && persist({ tone })}
+                onClick={() => !active && void persist({ tone })}
                 aria-pressed={active}
                 className={cn(
                   "rounded-xl border p-3 text-left transition-colors",

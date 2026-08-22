@@ -2,133 +2,178 @@
 
 ![MiniScira — research that shows its working](.github/assets/banner.png)
 
-An AI research assistant that shows its working. Ask a question and a durable
-backend agent searches the web, reads sources, and answers with inline
-citations — with every search, page read and delegated sub-agent rendered as a
-live step rather than a spinner.
+A Docker-first, self-hosted AI research assistant that shows its work. Ask a
+question and a durable backend agent searches, reads sources, delegates focused
+sub-questions, runs tools, and answers with inline citations—while the browser
+renders every step live instead of hiding it behind a spinner.
 
-Self-hosted, and each user brings their own AI Gateway key, so research is
-billed to them rather than to whoever runs the deployment.
+This repository is an independent fork focused on portable Docker deployment,
+local data ownership, OpenAI-compatible gateways, and a simple user experience.
+It has diverged substantially from the original project and follows its own
+roadmap and release process.
 
-**[Documentation](https://miniscira.com/docs)** ·
-[Architecture](https://miniscira.com/docs/architecture) ·
-[Self-hosting](https://miniscira.com/docs/self-host)
+## Acknowledgements
 
-## Stack
+MiniScira began from [Zaid Mukaddam's original
+MiniScira](https://github.com/zaidmukaddam/miniscira). Zaid created the product,
+its core research experience, and much of the foundation this fork builds on.
+We are grateful for that excellent work. This fork remains MIT-licensed,
+preserves the original copyright notice, and independently adapts useful
+upstream ideas where they fit its Docker-first architecture.
 
-- **[eve](https://github.com/vercel/eve)** — durable backend agent framework
-- **Next.js 16** + React 19 + **shadcn/ui** (Base UI) + Tailwind v4
-- **[Streamdown](https://streamdown.ai)** — streaming markdown
-- **[better-auth](https://better-auth.com)** — Vercel (default) + Google +
-  GitHub + email/password
-- **Neon Postgres** + **Drizzle ORM**
-- **[Vercel AI Gateway](https://vercel.com/ai-gateway)** for models and
-  reranking — no per-provider keys. Default model
-  `xai/grok-4.20-reasoning`, compaction on `google/gemini-3.5-flash`; see
-  `lib/models.ts` and `agent/agent.ts`.
+## What this fork optimizes for
 
-## How it fits together
+- **Docker portability:** deploy with Docker Compose on a VPS, home server, NAS,
+  or another Docker-capable host.
+- **Self-hosted data:** Postgres/pgvector plus durable local uploads and generated
+  artifacts.
+- **Gateway freedom:** route model calls through an OpenAI-compatible gateway;
+  no Vercel platform dependency is required.
+- **Durable research:** live, reconnectable Eve sessions with persisted events,
+  delegated research, citations, projects, memory, and scheduled lookouts.
+- **Secure code execution:** optional sibling-container sandboxes behind a
+  private, default-deny Docker middleware and egress allowlist.
+- **Simple product UX:** search, memory, tools, and model routing should be
+  automatic for ordinary users; infrastructure controls stay with operators.
 
-Two processes that behave like one. `withEve()` in `next.config.ts` rewrites
-`/eve/v1/*` to the agent, so from the browser there is a single origin and no
-CORS.
+## Architecture
 
-```
-Browser ──────▶ Next.js :3000 ──────▶ Postgres
+MiniScira runs two application processes in one image. Next.js serves the UI and
+API; Eve runs the durable agent. `withEve()` rewrites `/eve/v1/*` to Eve, keeping
+the browser on one origin.
+
+```text
+Browser ──────▶ Next.js :3000 ──────▶ Postgres + pgvector
                       │
-                      │ /eve/v1/*  (rewrite)
+                      │ /eve/v1/*
                       ▼
-                eve agent :4274 ────▶ Postgres
-                      └──────────────▶ AI Gateway
+                Eve agent :4274 ─────▶ OpenAI-compatible gateway
+                      │
+                      └───────────────▶ optional Docker sandbox
 ```
-
-On Vercel both deploy as one project. Everywhere else you start both yourself —
-`next build` does **not** build the agent.
 
 | Path | What lives there |
 | --- | --- |
-| `agent/` | Everything the model can see or do: tools, skills, instructions, subagents, schedules |
-| `agent/channels/eve.ts` | The agent's HTTP channel and its ordered auth chain |
-| `app/(app)/` | The authenticated shell — chat, projects, lookouts, settings, MCP |
-| `app/api/` | REST endpoints the UI calls directly |
-| `app/docs/` | The documentation site, built with Fumadocs |
-| `components/timeline/` | The research transcript |
-| `lib/` | Database, auth, retrieval, model catalog, event parsing |
-| `proxy.ts` | Next 16's renamed middleware |
+| `agent/` | Agent instructions, tools, subagents, schedules, channels, sandbox configuration |
+| `app/(app)/` | Authenticated chat, projects, lookouts, settings, and MCP UI |
+| `app/api/` | UI-facing API routes |
+| `components/timeline/` | Live research and tool timeline |
+| `lib/` | Database, auth, retrieval, storage, model catalog, event parsing |
+| `docs/DEPLOYMENT.md` | Portable Docker operations, backup, restore, upgrades, and troubleshooting |
+| `docs/UMBREL_SANDBOX_OPERATIONS.md` | Installation-specific Umbrel/Portainer operations |
 
-## Running it
+## Docker Compose quickstart
 
-You need [Bun](https://bun.sh), a [Neon](https://neon.tech) database, and a
-[Vercel AI Gateway](https://vercel.com/ai-gateway) key.
+### Prerequisites
+
+- Docker Engine and Docker Compose v2.20+
+- An OpenAI-compatible model gateway
+- An `amd64` host, or an ARM host able to run the image through emulation
+
+### Start the stack
+
+```bash
+git clone https://github.com/thesobercoder/miniscira.git
+cd miniscira
+cp .env.example .env
+# Fill the required values described in .env.example.
+
+docker compose build
+docker compose up -d db
+docker compose --profile migrate run --rm migrate
+docker compose up -d app
+
+curl --fail http://localhost:3000/api/health
+curl --fail http://localhost:3000/eve/v1/health
+```
+
+Required configuration includes:
+
+- `DATABASE_URL`
+- `POSTGRES_PASSWORD` for the bundled database
+- `AI_GATEWAY_BASE_URL`
+- `AI_GATEWAY_API_KEY`, unless every user supplies a private key
+- `BETTER_AUTH_SECRET`
+- `BETTER_AUTH_URL`
+
+The Compose stack includes:
+
+- MiniScira's combined Next.js + Eve image
+- Postgres with pgvector
+- an explicit, one-shot migration service
+- durable database and upload volumes
+- health checks for both application processes
+- an optional Docker sandbox control plane and egress proxy
+
+Normal startup does **not** mutate the schema. Apply committed migrations with
+the `migrate` profile before deploying a new application image.
+
+For an external Postgres service, use the supplied override instead of editing
+the base file:
+
+```bash
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.external-db.yml \
+  build
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.external-db.yml \
+  --profile migrate run --rm migrate
+docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.external-db.yml \
+  up -d app
+```
+
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for reverse proxies, secrets,
+backups, restore, upgrade/rollback, model-gateway configuration, health
+semantics, and troubleshooting.
+
+## Local development
+
+Docker is the supported deployment path. For source development:
 
 ```bash
 bun install
 cp .env.example .env.local
+bun run db:setup
+bun run db:push
+bun run dev
 ```
 
-Fill in `AI_GATEWAY_API_KEY`, `DATABASE_URL` and `BETTER_AUTH_SECRET` — the only
-hard requirements — and set `ALLOW_SHARED_GATEWAY_KEY=true` for local
-development. Then:
+A Next.js build alone does not build or start Eve. The production Dockerfile and
+entrypoint build and supervise both processes.
+
+## Quality gates
+
+Before opening a change or deploying an image:
 
 ```bash
-bun run db:setup   # creates the pgvector extension, once per database
-bun run db:push    # applies the schema
-bun run dev        # starts Next.js and the agent together
+bun run typecheck
+bun run lint
+bun test
+bun run check
+git diff --check
 ```
 
-Everything else degrades gracefully when unset: Exa, Firecrawl, Resend, Blob
-storage and the OAuth providers. See
-[the environment matrix](https://miniscira.com/docs/self-host#environment-variables)
-for what each one buys you.
+Agent, retrieval, prompt, model-routing, or tool changes should also run the
+relevant `evals/*.eval.ts`. Docker/Eve/sandbox changes require the full sandbox
+acceptance suite documented in `docs/UMBREL_SANDBOX_OPERATIONS.md`.
 
-## Deploying
+Read [AGENTS.md](AGENTS.md) before changing the repository. It records the
+architectural and operational invariants that are easy to miss from source code
+alone. See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution workflow and
+[SECURITY.md](SECURITY.md) for vulnerability reports.
 
-Vercel, Docker and a plain VPS are all covered in
-[the self-hosting docs](https://miniscira.com/docs/self-host), including the
-parts that bite — the two-process model, the `NODE_ENV` requirement on the agent
-process, and why the Docker image has to be `linux/amd64`.
+## Upstream policy
 
-Set `DEMO_MODE=true` to serve a landing page instead of the app; that is what
-miniscira.com runs.
-
-### Quickstart: Docker Compose
-
-The repo ships a complete self-hosted stack — app image, bundled Postgres +
-pgvector, a one-shot migration service, named volumes and healthchecks:
-
-```bash
-git clone https://github.com/thesobercoder/miniscira.git && cd miniscira
-cp .env.example .env         # fill in the REQUIRED values (below)
-docker compose build
-docker compose up -d db
-docker compose --profile migrate run --rm migrate   # apply schema once
-docker compose up -d app
-curl http://localhost:3000/api/health               # {"ok":true}
-```
-
-REQUIRED in `.env`: `DATABASE_URL` (use host `db` for the bundled service),
-`AI_GATEWAY_BASE_URL` (any OpenAI-compatible endpoint — every model call goes
-through it, with no fallback), `BETTER_AUTH_SECRET`
-(`openssl rand -base64 32`), `BETTER_AUTH_URL` (the browser-facing origin),
-and `POSTGRES_PASSWORD` (must match `DATABASE_URL`). Everything else is
-optional; `.env.example` is the full matrix.
-
-Normal startup never mutates the schema — apply committed migrations with the
-one-shot `migrate` service, and pre-existing databases are adopted by
-baseline-stamping (no DDL). The live gateway `/v1/models` catalog is the
-authority for which models exist; `DEFAULT_CHAT_MODEL` and `AI_MODELS_JSON`
-only steer defaults and display metadata.
-
-Backups, restore, upgrades, rollback, health semantics, secrets, reverse
-proxying and troubleshooting: see **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md), and [SECURITY.md](SECURITY.md) for
-reporting a vulnerability. `AGENTS.md` documents the invariants that aren't
-visible from the code alone — worth reading before changing the agent channel,
-the event parser, or the lookout scheduler.
+The fork does not depend on upstream accepting its changes. Upstream remains a
+valuable source of fixes and ideas: we fetch and review new commits, then adapt
+useful changes surgically around this fork's local-storage, gateway, Docker,
+authentication, and deployment invariants. We do not merge large upstream
+changes blindly.
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). The original copyright notice is retained.

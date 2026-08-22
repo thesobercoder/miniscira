@@ -134,6 +134,7 @@ function AttachmentPreviewDialog({
               src={doc.url}
               title={doc.filename}
               className="h-[75vh] w-full"
+              sandbox=""
             />
           ) : (
             <p className="p-5 text-muted-foreground text-sm">

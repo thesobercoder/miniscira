@@ -4,12 +4,12 @@
   "type": "module",
   "private": true,
   "license": "MIT",
-  "homepage": "https://miniscira.com",
+  "homepage": "https://github.com/thesobercoder/miniscira",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zaidmukaddam/miniscira.git"
+    "url": "git+https://github.com/thesobercoder/miniscira.git"
   },
-  "bugs": "https://github.com/zaidmukaddam/miniscira/issues",
+  "bugs": "https://github.com/thesobercoder/miniscira/issues",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

@@ -1,5 +1,37 @@
 # Project conventions
 
+## Product and repository identity
+
+- This is an independent, Docker-first fork. The original MiniScira is credited
+  in `README.md`, but upstream acceptance is not a roadmap dependency.
+- Keep `origin` as the authoritative production fork. Treat `upstream` as a
+  read-only source of fixes and ideas: fetch it, inspect individual changes, and
+  adapt useful behavior surgically rather than merging large commits blindly.
+- Generic Docker Compose behavior belongs in `README.md`, `.env.example`,
+  `docker-compose.yml`, and `docs/DEPLOYMENT.md`. Installation-specific Umbrel
+  and Portainer details belong only in `docs/UMBREL_SANDBOX_OPERATIONS.md`.
+- The normal product experience stays simple. Search, memory, tools, and routing
+  should happen automatically; provider and infrastructure controls belong in
+  deployment configuration or advanced/admin surfaces.
+
+## Engineering workflow
+
+1. Start from a clean tree and state the observable acceptance criteria.
+2. Trace the complete affected path before editing: UI, API, database, Eve
+   events, tools, gateway, storage, and deployment where relevant.
+3. Add the smallest regression test that would have caught the problem.
+4. Implement the smallest coherent change using adjacent repository patterns.
+5. Run focused tests first, then the full quality gates before deployment.
+6. Exercise the real user-visible flow. Health checks alone are insufficient.
+7. Review diffs for secrets, generated artifacts, schema changes, stale docs,
+   and unrelated formatting before committing.
+
+Code should optimize for clarity over cleverness: small named functions,
+explicit error states, one source of truth, narrow types, and comments that
+explain *why* an invariant exists. Avoid speculative abstractions, duplicate
+state, fire-and-forget promises without an error path, and provider-specific
+behavior leaking into ordinary UI components.
+
 ## Toolchain
 
 - Package manager is **bun**. Install with `bun install`, run scripts with `bun run <script>`.
@@ -9,6 +41,8 @@
   Model-level evals are `evals/*.eval.ts`.
 - Formatter and linter are **biome** (`bun run format`, `bun run check`).
   Do **not** add prettier or eslint config; they were deliberately removed.
+- `bun run check` writes formatting/lint fixes. Inspect its diff and rerun tests;
+  an auto-fixer's exit code is not proof that behavior is correct.
 
 ## Non-obvious invariants
 
@@ -56,6 +90,13 @@
   live model is chosen per turn in `agent/agent.ts` from the user's picker
   choice and sent as-is; only its *context window* is looked up in the AI
   Gateway catalog. Changing one without the other desyncs context-window math.
+- Long-running root and delegated Eve streams use the shared policy in
+  `lib/eve-stream-policy.ts`. Do not disable subagent reconnection or replace it
+  with a short SDK default: durable research may cross proxy resets, temporary
+  gateway failures, or browser network changes.
+- `hooks/use-chat-attachments.ts` owns browser object URLs. Every
+  `URL.createObjectURL` needs immediate replacement/removal cleanup and unmount
+  cleanup; uploads and generated files remain local-storage-first.
 
 ## Motion tokens
 

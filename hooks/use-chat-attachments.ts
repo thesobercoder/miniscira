@@ -51,6 +51,9 @@ export function useChatAttachments({
   // re-render it on every keystroke of an unrelated upload.
   const documentsRef = useRef(documents)
   documentsRef.current = documents
+  // Every object URL created for a staged image. Removing a chip revokes its
+  // URL immediately; unmount cleanup catches previews left behind on navigation.
+  const previewUrlsRef = useRef(new Set<string>())
   // Sent attachments, grouped by the user-turn index they rode along with.
   const [attachmentsByTurn, setAttachmentsByTurn] = useState<
     Record<number, UploadedDoc[]>
@@ -81,6 +84,11 @@ export function useChatAttachments({
     }
   })
 
+  useMountEffect(() => () => {
+    for (const url of previewUrlsRef.current) URL.revokeObjectURL(url)
+    previewUrlsRef.current.clear()
+  })
+
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
       const list = Array.from(files)
@@ -92,19 +100,27 @@ export function useChatAttachments({
         const tempId = `tmp-${file.name}-${file.size}-${file.lastModified}`
         const isImage = file.type.startsWith("image/")
         const previewUrl = isImage ? URL.createObjectURL(file) : undefined
-        setDocuments((prev) => [
-          {
-            id: tempId,
-            filename: file.name,
-            status: "processing",
-            kind: isImage ? "image" : "document",
-            url: previewUrl,
-            mimeType: file.type,
-            // Kept so a failure can offer Retry instead of a dead-end icon.
-            file,
-          },
-          ...prev.filter((d) => d.id !== tempId),
-        ])
+        if (previewUrl) previewUrlsRef.current.add(previewUrl)
+        setDocuments((prev) => {
+          const replaced = prev.find((d) => d.id === tempId)
+          if (replaced?.url?.startsWith("blob:")) {
+            URL.revokeObjectURL(replaced.url)
+            previewUrlsRef.current.delete(replaced.url)
+          }
+          return [
+            {
+              id: tempId,
+              filename: file.name,
+              status: "processing",
+              kind: isImage ? "image" : "document",
+              url: previewUrl,
+              mimeType: file.type,
+              // Kept so a failure can offer Retry instead of a dead-end icon.
+              file,
+            },
+            ...prev.filter((d) => d.id !== tempId),
+          ]
+        })
         const body = new FormData()
         body.set("file", file)
         const id = currentChatId()
@@ -134,8 +150,10 @@ export function useChatAttachments({
           setDocuments((prev) =>
             prev.map((d) => (d.id === tempId ? merged : d))
           )
-          if (previewUrl && merged.url !== previewUrl)
+          if (previewUrl && merged.url !== previewUrl) {
             URL.revokeObjectURL(previewUrl)
+            previewUrlsRef.current.delete(previewUrl)
+          }
           if (json.document.status === "error" && json.error)
             toast.error(json.error)
         } catch {
@@ -165,14 +183,14 @@ export function useChatAttachments({
   )
 
   const removeDocument = useCallback(async (id: string) => {
-    let removed: UploadedDoc | undefined
-    setDocuments((prev) => {
-      removed = prev.find((d) => d.id === id)
-      return prev.filter((d) => d.id !== id)
-    })
+    const removed = documentsRef.current.find((d) => d.id === id)
+    setDocuments((prev) => prev.filter((d) => d.id !== id))
     // Object URLs are only ever minted for local previews, and nothing else
     // holds this one once the chip is gone.
-    if (removed?.url?.startsWith("blob:")) URL.revokeObjectURL(removed.url)
+    if (removed?.url?.startsWith("blob:")) {
+      URL.revokeObjectURL(removed.url)
+      previewUrlsRef.current.delete(removed.url)
+    }
     if (id.startsWith("tmp-")) return
     // The chip is already gone from the composer and putting it back would be
     // more confusing than the toast; say so and leave the row for the

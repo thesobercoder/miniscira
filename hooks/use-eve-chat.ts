@@ -19,6 +19,7 @@ import {
   SUPERSEDE_EVENT,
   subagentCallId,
 } from "@/lib/chat-events"
+import { EVE_LONG_RUNNING_STREAM_POLICY } from "@/lib/eve-stream-policy"
 import { segmentedMessageReducer } from "@/lib/message-reducer"
 import { collectSubagentCalls, subagentChild } from "@/lib/subagent-stream"
 import {
@@ -245,6 +246,7 @@ export function useEveChat({
           stream = getSession().stream({
             startIndex: cursorRef.current.streamIndex,
             signal: abortRef.current?.signal ?? undefined,
+            streamReconnectPolicy: EVE_LONG_RUNNING_STREAM_POLICY,
           })
         }
       } finally {
@@ -283,7 +285,13 @@ export function useEveChat({
     const session = getSession()
     const ac = new AbortController()
     abortRef.current = ac
-    void consume(session.stream({ startIndex, signal: ac.signal }))
+    void consume(
+      session.stream({
+        startIndex,
+        signal: ac.signal,
+        streamReconnectPolicy: EVE_LONG_RUNNING_STREAM_POLICY,
+      })
+    )
     return () => ac.abort()
   })
 
@@ -396,6 +404,7 @@ export function useEveChat({
             message,
             signal: ac.signal,
             clientContext: context,
+            streamReconnectPolicy: EVE_LONG_RUNNING_STREAM_POLICY,
           })
         } catch (err) {
           if ((err as Error)?.name !== "AbortError")
@@ -470,6 +479,7 @@ export function useEveChat({
             inputResponses: responses,
             clientContext,
             signal: ac.signal,
+            streamReconnectPolicy: EVE_LONG_RUNNING_STREAM_POLICY,
           })
         } catch (err) {
           if ((err as Error)?.name === "AbortError") {

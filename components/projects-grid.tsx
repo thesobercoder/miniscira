@@ -3,7 +3,7 @@
 import { RiAddLine, RiFolder3Line } from "@remixicon/react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -13,8 +13,11 @@ type ProjectItem = { id: string; name: string; instructions: string | null }
 export function ProjectsGrid({ initial }: { initial: ProjectItem[] }) {
   const router = useRouter()
   const [creating, setCreating] = useState(false)
+  const createInFlight = useRef(false)
 
   const create = async () => {
+    if (createInFlight.current) return
+    createInFlight.current = true
     setCreating(true)
     try {
       const res = await fetch("/api/projects", {
@@ -34,6 +37,7 @@ export function ProjectsGrid({ initial }: { initial: ProjectItem[] }) {
     } catch {
       toast.error("Couldn't create the project")
     } finally {
+      createInFlight.current = false
       setCreating(false)
     }
   }

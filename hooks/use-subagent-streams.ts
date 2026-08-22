@@ -16,6 +16,10 @@ import {
   subagentCallId,
 } from "@/lib/chat-events"
 import {
+  EVE_LONG_RUNNING_STREAM_POLICY,
+  shouldReattachSubagent,
+} from "@/lib/eve-stream-policy"
+import {
   collectSubagentCalls,
   EMPTY_MESSAGE_DATA,
   reduceSubagentEvents,
@@ -90,23 +94,36 @@ export function useSubagentStreams({
             sessionId: call.childSessionId,
             streamIndex: 0,
           })
-          for await (const e of child.stream({
-            startIndex: 0,
-            // Follow a delegate that is still working, so its steps appear as
-            // they happen; for one that already finished (or on reload), read
-            // to the durable tail and stop rather than hold a socket open.
-            follow: !doneCallsRef.current.has(call.callId),
-            signal: ac.signal,
-            streamReconnectPolicy: { reconnect: false },
-          })) {
-            acc = reducer.reduce(acc, e)
-            const now = Date.now()
-            if (now - lastPublish > PUBLISH_INTERVAL_MS) {
-              lastPublish = now
-              const snapshot = acc
-              setChildData((prev) => ({ ...prev, [call.callId]: snapshot }))
+          do {
+            // A single Eve iterator has a bounded no-progress retry budget. If
+            // that budget is exhausted while the child is unfinished, open a
+            // fresh iterator instead of permanently freezing its transcript.
+            acc = EMPTY_MESSAGE_DATA
+            for await (const e of child.stream({
+              startIndex: 0,
+              // Follow a delegate that is still working, so its steps appear as
+              // they happen; for one that already finished (or on reload), read
+              // to the durable tail and stop rather than hold a socket open.
+              follow: !doneCallsRef.current.has(call.callId),
+              signal: ac.signal,
+              streamReconnectPolicy: EVE_LONG_RUNNING_STREAM_POLICY,
+            })) {
+              acc = reducer.reduce(acc, e)
+              const now = Date.now()
+              if (now - lastPublish > PUBLISH_INTERVAL_MS) {
+                lastPublish = now
+                const snapshot = acc
+                setChildData((prev) => ({ ...prev, [call.callId]: snapshot }))
+              }
             }
-          }
+            const snapshot = acc
+            setChildData((prev) => ({ ...prev, [call.callId]: snapshot }))
+          } while (
+            shouldReattachSubagent({
+              aborted: ac.signal.aborted,
+              completed: doneCallsRef.current.has(call.callId),
+            })
+          )
           // Final flush so the last events always land.
           const final = acc
           setChildData((prev) => ({ ...prev, [call.callId]: final }))

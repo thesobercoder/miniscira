@@ -1,82 +1,104 @@
 # Contributing
 
-Thanks for looking. This is a small project, so the process is short.
+MiniScira is an independently maintained, Docker-first fork. Contributions are
+welcome when they preserve portable self-hosting, local data ownership, the
+simple product experience, and the repository invariants in `AGENTS.md`.
 
-## Setting up
+## Set up a development environment
 
-You need [Bun](https://bun.sh), a [Neon](https://neon.tech) database, and a
-[Vercel AI Gateway](https://vercel.com/ai-gateway) key.
+You need Bun, Postgres with pgvector, and an OpenAI-compatible gateway.
 
 ```bash
-git clone https://github.com/zaidmukaddam/miniscira
+git clone https://github.com/thesobercoder/miniscira.git
 cd miniscira
 bun install
 cp .env.example .env.local
 ```
 
-Fill in `AI_GATEWAY_API_KEY`, `DATABASE_URL`, and `BETTER_AUTH_SECRET`, then:
+Set the required database, gateway, and Better Auth values described in
+`.env.example`, then:
 
 ```bash
-bun run db:setup   # creates the pgvector extension, once per database
-bun run db:push    # applies the schema
+bun run db:setup
+bun run db:push
 bun run dev
 ```
 
-Set `ALLOW_SHARED_GATEWAY_KEY=true` locally. Without it, chat turns require you
-to save your own gateway key in Settings first — correct in production, a
-nuisance while developing.
+`bun run dev` starts both Next.js and the Eve agent. A Next.js build alone does
+not build or start Eve.
 
-`bun run dev` starts Next.js **and** the eve agent together. If chat requests
-start 502-ing, the agent process has usually died on a compile error; check the
-dev server output and restart, because `eve dev` does not recover from a failed
-rebuild on its own.
+For production-like testing, prefer the Docker Compose path documented in
+`README.md` and `docs/DEPLOYMENT.md`.
 
-## Before you open a pull request
+## Before changing code
+
+1. Read `AGENTS.md`.
+2. Define an observable acceptance criterion or reproduce the bug.
+3. Inspect adjacent code and tests before introducing an abstraction.
+4. Trace the whole affected path—UI, API, database, Eve events, tools, gateway,
+   storage, and deployment where relevant.
+5. Add the smallest useful regression test.
+
+Comments should explain *why* a constraint exists, especially when the safest
+code looks unusual. Prefer explicit failure states and narrow functions over
+clever or speculative abstractions.
+
+## Quality gates
+
+Run focused tests during development, then all baseline checks:
 
 ```bash
-bun run typecheck && bun run lint && bun test
+bun run typecheck
+bun run lint
+bun test
+bun run check
+git diff --check
 ```
 
-CI runs these first, then the three below. Run those locally too when your
-change touches the relevant area:
+`bun run check` writes fixes. Inspect the resulting diff and rerun tests.
+
+When relevant, also run:
 
 ```bash
-bun run build      # the Next build; catches page-data and bundling failures
-bunx eve build     # the agent build; `next build` does NOT cover it
-bun run knip       # unused exports
+bun run build
+bunx eve build
+bun run knip
 ```
 
-`bunx eve eval` runs the model-level evals in `evals/`. They cost real tokens,
-so run the ones related to your change rather than the whole suite.
+Agent, prompt, retrieval, model-routing, and tool changes should run the related
+`evals/*.eval.ts`. These use real model tokens, so run the focused evaluations
+that exercise your change.
 
-Formatting and linting are [Biome](https://biomejs.dev) — `bun run check` writes
-fixes. Prettier and ESLint were removed deliberately; please don't add them back.
+Docker, Eve, middleware, egress, or sandbox changes require the acceptance suite
+in `docs/UMBREL_SANDBOX_OPERATIONS.md`, including a real file-write-and-execute
+proof—not merely a successful container spawn.
 
-## Things that will bite you
+## Upstream changes
 
-These are the non-obvious ones. `AGENTS.md` has the full list, and the
-[architecture docs](https://miniscira.com/docs/architecture) explain the why.
+The original project remains a valuable source of fixes and ideas. Do not merge
+large upstream commits blindly. Review individual changes and adapt useful
+behavior around this fork's Docker, local-storage, gateway, authentication, and
+security architecture.
 
-- **`agent/channels/eve.ts` — the `auth:` array is ordered.** First entry that
-  resolves wins. Reordering it changes which principal authenticates a request.
-- **`lib/chat-events.ts` — `eventType()` is the only place allowed to read
-  `.type`.** eve's event payloads are not one discriminated union; everything
-  else goes through the exported predicates.
-- **`lib/lookout-schedule.ts` only understands two cron shapes.** `M H * * *`
-  and `M H * * D`. Anything else silently never fires.
-- **A tool's filename is its name.** `agent/tools/x_search.ts` is `x_search`.
-  Renaming `web_search.ts` re-enables eve's built-in one, with no error.
-- **`next.config.ts` wrapper order is load-bearing.** `withEve(withMDX(config))`
-  — `createMDX()` only takes a plain object, `withEve` returns the function form.
-- **Don't add `import "server-only"` to anything the agent imports.** eve's
-  bundler evaluates it as a Client Component check and the build fails.
+## Important invariants
 
-## Style
+- `agent/channels/eve.ts` authentication is ordered; first success wins.
+- Only `eventType()` in `lib/chat-events.ts` may read `.type` from an opaque Eve
+  event.
+- Long-running root and subagent streams share `lib/eve-stream-policy.ts`.
+- Normal startup does not mutate the database schema; use committed migrations.
+- Uploads and generated artifacts are local-storage-first.
+- The MiniScira app never receives the Docker socket or Portainer credentials.
+- The two-process Next.js + Eve lifecycle must remain intact.
 
-Match the surrounding code. The one house rule worth stating: comments explain
-*why*, especially when the code looks wrong but isn't. Several bugs here were
-fixed twice because the first fix had no comment saying what it was for.
+`AGENTS.md` contains the complete list.
 
-## Reporting a security issue
+## Formatting and dependencies
 
-Please don't open a public issue. See [SECURITY.md](SECURITY.md).
+Biome is the formatter and linter. Do not add Prettier or ESLint configuration.
+Avoid adding a dependency for behavior that can be expressed clearly with the
+existing stack.
+
+## Security reports
+
+Do not open a public issue for a vulnerability. See [SECURITY.md](SECURITY.md).
