@@ -26,9 +26,12 @@ import {
 } from "@/components/ui/sidebar"
 import { useMountEffect } from "@/hooks/use-mount-effect"
 import {
+  addChatListRow,
   CHAT_CREATED_EVENT,
   CHAT_TITLED_EVENT,
   type ChatListRow,
+  type ChatListState,
+  titleChatListRow,
 } from "@/lib/chat-list-events"
 
 type ChatRow = ChatListRow
@@ -101,11 +104,18 @@ function DeleteChat({ id, title }: { id: string; title: string }) {
 
 export function ChatList({ chats }: { chats: ChatRow[] }) {
   const pathname = usePathname()
-  const [rows, setRows] = useState<ChatRow[]>(chats)
+  const [list, setList] = useState<ChatListState>({
+    source: chats,
+    rows: chats,
+  })
 
-  // Server-rendered data wins whenever the layout re-renders (state
-  // adjustment during render — no effect needed).
-  if (rows !== chats) setRows(chats)
+  // Adopt a genuinely new server payload without mistaking a local optimistic
+  // row update for a prop change. Comparing `rows !== chats` erased every
+  // optimistic branch on its next render because setRows necessarily creates a
+  // different array.
+  if (list.source !== chats) setList({ source: chats, rows: chats })
+
+  const rows = list.source === chats ? list.rows : chats
 
   // New chats are surfaced optimistically: research-chat dispatches these
   // events the moment a chat row exists, so the sidebar updates without a
@@ -115,17 +125,11 @@ export function ChatList({ chats }: { chats: ChatRow[] }) {
   useMountEffect(() => {
     const created = (e: Event) => {
       const detail = (e as CustomEvent<ChatRow>).detail
-      setRows((prev) =>
-        prev.some((c) => c.id === detail.id) ? prev : [detail, ...prev]
-      )
+      setList((current) => addChatListRow(current, detail))
     }
     const titled = (e: Event) => {
       const detail = (e as CustomEvent<{ id: string; title: string }>).detail
-      setRows((prev) =>
-        prev.map((c) =>
-          c.id === detail.id ? { ...c, title: detail.title } : c
-        )
-      )
+      setList((current) => titleChatListRow(current, detail))
     }
     window.addEventListener(CHAT_CREATED_EVENT, created)
     window.addEventListener(CHAT_TITLED_EVENT, titled)
