@@ -1,13 +1,14 @@
+import nodemailer from "nodemailer"
 import { Resend } from "resend"
 
-/**
- * Whether outbound email is configured at all.
- *
- * @public Callers can use this to skip or soften email-dependent flows (lookout
- * delivery, invites) when no key is set.
- */
+/** Whether either supported outbound transport is configured. */
 export function emailConfigured() {
-  return !!process.env.RESEND_API_KEY
+  return !!(
+    process.env.RESEND_API_KEY ||
+    (process.env.SMTP_HOST &&
+      process.env.SMTP_USER &&
+      process.env.SMTP_PASSWORD)
+  )
 }
 
 // Minimal, safe Markdown → HTML for the email body (links, bold, headings, breaks).
@@ -34,6 +35,36 @@ function mdToHtml(md: string): string {
     .replace(/\n/g, "<br>")
 }
 
+async function sendEmail(input: {
+  to: string
+  subject: string
+  html: string
+}): Promise<void> {
+  const from =
+    process.env.LOOKOUT_EMAIL_FROM ||
+    "MiniScira Lookout <onboarding@resend.dev>"
+  const smtpHost = process.env.SMTP_HOST
+  const smtpUser = process.env.SMTP_USER
+  const smtpPassword = process.env.SMTP_PASSWORD
+
+  if (smtpHost && smtpUser && smtpPassword) {
+    const port = Number.parseInt(process.env.SMTP_PORT || "465", 10)
+    const transport = nodemailer.createTransport({
+      host: smtpHost,
+      port: Number.isFinite(port) ? port : 465,
+      secure: process.env.SMTP_SECURE !== "false",
+      auth: { user: smtpUser, pass: smtpPassword },
+    })
+    await transport.sendMail({ from, ...input })
+    return
+  }
+
+  const key = process.env.RESEND_API_KEY
+  if (!key) return
+  const { error } = await new Resend(key).emails.send({ from, ...input })
+  if (error) throw new Error(error.message)
+}
+
 export async function sendLookoutEmail(input: {
   to: string
   name?: string | null
@@ -41,11 +72,7 @@ export async function sendLookoutEmail(input: {
   answer: string
   chatUrl: string
 }): Promise<void> {
-  const key = process.env.RESEND_API_KEY
-  if (!key) return // email not configured — skip silently
-  const from =
-    process.env.LOOKOUT_EMAIL_FROM ||
-    "MiniScira Lookout <onboarding@resend.dev>"
+  if (!emailConfigured()) return
 
   const body = input.answer
     ? `<p>${mdToHtml(input.answer)}</p>`
@@ -60,8 +87,7 @@ export async function sendLookoutEmail(input: {
       </p>
     </div>`
 
-  await new Resend(key).emails.send({
-    from,
+  await sendEmail({
     to: input.to,
     subject: `🔭 ${input.lookoutName}`,
     html,

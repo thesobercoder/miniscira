@@ -127,7 +127,9 @@ export async function runLookout(
     .limit(1)
   if (u?.email) {
     await sendLookoutEmail({
-      to: u.email,
+      // Self-hosted operators may keep their login/profile email separate from
+      // the mailbox that receives automated research digests.
+      to: process.env.LOOKOUT_EMAIL_TO || u.email,
       name: u.name,
       lookoutName: lk.name,
       answer: extractAnswerText(events),
