@@ -64,8 +64,7 @@ missing. Everything else is optional — off or defaulted unless set.
 | `RUN_DB_PUSH` | TRANSITIONAL: `"true"` runs `drizzle-kit push` at container start under a Postgres advisory lock. Default off — normal startup never mutates the schema. |
 | `EXA_API_KEY`, `FIRECRAWL_API_KEY`, `FIRECRAWL_API_URL`, `XAI_API_KEY`, `SEARXNG_URL` | Search providers — the agent's only web access. `reddit_search` uses `SEARXNG_URL` with `site:reddit.com` queries. With none set, the agent cannot reach the web. |
 | `LOOKOUT_RUN_SECRET` | Secret for scheduled-research internal auth: `openssl rand -hex 32`. |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `LOOKOUT_EMAIL_FROM`, `LOOKOUT_EMAIL_TO` | Optional SMTP delivery for Lookout results. SMTP is preferred over Resend when fully configured. `LOOKOUT_EMAIL_TO` overrides the owner's profile email as the digest recipient. |
-| `RESEND_API_KEY` | Optional fallback email transport for Lookout results. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `LOOKOUT_EMAIL_FROM`, `LOOKOUT_EMAIL_TO` | Optional Fastmail SMTP delivery for Lookout results. Use an app password. `LOOKOUT_EMAIL_TO` overrides the owner's profile email as the digest recipient. |
 | `RATE_LIMIT_PER_MINUTE` | Per-user requests/minute on `/api/*` (in-memory, per process). |
 | `APP_PORT`, `IMAGE_PLATFORM`, `MINISCIRA_IMAGE` | Compose/build knobs. `APP_PORT` is the published host port (default `3000`). |
 | `DEMO_MODE` | `"true"` serves a landing page instead of the app. Leave unset when self-hosting. |
