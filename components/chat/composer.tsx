@@ -393,6 +393,8 @@ export const Composer = memo(function Composer({
   uploading,
 }: ComposerProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const dragDepthRef = useRef(0)
+  const [dragActive, setDragActive] = useState(false)
   // Sending with an upload in flight would leave that file behind, so the
   // button waits for it rather than silently dropping the attachment.
   const canSend = input.trim().length > 0 && !uploading
@@ -401,6 +403,30 @@ export const Composer = memo(function Composer({
       onSubmit={(e) => {
         e.preventDefault()
         if (canSend) onSubmit()
+      }}
+      onDragEnter={(e) => {
+        if (!e.dataTransfer.types.includes("Files")) return
+        e.preventDefault()
+        dragDepthRef.current += 1
+        setDragActive(true)
+      }}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes("Files")) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = "copy"
+      }}
+      onDragLeave={(e) => {
+        if (!e.dataTransfer.types.includes("Files")) return
+        e.preventDefault()
+        dragDepthRef.current = Math.max(0, dragDepthRef.current - 1)
+        if (dragDepthRef.current === 0) setDragActive(false)
+      }}
+      onDrop={(e) => {
+        if (!e.dataTransfer.types.includes("Files")) return
+        e.preventDefault()
+        dragDepthRef.current = 0
+        setDragActive(false)
+        if (e.dataTransfer.files.length > 0) onUpload(e.dataTransfer.files)
       }}
     >
       <input
@@ -430,7 +456,18 @@ export const Composer = memo(function Composer({
             transcript scrolls right up under it — so the last line showed
             through the rounded corners, inside the border. The fade above only
             softens the text, it does not hide it. */}
-        <InputGroup className="rounded-xl border-input bg-background">
+        <InputGroup
+          className={cn(
+            "rounded-xl border-input bg-background",
+            dragActive && "border-primary ring-3 ring-primary/20"
+          )}
+        >
+          {dragActive && (
+            <div className="pointer-events-none absolute inset-1 z-10 flex items-center justify-center rounded-lg border border-primary/35 bg-background/95 font-medium text-primary-strong text-sm backdrop-blur-sm">
+              <RiAttachmentLine className="mr-2 size-4" />
+              Drop files to attach
+            </div>
+          )}
           {documents.length > 0 && (
             <InputGroupAddon
               align="block-start"
@@ -451,6 +488,12 @@ export const Composer = memo(function Composer({
           <InputGroupTextarea
             value={input}
             onChange={(e) => onInputChange(e.target.value)}
+            onPaste={(e) => {
+              const files = Array.from(e.clipboardData.files)
+              if (files.length === 0) return
+              e.preventDefault()
+              onUpload(files)
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault()
