@@ -18,8 +18,8 @@ known failure modes.
 | Browser URL | `http://umbrel.local:8325` |
 | In-container host probe | `http://10.21.0.1:8325` (`umbrel.local` does not resolve inside Hermes) |
 | Scratch acceptance port | `8326` |
-| App image tag | `miniscira:docker-sandbox-egress6` |
-| App image ID | `sha256:45a3a0f970920cc544131d87167a113be6162129c91020f74f3b8bcc281d455f` |
+| App image tag | `miniscira:local` (the single canonical production/sandbox tag) |
+| App image ID | Inspect the live immutable ID before each operation; the tag is rebuilt in place from `origin/main`. |
 | Docker middleware tag | `miniscira-docker-api-proxy:local` |
 | Working middleware image ID | `sha256:06edc3230079cbde9156dd356dbd68d850c392229e77048e8edf14b1789d9801` |
 | Egress proxy tag | `miniscira-sandbox-egress-proxy:local` |
@@ -192,9 +192,9 @@ Directory: `/opt/data/scripts`
 - `deploy-miniscira-docker-sandbox-prod.py` — one-time Stack 30 deployment helper
   with automatic rollback. It contains rollout-specific string replacements and
   image tags; inspect/update it before reuse.
-- `miniscira-build.py` — older Portainer full-repository app-image builder. Its
-  hard-coded tag is `miniscira:1.0.0`; prefer an explicit versioned build helper
-  or update the tag before use.
+- `miniscira-build.py` — Portainer full-repository app-image builder. It writes
+  only the canonical `miniscira:local` tag. Record the immutable image ID after
+  each build and recreate the app service before verification.
 - `miniscira-upstream-merge.sh` — scratch-branch upstream merge helper. Its
   hard-coded cherry-pick IDs in `--rebase` mode are historical; **merge mode is
   preferred**, and the script must be reviewed before reuse.
