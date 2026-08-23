@@ -35,7 +35,7 @@ import { useMountEffect } from "@/hooks/use-mount-effect"
 import { buildClientContext, conversationRecap } from "@/lib/chat-context"
 import { type ChatEvent, partText } from "@/lib/chat-events"
 import { chatCreatedEvent, chatTitledEvent } from "@/lib/chat-list-events"
-import { replaceWithChatPath } from "@/lib/chat-route"
+import { chatPath } from "@/lib/chat-route"
 import {
   messagesBeforeReplacement,
   nextReplacementTurnIndex,
@@ -250,7 +250,10 @@ export function ResearchChat({
       if (!res.ok || !json.chat) return null
       chatIdRef.current = json.chat.id
       createdRef.current = true
-      replaceWithChatPath(json.chat.id)
+      // Let the App Router own both the URL and mounted route. This avoids a
+      // split state where the address says /chat/:id while the root page is
+      // still mounted, which made New Research reuse the running transcript.
+      router.replace(chatPath(json.chat.id))
       return json.chat.id
     } catch {
       return null
@@ -337,11 +340,9 @@ export function ResearchChat({
     if (!replacement) persistTurnBinding(attached, turnIndex)
 
     // The chat row exists in the database now. Surface it in the sidebar
-    // immediately — WITHOUT router.refresh(): `ensureChat` changed the URL via
-    // replaceState, and a refresh mid-turn would re-fetch /chat/<id>, swap the
-    // home page for the chat-route page, remount this component and kill the
-    // live eve stream ("eve stream error: network error"). chat-list.tsx
-    // listens for these events and inserts/updates the row optimistically.
+    // immediately without a refresh. chat-list.tsx listens for these events
+    // and inserts/updates the row optimistically while the App Router performs
+    // the canonical route transition above.
     // The first event shows the row (question text as a placeholder title);
     // the second swaps in the generated title, which is produced in parallel
     // with the turn instead of waiting for the whole response to finish.
