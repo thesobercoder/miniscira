@@ -25,6 +25,7 @@ import {
   type McpAuthType,
   type McpCatalogEntry,
 } from "@/lib/mcp-catalog"
+import { validateMcpHeaders } from "@/lib/mcp-headers"
 import { authActionFor } from "@/lib/mcp-ui"
 import { cn } from "@/lib/utils"
 
@@ -284,6 +285,11 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
     const headers = credential
       ? { [headerKey.trim() || "Authorization"]: credential }
       : undefined
+    const headerError = validateMcpHeaders(headers ?? null)
+    if (headerError) {
+      toast.error(headerError)
+      return
+    }
     await addServer(
       {
         name,
@@ -451,7 +457,7 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                   )}
                 </div>
               </div>
-              <div className="grid gap-3 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start">
+              <div className="flex flex-wrap items-end gap-3">
                 <div className="grid gap-1.5">
                   <Label>Transport</Label>
                   <div className="flex gap-1">
@@ -469,14 +475,14 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                     ))}
                   </div>
                 </div>
-                <div className="grid min-w-0 gap-1.5">
+                <div className="grid flex-1 basis-52 gap-1.5">
                   {/* One visual label over the pair, but each input carries its
                       own name — the value field holds a credential and must
                       announce as more than an unlabeled textbox. */}
                   <span className="font-medium text-sm leading-none">
                     Authentication header (optional)
                   </span>
-                  <div className="grid gap-1.5 sm:grid-cols-2">
+                  <div className="flex gap-1.5">
                     <Input
                       id="mcp-hk"
                       aria-label="Header name"
@@ -496,20 +502,14 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                       className="font-mono text-xs"
                     />
                   </div>
-                  <p className="text-muted-foreground text-xs">
-                    For bearer authentication, keep the name as Authorization
-                    and enter the complete value: Bearer followed by your token.
-                  </p>
                 </div>
-                <div className="flex justify-end sm:col-span-2">
-                  <Button
-                    onClick={create}
-                    disabled={creating || !name.trim() || !url.trim()}
-                    className="gap-2"
-                  >
-                    <RiAddLine className="size-4" /> Add
-                  </Button>
-                </div>
+                <Button
+                  onClick={create}
+                  disabled={creating || !name.trim() || !url.trim()}
+                  className="gap-2"
+                >
+                  <RiAddLine className="size-4" /> Add
+                </Button>
               </div>
             </div>
           </div>

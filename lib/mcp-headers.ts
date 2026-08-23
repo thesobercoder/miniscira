@@ -20,3 +20,16 @@ export function sanitizeMcpHeaders(
 
   return Object.keys(out).length > 0 ? out : null
 }
+
+export function validateMcpHeaders(
+  headers: Record<string, string> | null
+): string | null {
+  if (!headers) return null
+  for (const [name, value] of Object.entries(headers)) {
+    if (!/^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/.test(name))
+      return "Header name is invalid."
+    if (name.toLowerCase() === "authorization" && !/^\S+\s+\S/.test(value))
+      return "Authorization must include a scheme, such as Bearer followed by your token."
+  }
+  return null
+}

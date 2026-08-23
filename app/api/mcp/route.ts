@@ -5,7 +5,7 @@ import { authed } from "@/lib/api-auth"
 import { db } from "@/lib/db"
 import { mcpServer } from "@/lib/db/schema"
 import { publicServer } from "@/lib/mcp"
-import { sanitizeMcpHeaders } from "@/lib/mcp-headers"
+import { sanitizeMcpHeaders, validateMcpHeaders } from "@/lib/mcp-headers"
 import { sealMcpHeaders, sealMcpJson } from "@/lib/mcp-secrets"
 import { validateMcpServerUrl } from "@/lib/mcp-url"
 
@@ -39,6 +39,7 @@ export const POST = authed(async (request, { userId }) => {
   const authType = ["none", "header", "oauth"].includes(body.authType ?? "")
     ? body.authType
     : "auto"
+  const headers = sanitizeMcpHeaders(body.headers)
 
   if (!name || !url)
     return NextResponse.json(
@@ -48,6 +49,9 @@ export const POST = authed(async (request, { userId }) => {
   const parsed = validateMcpServerUrl(url)
   if (!parsed.ok)
     return NextResponse.json({ error: parsed.error }, { status: 400 })
+  const headerError = validateMcpHeaders(headers)
+  if (headerError)
+    return NextResponse.json({ error: headerError }, { status: 400 })
 
   const [created] = await db
     .insert(mcpServer)
@@ -57,7 +61,7 @@ export const POST = authed(async (request, { userId }) => {
       url,
       transport,
       authType,
-      headers: sealMcpHeaders(sanitizeMcpHeaders(body.headers)),
+      headers: sealMcpHeaders(headers),
       oauthClient: oauthClientId
         ? sealMcpJson({
             client_id: oauthClientId,
