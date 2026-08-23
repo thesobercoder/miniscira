@@ -32,6 +32,23 @@ explain *why* an invariant exists. Avoid speculative abstractions, duplicate
 state, fire-and-forget promises without an error path, and provider-specific
 behavior leaking into ordinary UI components.
 
+## Product backlog gate
+
+- Never add a new item to `docs/PRODUCT_IDEAS.md` from a raw idea alone.
+- First create and commit a complete PRD at `tasks/prd-<feature-name>.md`.
+- The PRD must decompose the feature into ordered, atomic implementation tasks
+  with dependencies, affected areas/files where known, and verifiable acceptance
+  criteria. It must also define the exact unit, integration, browser/end-to-end,
+  security, migration/rollback, and production acceptance tests that apply.
+- When the feature changes agent behavior, prompts, tools, retrieval, memory, or
+  model routing, the PRD must define model-level eval cases, datasets/fixtures,
+  expected outcomes, and pass thresholds. If evals do not apply, the PRD must
+  explain why explicitly rather than omitting them.
+- Only after the PRD exists may the backlog receive a short entry linking to it.
+  The PRD is the source of truth; the backlog is only an index and status view.
+- Do not start implementation until unresolved product or architecture questions
+  in the PRD have been answered and its task/test/eval plan is executable.
+
 ## Toolchain
 
 - Package manager is **bun**. Install with `bun install`, run scripts with `bun run <script>`.
