@@ -49,6 +49,12 @@ git diff --check
 
 This repository uses a Next.js version with APIs and conventions that can differ from model training data. Before you write Next.js code, read the relevant guide in `node_modules/next/dist/docs/` and follow its deprecation notices.
 
+Prefer the simplest canonical solution supported by the installed framework and adjacent repository code. Most application problems already have an established Next.js, React, browser-platform, or library pattern: search the installed documentation and existing source first, then follow that pattern rather than inventing a new mechanism.
+
+Complexity requires proof, not preference. Do not introduce custom routing layers, manual URL synchronization, private framework state, duplicated state machines, speculative abstractions, or compatibility workarounds when a public framework API or ordinary web-platform pattern solves the requirement. Start with the smallest direct implementation, add only the complexity required by reproduced behavior, and keep one owner for each piece of state.
+
+For Next.js routing, let the App Router own navigation, URL state, mounted route trees, and history through documented public APIs such as `Link`, `redirect`, and `useRouter`. Do not use hard reloads, raw anchors as routing workarounds, native History API mutations that leave the route tree behind, or private Next.js internals. Verify navigation in a real browser because a changed URL alone does not prove the router tree and rendered state are synchronized.
+
 ## Source-control completion
 
 After a successful production deployment:

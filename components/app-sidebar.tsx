@@ -47,11 +47,13 @@ export async function AppSidebar({ user }: { user: SidebarUserInfo }) {
           <SidebarTrigger className="ml-auto text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:mx-auto" />
         </div>
         <Button
+          aria-keyshortcuts="Control+Shift+O Meta+Shift+O"
           nativeButton={false}
           render={<Link href="/" />}
           size="sm"
           // Icon rail: exact 32px circle; the glyph centers via mx-auto (see above).
           className="h-9 justify-start gap-2 rounded-lg transition-transform active:scale-[0.96] group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:rounded-full group-data-[collapsible=icon]:p-0!"
+          title="New research (Ctrl/Cmd+Shift+O)"
         >
           <RiAddLine className="size-4 shrink-0 group-data-[collapsible=icon]:mx-auto" />
           <span className="group-data-[collapsible=icon]:hidden">

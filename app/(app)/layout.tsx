@@ -1,6 +1,7 @@
 import { cookies, headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
+import { NewResearchShortcut } from "@/components/new-research-shortcut"
 import { SettingsProvider } from "@/components/settings-provider"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 import { auth } from "@/lib/auth"
@@ -29,6 +30,7 @@ export default async function AppLayout({
   return (
     <SettingsProvider initial={settings}>
       <SidebarProvider defaultOpen={defaultOpen}>
+        <NewResearchShortcut />
         {/* ~58 focusables (nav + the whole chat history) sit before <main>,
             so this has to be the first thing in the tab order. */}
         <a
