@@ -334,6 +334,7 @@ export const mcpServer = pgTable(
     name: text("name").notNull(),
     url: text("url").notNull(),
     transport: text("transport").notNull().default("http"), // http | sse
+    authType: text("auth_type").notNull().default("auto"), // auto | none | header | oauth
     // Optional HTTP headers (e.g. Authorization) sent on every request.
     headers: jsonb("headers").$type<Record<string, string>>(),
     // OAuth 2.0 state for protected servers (MCP authorization flow):

@@ -24,6 +24,7 @@ import {
   type McpAuthType,
   type McpCatalogEntry,
 } from "@/lib/mcp-catalog"
+import { authActionFor } from "@/lib/mcp-ui"
 import { cn } from "@/lib/utils"
 
 const AUTH_LABEL: Record<McpAuthType, string> = {
@@ -54,6 +55,8 @@ type McpServerItem = {
   headerNames: string[]
   enabled: boolean
   authorized: boolean
+  hasOAuthClient: boolean
+  offersOAuth: boolean
 }
 
 type Transport = "http" | "sse"
@@ -64,6 +67,9 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
   const [creating, setCreating] = useState(false)
   const [testing, setTesting] = useState<string | null>(null)
   const [connecting, setConnecting] = useState<string | null>(null)
+  const [configuringOAuth, setConfiguringOAuth] = useState<string | null>(null)
+  const [oauthClientId, setOAuthClientId] = useState("")
+  const [oauthClientSecret, setOAuthClientSecret] = useState("")
   const [addTab, setAddTab] = useState<AddTab>("manual")
 
   const connect = async (s: McpServerItem) => {
@@ -74,6 +80,7 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
         authorized?: boolean
         url?: string
         error?: string
+        needsClient?: boolean
       }
       if (json.authorized) {
         setItems((prev) =>
@@ -85,10 +92,38 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
         window.location.href = json.url
       } else {
         toast.error(json.error ?? "Couldn't start authorization")
+        if (json.needsClient) setConfiguringOAuth(s.id)
       }
     } finally {
       setConnecting(null)
     }
+  }
+
+  const saveOAuthClient = async (s: McpServerItem) => {
+    const clientId = oauthClientId.trim()
+    if (!clientId) return
+    const res = await fetch(`/api/mcp/${s.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        oauthClientId: clientId,
+        oauthClientSecret: oauthClientSecret.trim() || undefined,
+      }),
+    })
+    const json = (await res.json().catch(() => ({}))) as {
+      server?: McpServerItem
+      error?: string
+    }
+    if (!res.ok || !json.server) {
+      toast.error(json.error ?? "Couldn't save OAuth client")
+      return
+    }
+    const updated = json.server
+    setItems((prev) => prev.map((item) => (item.id === s.id ? updated : item)))
+    setOAuthClientId("")
+    setOAuthClientSecret("")
+    setConfiguringOAuth(null)
+    toast.success(`${s.name}: OAuth client saved securely`)
   }
 
   const disconnect = async (s: McpServerItem) => {
@@ -124,6 +159,7 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
       url: string
       transport: Transport
       headers?: Record<string, string>
+      authType?: McpAuthType
     },
     successMessage: string
   ) => {
@@ -158,7 +194,13 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
         ? { [headerKey.trim()]: headerValue.trim() }
         : undefined
     await addServer(
-      { name, url, transport, headers },
+      {
+        name,
+        url,
+        transport,
+        headers,
+        authType: headers ? "header" : undefined,
+      },
       "MCP server added. Hit Test to check the connection."
     )
     setName("")
@@ -171,12 +213,19 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
   const inCatalogAlready = (entry: McpCatalogEntry) =>
     items.some((x) => x.url === entry.url)
 
+  const authAction = (server: McpServerItem) => authActionFor(server)
+
   // No-auth and OAuth entries need nothing from the user up front — add them
   // directly. OAuth still requires hitting Connect afterward to authorize.
   const addFromCatalog = async (entry: McpCatalogEntry) => {
     if (inCatalogAlready(entry)) return
     await addServer(
-      { name: entry.name, url: entry.url, transport: entry.transport },
+      {
+        name: entry.name,
+        url: entry.url,
+        transport: entry.transport,
+        authType: entry.authType,
+      },
       entry.authType === "oauth"
         ? `${entry.name} added — hit Connect below to authorize.`
         : `${entry.name} added. Hit Test to check the connection.`
@@ -428,7 +477,7 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
           {items.map((s) => (
             <li
               key={s.id}
-              className="flex items-center gap-3 rounded-xl border bg-card/40 p-3.5"
+              className="flex flex-wrap items-center gap-3 rounded-xl border bg-card/40 p-3.5"
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
@@ -454,27 +503,50 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                       oauth ✓
                     </span>
                   )}
+                  {s.hasOAuthClient && !s.authorized && (
+                    <span className="rounded-full border px-1.5 py-0.5 font-medium text-[10px] text-muted-foreground">
+                      OAuth client saved
+                    </span>
+                  )}
                 </div>
                 <p className="mt-0.5 truncate font-mono text-muted-foreground text-xs">
                   {s.url}
                 </p>
               </div>
+              {authAction(s) && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5"
+                  disabled={connecting === s.id}
+                  onClick={() =>
+                    authAction(s) === "disconnect" ? disconnect(s) : connect(s)
+                  }
+                  title={
+                    s.authorized ? "Drop OAuth tokens" : "Authorize via OAuth"
+                  }
+                >
+                  <RiKey2Line className="size-3.5" />
+                  {connecting === s.id
+                    ? "Starting…"
+                    : s.authorized
+                      ? "Disconnect"
+                      : "Connect"}
+                </Button>
+              )}
               <Button
                 size="sm"
-                variant="outline"
-                className="h-8 gap-1.5"
-                disabled={connecting === s.id}
-                onClick={() => (s.authorized ? disconnect(s) : connect(s))}
-                title={
-                  s.authorized ? "Drop OAuth tokens" : "Authorize via OAuth"
-                }
+                variant="ghost"
+                className="h-8"
+                onClick={() => {
+                  setConfiguringOAuth((current) =>
+                    current === s.id ? null : s.id
+                  )
+                  setOAuthClientId("")
+                  setOAuthClientSecret("")
+                }}
               >
-                <RiKey2Line className="size-3.5" />
-                {connecting === s.id
-                  ? "Starting…"
-                  : s.authorized
-                    ? "Disconnect"
-                    : "Connect"}
+                OAuth client
               </Button>
               <Button
                 size="sm"
@@ -507,6 +579,45 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                   </Button>
                 }
               />
+              {configuringOAuth === s.id && (
+                <div className="grid w-full gap-2 border-t pt-3 sm:grid-cols-[1fr_1fr_auto]">
+                  <div className="grid gap-1.5">
+                    <Label htmlFor={`mcp-client-id-${s.id}`}>Client ID</Label>
+                    <Input
+                      id={`mcp-client-id-${s.id}`}
+                      value={oauthClientId}
+                      onChange={(event) => setOAuthClientId(event.target.value)}
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label htmlFor={`mcp-client-secret-${s.id}`}>
+                      Client secret (optional)
+                    </Label>
+                    <Input
+                      id={`mcp-client-secret-${s.id}`}
+                      type="password"
+                      value={oauthClientSecret}
+                      onChange={(event) =>
+                        setOAuthClientSecret(event.target.value)
+                      }
+                      autoComplete="off"
+                    />
+                  </div>
+                  <Button
+                    className="self-end"
+                    disabled={!oauthClientId.trim()}
+                    onClick={() => saveOAuthClient(s)}
+                  >
+                    Save
+                  </Button>
+                  <p className="text-muted-foreground text-xs sm:col-span-3">
+                    Use this only when the authorization server does not support
+                    dynamic client registration. MiniScira encrypts these values
+                    before storing them.
+                  </p>
+                </div>
+              )}
             </li>
           ))}
         </ul>

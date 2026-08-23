@@ -22,8 +22,14 @@ export const POST = authedWithParams<Params>(
         return NextResponse.json({ authorized: true })
       return NextResponse.json({ authorized: false, url: result.url })
     } catch (err) {
+      const message = err instanceof Error ? err.message : "OAuth start failed"
       return NextResponse.json(
-        { error: err instanceof Error ? err.message : "OAuth start failed" },
+        {
+          error: message,
+          needsClient:
+            !row.oauthClient &&
+            /registration|register|client information/i.test(message),
+        },
         { status: 400 }
       )
     }

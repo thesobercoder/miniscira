@@ -1,0 +1,2 @@
+ALTER TABLE "mcp_server" ADD COLUMN "auth_type" text DEFAULT 'auto' NOT NULL;--> statement-breakpoint
+UPDATE "mcp_server" SET "auth_type" = CASE WHEN "headers" IS NOT NULL THEN 'header' ELSE 'none' END;

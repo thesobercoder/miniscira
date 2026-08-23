@@ -11,6 +11,12 @@ import { eq } from "drizzle-orm"
 import { appBaseUrl } from "@/lib/base-url"
 import { db } from "@/lib/db"
 import { type McpServer, mcpServer } from "@/lib/db/schema"
+import {
+  openMcpJson,
+  openMcpSecret,
+  sealMcpJson,
+  sealMcpSecret,
+} from "@/lib/mcp-secrets"
 
 /**
  * OAuth 2.0 for protected MCP servers, per the MCP authorization spec:
@@ -52,19 +58,29 @@ export class DbOAuthProvider implements OAuthClientProvider {
   }
 
   clientInformation(): OAuthClientInformation | undefined {
-    return (this.row.oauthClient as OAuthClientInformation | null) ?? undefined
+    const client = openMcpJson<OAuthClientInformation>(this.row.oauthClient)
+    if (this.row.oauthClient && !client)
+      throw new Error(
+        "Stored OAuth client cannot be decrypted. Save the OAuth client again."
+      )
+    return client ?? undefined
   }
 
   async saveClientInformation(info: OAuthClientInformation): Promise<void> {
-    await this.persist({ oauthClient: info as Record<string, unknown> })
+    await this.persist({ oauthClient: sealMcpJson(info) })
   }
 
   tokens(): OAuthTokens | undefined {
-    return (this.row.oauthTokens as OAuthTokens | null) ?? undefined
+    const tokens = openMcpJson<OAuthTokens>(this.row.oauthTokens)
+    if (this.row.oauthTokens && !tokens)
+      throw new Error(
+        "Stored OAuth tokens cannot be decrypted. Reconnect this server."
+      )
+    return tokens ?? undefined
   }
 
   async saveTokens(tokens: OAuthTokens): Promise<void> {
-    await this.persist({ oauthTokens: tokens as Record<string, unknown> })
+    await this.persist({ oauthTokens: sealMcpJson(tokens) })
   }
 
   async codeVerifier(): Promise<string> {
@@ -72,25 +88,30 @@ export class DbOAuthProvider implements OAuthClientProvider {
       throw new Error(
         "No PKCE code verifier stored — restart the connect flow."
       )
-    return this.row.oauthVerifier
+    const verifier = openMcpSecret(this.row.oauthVerifier)
+    if (!verifier)
+      throw new Error(
+        "Stored PKCE code verifier cannot be opened — restart the connect flow."
+      )
+    return verifier
   }
 
   async saveCodeVerifier(codeVerifier: string): Promise<void> {
-    await this.persist({ oauthVerifier: codeVerifier })
+    await this.persist({ oauthVerifier: sealMcpSecret(codeVerifier) })
   }
 
   async state(): Promise<string> {
     const value = `${this.row.id}.${randomBytes(16).toString("hex")}`
-    await this.persist({ oauthState: value })
+    await this.persist({ oauthState: sealMcpSecret(value) })
     return value
   }
 
   async saveState(state: string): Promise<void> {
-    await this.persist({ oauthState: state })
+    await this.persist({ oauthState: sealMcpSecret(state) })
   }
 
   storedState(): string | undefined {
-    return this.row.oauthState ?? undefined
+    return openMcpSecret(this.row.oauthState) ?? undefined
   }
 
   redirectToAuthorization(authorizationUrl: URL): void {

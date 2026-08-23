@@ -5,6 +5,7 @@ import { authed } from "@/lib/api-auth"
 import { db } from "@/lib/db"
 import { mcpServer } from "@/lib/db/schema"
 import { publicServer } from "@/lib/mcp"
+import { sealMcpHeaders, sealMcpJson } from "@/lib/mcp-secrets"
 
 function sanitizeHeaders(input: unknown): Record<string, string> | null {
   if (!input || typeof input !== "object") return null
@@ -33,10 +34,18 @@ export const POST = authed(async (request, { userId }) => {
     url?: string
     transport?: string
     headers?: unknown
+    oauthClientId?: string
+    oauthClientSecret?: string
+    authType?: string
   }
   const name = body.name?.trim()
   const url = body.url?.trim()
   const transport = body.transport === "sse" ? "sse" : "http"
+  const oauthClientId = body.oauthClientId?.trim()
+  const oauthClientSecret = body.oauthClientSecret?.trim()
+  const authType = ["none", "header", "oauth"].includes(body.authType ?? "")
+    ? body.authType
+    : "auto"
 
   if (!name || !url)
     return NextResponse.json(
@@ -70,9 +79,25 @@ export const POST = authed(async (request, { userId }) => {
       name: name.slice(0, 80),
       url,
       transport,
-      headers: sanitizeHeaders(body.headers),
+      authType,
+      headers: sealMcpHeaders(sanitizeHeaders(body.headers)),
+      oauthClient: oauthClientId
+        ? sealMcpJson({
+            client_id: oauthClientId,
+            ...(oauthClientSecret ? { client_secret: oauthClientSecret } : {}),
+          })
+        : null,
     })
     .returning()
 
-  return NextResponse.json({ server: publicServer(created) }, { status: 201 })
+  return NextResponse.json(
+    {
+      server: {
+        ...publicServer(created),
+        offersOAuth:
+          created.authType === "oauth" || created.oauthClient != null,
+      },
+    },
+    { status: 201 }
+  )
 })

@@ -6,6 +6,7 @@ import { ownedMcpServer } from "@/lib/api-ownership"
 import { db } from "@/lib/db"
 import { mcpServer } from "@/lib/db/schema"
 import { publicServer } from "@/lib/mcp"
+import { sealMcpJson } from "@/lib/mcp-secrets"
 
 type Params = { id: string }
 
@@ -18,11 +19,26 @@ export const PATCH = authedWithParams<Params>(
     const body = (await request.json().catch(() => ({}))) as {
       name?: string
       enabled?: boolean
+      oauthClientId?: string
+      oauthClientSecret?: string
     }
     const patch: Record<string, unknown> = { updatedAt: new Date() }
     if (typeof body.name === "string" && body.name.trim())
       patch.name = body.name.trim().slice(0, 80)
     if (typeof body.enabled === "boolean") patch.enabled = body.enabled
+    if (typeof body.oauthClientId === "string") {
+      const clientId = body.oauthClientId.trim()
+      const clientSecret = body.oauthClientSecret?.trim()
+      patch.oauthClient = clientId
+        ? sealMcpJson({
+            client_id: clientId,
+            ...(clientSecret ? { client_secret: clientSecret } : {}),
+          })
+        : null
+      patch.oauthTokens = null
+      patch.oauthVerifier = null
+      patch.oauthState = null
+    }
 
     const [updated] = await db
       .update(mcpServer)

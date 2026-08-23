@@ -6,6 +6,7 @@ import {
   enabledServersFor,
   listServerToolsCached,
 } from "@/lib/mcp"
+import { openMcpHeaders } from "@/lib/mcp-secrets"
 
 // The user's enabled MCP servers, surfaced as real named, typed tools
 // (`<server>__<tool>` with the server's own JSON schema) instead of the
@@ -41,7 +42,8 @@ export default defineDynamic({
             name: server.name,
             url: server.url,
             transport: server.transport,
-            headers: server.headers,
+            authType: server.authType,
+            headers: openMcpHeaders(server.headers),
             enabled: server.enabled,
             oauthClient: server.oauthClient,
             oauthTokens: server.oauthTokens,

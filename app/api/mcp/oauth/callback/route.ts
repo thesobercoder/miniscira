@@ -5,6 +5,7 @@ import { auth as betterAuth } from "@/lib/auth"
 import { db } from "@/lib/db"
 import { mcpServer } from "@/lib/db/schema"
 import { finishOAuth, serverIdFromState } from "@/lib/mcp-oauth"
+import { openMcpSecret } from "@/lib/mcp-secrets"
 
 // GET /api/mcp/oauth/callback — the OAuth redirect URI for every MCP server.
 // The state parameter carries the server id; tokens are exchanged and stored,
@@ -32,14 +33,14 @@ export async function GET(request: NextRequest) {
     .limit(1)
   if (!row || row.userId !== session.user.id)
     return back("auth_error=unknown_server")
-  if (!row.oauthState || row.oauthState !== state)
+  if (!row.oauthState || openMcpSecret(row.oauthState) !== state)
     return back("auth_error=state_mismatch")
 
   try {
     await finishOAuth(row, code, state)
     return back(`connected=${encodeURIComponent(row.name)}`)
   } catch (err) {
-    console.error("mcp oauth token exchange failed", err)
+    console.error("mcp oauth token exchange failed")
     return back(
       `auth_error=${encodeURIComponent(err instanceof Error ? err.message : "token_exchange_failed")}`
     )

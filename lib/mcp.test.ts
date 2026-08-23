@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import type { McpServer } from "@/lib/db/schema"
 import { publicServer } from "@/lib/mcp"
+import { authActionFor } from "@/lib/mcp-ui"
 
 const DUMMY_SECRET = "dummy-not-a-real-token"
 
@@ -12,6 +13,7 @@ function row(overrides: Partial<McpServer> = {}): McpServer {
     name: "example",
     url: "https://mcp.example.com/mcp",
     transport: "http",
+    authType: "auto",
     headers: null,
     oauthClient: null,
     oauthTokens: null,
@@ -52,10 +54,50 @@ describe("publicServer", () => {
       })
     )
     expect(result.authorized).toBe(true)
+    expect(result.hasOAuthClient).toBe(true)
     expect(JSON.stringify(result)).not.toContain(DUMMY_SECRET)
   })
 
   test("does not leak the owning user id", () => {
     expect(JSON.stringify(publicServer(row()))).not.toContain("user_1")
+  })
+})
+
+describe("authActionFor", () => {
+  test("does not offer OAuth until an OAuth client exists", () => {
+    expect(
+      authActionFor({
+        authorized: false,
+        hasOAuthClient: false,
+        offersOAuth: false,
+      })
+    ).toBeNull()
+  })
+
+  test("connects with a saved client and disconnects with tokens", () => {
+    expect(
+      authActionFor({
+        authorized: false,
+        hasOAuthClient: true,
+        offersOAuth: false,
+      })
+    ).toBe("connect")
+    expect(
+      authActionFor({
+        authorized: true,
+        hasOAuthClient: true,
+        offersOAuth: true,
+      })
+    ).toBe("disconnect")
+  })
+
+  test("offers dynamic OAuth for catalog servers", () => {
+    expect(
+      authActionFor({
+        authorized: false,
+        hasOAuthClient: false,
+        offersOAuth: true,
+      })
+    ).toBe("connect")
   })
 })

@@ -24,10 +24,9 @@ import {
  * key can no longer be read should be asked for it again, not shown a crash.
  */
 
-const KEY_INFO = "miniscira:gateway-key:v1"
 const IV_BYTES = 12 // GCM standard; 96 bits is what the mode is specified for.
 
-function derivedKey(): Buffer {
+function derivedKey(keyInfo: string): Buffer {
   const secret = process.env.BETTER_AUTH_SECRET
   if (!secret)
     throw new Error(
@@ -35,7 +34,7 @@ function derivedKey(): Buffer {
     )
   // Salt is empty on purpose: the input is already a high-entropy secret, and a
   // stored random salt would have to live beside the ciphertext to be useful.
-  return Buffer.from(hkdfSync("sha256", secret, "", KEY_INFO, 32))
+  return Buffer.from(hkdfSync("sha256", secret, "", keyInfo, 32))
 }
 
 /**
@@ -44,9 +43,9 @@ function derivedKey(): Buffer {
  * Returns `iv.tag.ciphertext`, base64url, each part fixed-width except the
  * last, so `open` can split without a length prefix.
  */
-export function seal(plaintext: string): string {
+export function sealFor(plaintext: string, keyInfo: string): string {
   const iv = randomBytes(IV_BYTES)
-  const cipher = createCipheriv("aes-256-gcm", derivedKey(), iv)
+  const cipher = createCipheriv("aes-256-gcm", derivedKey(keyInfo), iv)
   const body = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()])
   const tag = cipher.getAuthTag()
   return [
@@ -57,13 +56,16 @@ export function seal(plaintext: string): string {
 }
 
 /** Open a sealed secret, or `null` if it is malformed, tampered with, or stale. */
-export function open(sealed: string | null | undefined): string | null {
+export function openFor(
+  sealed: string | null | undefined,
+  keyInfo: string
+): string | null {
   if (!sealed) return null
   const parts = sealed.split(".")
   if (parts.length !== 3) return null
   try {
     const [iv, tag, body] = parts.map((p) => Buffer.from(p, "base64url"))
-    const decipher = createDecipheriv("aes-256-gcm", derivedKey(), iv)
+    const decipher = createDecipheriv("aes-256-gcm", derivedKey(keyInfo), iv)
     decipher.setAuthTag(tag)
     return Buffer.concat([decipher.update(body), decipher.final()]).toString(
       "utf8"
@@ -73,4 +75,14 @@ export function open(sealed: string | null | undefined): string | null {
     // have a usable key", which the caller handles the same way.
     return null
   }
+}
+
+const GATEWAY_KEY_INFO = "miniscira:gateway-key:v1"
+
+export function seal(plaintext: string): string {
+  return sealFor(plaintext, GATEWAY_KEY_INFO)
+}
+
+export function open(sealed: string | null | undefined): string | null {
+  return openFor(sealed, GATEWAY_KEY_INFO)
 }
