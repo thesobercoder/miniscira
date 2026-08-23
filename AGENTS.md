@@ -25,10 +25,3 @@
 | [Umbrel Sandbox operations](docs/UMBREL_SANDBOX_OPERATIONS.md) | Before any Soham-specific Umbrel, Portainer, Docker Sandbox, middleware, network, egress, image, or production deployment work. |
 | [Fork foundations plan](docs/plans/2026-08-22-fork-foundations.md) | When you need the historical rationale and implementation record for the independent fork foundations. |
 | [README](README.md) | When you need the product overview, architecture, local setup, or public project guidance. |
-
-## Document maintenance
-
-- Keep each detailed rule in one canonical document.
-- Update this table when you add, rename, move, or remove an instruction document.
-- Use link descriptions as routing rules. Make them specific enough that an agent knows when to read the document.
-- Split a document when unrelated guidance makes it difficult to load only the context needed for one job.
