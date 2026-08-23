@@ -56,6 +56,7 @@ type McpServerItem = {
   enabled: boolean
   authorized: boolean
   hasOAuthClient: boolean
+  oauthClientId: string | null
   offersOAuth: boolean
 }
 
@@ -124,6 +125,13 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
     setOAuthClientSecret("")
     setConfiguringOAuth(null)
     toast.success(`${s.name}: OAuth client saved securely`)
+  }
+
+  const toggleAdvanced = (s: McpServerItem) => {
+    const opening = configuringOAuth !== s.id
+    setConfiguringOAuth(opening ? s.id : null)
+    setOAuthClientId(opening ? (s.oauthClientId ?? "") : "")
+    setOAuthClientSecret("")
   }
 
   const disconnect = async (s: McpServerItem) => {
@@ -509,28 +517,9 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                     </span>
                   )}
                 </div>
-                <div className="mt-0.5 flex min-w-0 items-center gap-2">
-                  <p className="truncate font-mono text-muted-foreground text-xs">
-                    {s.url}
-                  </p>
-                  <Button
-                    size="sm"
-                    variant="link"
-                    className="h-auto shrink-0 px-0 text-muted-foreground text-xs"
-                    aria-expanded={configuringOAuth === s.id}
-                    onClick={() => {
-                      setConfiguringOAuth((current) =>
-                        current === s.id ? null : s.id
-                      )
-                      setOAuthClientId("")
-                      setOAuthClientSecret("")
-                    }}
-                  >
-                    {s.hasOAuthClient
-                      ? "Change OAuth client"
-                      : "Set OAuth client"}
-                  </Button>
-                </div>
+                <p className="mt-0.5 truncate font-mono text-muted-foreground text-xs">
+                  {s.url}
+                </p>
               </div>
               {authAction(s) && (
                 <Button
@@ -562,6 +551,15 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
               >
                 <RiPulseLine className="size-3.5" />
                 {testing === s.id ? "Testing…" : "Test"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8"
+                aria-expanded={configuringOAuth === s.id}
+                onClick={() => toggleAdvanced(s)}
+              >
+                Advanced
               </Button>
               <Switch
                 checked={s.enabled}
@@ -607,6 +605,11 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                         setOAuthClientSecret(event.target.value)
                       }
                       autoComplete="off"
+                      placeholder={
+                        s.hasOAuthClient
+                          ? "Leave blank to keep saved secret"
+                          : undefined
+                      }
                     />
                   </div>
                   <Button

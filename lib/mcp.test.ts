@@ -58,6 +58,19 @@ describe("publicServer", () => {
     expect(JSON.stringify(result)).not.toContain(DUMMY_SECRET)
   })
 
+  test("exposes the OAuth client id but never its secret", () => {
+    const result = publicServer(
+      row({
+        oauthClient: {
+          client_id: "safe-client-id",
+          client_secret: DUMMY_SECRET,
+        },
+      })
+    )
+    expect(result.oauthClientId).toBe("safe-client-id")
+    expect(JSON.stringify(result)).not.toContain(DUMMY_SECRET)
+  })
+
   test("does not leak the owning user id", () => {
     expect(JSON.stringify(publicServer(row()))).not.toContain("user_1")
   })

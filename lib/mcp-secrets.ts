@@ -70,3 +70,19 @@ export function isSealedMcpJson(
 ): boolean {
   return typeof value?.[ENVELOPE_KEY] === "string"
 }
+
+export function updatedMcpOAuthClient(
+  current: Record<string, unknown> | null | undefined,
+  clientId: string,
+  clientSecret?: string
+): Record<string, unknown> | null {
+  if (!clientId) return null
+  const opened = openMcpJson<{ client_secret?: unknown }>(current)
+  const savedSecret =
+    typeof opened?.client_secret === "string" ? opened.client_secret : undefined
+  const secret = clientSecret || savedSecret
+  return {
+    client_id: clientId,
+    ...(secret ? { client_secret: secret } : {}),
+  }
+}

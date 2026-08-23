@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm"
 import { db } from "@/lib/db"
 import { type McpServer, mcpServer } from "@/lib/db/schema"
 import { DbOAuthProvider } from "@/lib/mcp-oauth"
-import { openMcpHeaders } from "@/lib/mcp-secrets"
+import { openMcpHeaders, openMcpJson } from "@/lib/mcp-secrets"
 
 /**
  * Remote MCP servers only: HTTP (streamable) and SSE transports. No stdio.
@@ -73,6 +73,7 @@ async function withMCPClient<T>(
  * `authorized`.
  */
 export function publicServer(row: McpServer) {
+  const oauthClient = openMcpJson<{ client_id?: unknown }>(row.oauthClient)
   return {
     id: row.id,
     name: row.name,
@@ -86,6 +87,8 @@ export function publicServer(row: McpServer) {
     updatedAt: row.updatedAt,
     authorized: row.oauthTokens != null,
     hasOAuthClient: row.oauthClient != null,
+    oauthClientId:
+      typeof oauthClient?.client_id === "string" ? oauthClient.client_id : null,
     offersOAuth:
       row.authType === "oauth" ||
       row.oauthClient != null ||

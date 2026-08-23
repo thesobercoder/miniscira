@@ -7,6 +7,7 @@ import {
   sealMcpHeaders,
   sealMcpJson,
   sealMcpSecret,
+  updatedMcpOAuthClient,
 } from "@/lib/mcp-secrets"
 
 const SECRET = "dummy-not-a-real-credential"
@@ -55,5 +56,27 @@ describe("MCP credential sealing", () => {
     expect(() => openMcpHeaders(sealedHeaders)).toThrow(
       "Stored MCP credential cannot be decrypted"
     )
+  })
+
+  test("keeps a saved OAuth client secret when only the id changes", () => {
+    const current = sealMcpJson({
+      client_id: "old-client",
+      client_secret: SECRET,
+    })
+    expect(updatedMcpOAuthClient(current, "new-client")).toEqual({
+      client_id: "new-client",
+      client_secret: SECRET,
+    })
+  })
+
+  test("replaces a saved OAuth client secret when a new one is entered", () => {
+    const current = sealMcpJson({
+      client_id: "old-client",
+      client_secret: SECRET,
+    })
+    expect(updatedMcpOAuthClient(current, "new-client", "new-secret")).toEqual({
+      client_id: "new-client",
+      client_secret: "new-secret",
+    })
   })
 })

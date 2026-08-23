@@ -6,7 +6,7 @@ import { ownedMcpServer } from "@/lib/api-ownership"
 import { db } from "@/lib/db"
 import { mcpServer } from "@/lib/db/schema"
 import { publicServer } from "@/lib/mcp"
-import { sealMcpJson } from "@/lib/mcp-secrets"
+import { sealMcpJson, updatedMcpOAuthClient } from "@/lib/mcp-secrets"
 
 type Params = { id: string }
 
@@ -29,12 +29,12 @@ export const PATCH = authedWithParams<Params>(
     if (typeof body.oauthClientId === "string") {
       const clientId = body.oauthClientId.trim()
       const clientSecret = body.oauthClientSecret?.trim()
-      patch.oauthClient = clientId
-        ? sealMcpJson({
-            client_id: clientId,
-            ...(clientSecret ? { client_secret: clientSecret } : {}),
-          })
-        : null
+      const client = updatedMcpOAuthClient(
+        row.oauthClient,
+        clientId,
+        clientSecret
+      )
+      patch.oauthClient = sealMcpJson(client)
       patch.oauthTokens = null
       patch.oauthVerifier = null
       patch.oauthState = null
