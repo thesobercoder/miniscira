@@ -32,28 +32,65 @@ explain *why* an invariant exists. Avoid speculative abstractions, duplicate
 state, fire-and-forget promises without an error path, and provider-specific
 behavior leaking into ordinary UI components.
 
-## Product planning sequence
+## Product planning and execution lifecycle
 
-Follow this order exactly: **raw backlog idea → PRD → implementation tasks →
-execution**.
+Follow this order exactly: **raw backlog idea → PRD → user approval → TODO tasks →
+execution → verified completion**.
+
+### 1. Backlog: preserve raw ideas
 
 - Record concrete raw ideas in `docs/PRODUCT_IDEAS.md` first. A backlog entry may
-  be brief and incomplete; it exists to preserve the idea, not to authorize work.
-- Before implementation, promote the selected idea into a complete PRD at
-  `tasks/prd-<feature-name>.md`. Link the backlog entry to that PRD and record its
-  planning status.
-- After the PRD is approved and material questions are resolved, derive a
-  separate ordered task plan from it. Tasks must be atomic, name dependencies and
-  affected areas/files where known, and map every acceptance criterion to exact
-  unit, integration, browser/end-to-end, security, migration/rollback, and
-  production acceptance tests as applicable.
-- The PRD must determine the required model-level eval strategy for changes to
-  agent behavior, prompts, tools, retrieval, memory, or model routing: cases,
-  datasets/fixtures, expected outcomes, and pass thresholds. If evals do not
-  apply, say why explicitly.
-- Do not execute implementation directly from a raw backlog entry or directly
-  from an un-decomposed PRD. Execution begins only after the PRD and derived task,
-  test, and eval plan are ready.
+  be brief and incomplete; it preserves an idea but does not authorize work.
+- Track the idea's lifecycle explicitly, using a status such as `Backlog`,
+  `PRD in progress`, `PRD approved`, `In progress`, or `Done`.
+
+### 2. PRD: specify the selected idea
+
+- Before implementation, promote a selected idea into a complete PRD at
+  `tasks/prd-<feature-name>.md` and link the backlog entry to it.
+- The PRD must define goals, user stories, scope, non-goals, functional and
+  technical requirements, acceptance criteria, testing, evals, deployment,
+  observability, rollback, and open questions.
+- It must determine the model-level eval strategy for changes to agent behavior,
+  prompts, tools, retrieval, memory, or model routing: cases, datasets/fixtures,
+  expected outcomes, and pass thresholds. If evals do not apply, say why.
+- A written PRD is not approved by implication. Ask the user to review it; record
+  approval only after the user explicitly approves it.
+- Once the PRD is complete and explicitly user-approved, the **PRD planning work**
+  may be marked done. This means the specification phase is done—not that the
+  feature itself has been implemented. Update the backlog status to `PRD approved`.
+
+### 3. TODO tasks: the agent's executable work queue
+
+- After PRD approval, derive the implementation work into the agent's TODO list.
+  TODO items are the concrete units the agent will actually work on and track.
+- TODOs must be ordered, atomic, and small enough to complete and verify without
+  combining unrelated changes. Name dependencies and affected areas/files where
+  known.
+- Map every PRD acceptance criterion to one or more TODOs and to exact applicable
+  unit, integration, browser/end-to-end, authorization/security,
+  migration/rollback, eval, deployment, and production acceptance checks.
+- Keep only one TODO `in_progress` at a time. Mark a TODO `completed` immediately
+  after its implementation and required verification pass. If it fails or its
+  approach becomes invalid, mark it `cancelled` and add a corrected replacement.
+- The TODO list is execution state, not a substitute for the durable PRD. Do not
+  copy temporary task progress into durable memory or rewrite the PRD merely to
+  reflect day-to-day execution status.
+
+### 4. Execution and completion
+
+- Do not execute implementation directly from a raw backlog entry or an
+  unapproved PRD. Begin only after explicit PRD approval and creation of the
+  derived TODO/test/eval plan.
+- Change the backlog status to `In progress` when implementation starts.
+- A feature may be marked `Done` only after every required TODO and mapped
+  acceptance check has passed, the real user-visible flow has been exercised,
+  production deployment has been verified when applicable, and repository state
+  satisfies the production source-control invariant.
+- Keep the approved PRD as the durable record of intent and acceptance. Preserve
+  evidence of completion in the normal commits, tests, eval results, and relevant
+  operational documentation rather than claiming completion from code changes or
+  health checks alone.
 
 ## Toolchain
 
