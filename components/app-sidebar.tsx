@@ -2,7 +2,6 @@ import { RiAddLine } from "@remixicon/react"
 import { desc, eq } from "drizzle-orm"
 import Link from "next/link"
 import { ChatList } from "@/components/chat-list"
-import { NewResearchLink } from "@/components/new-research-link"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { SidebarUser } from "@/components/sidebar-user"
 import { Button } from "@/components/ui/button"
@@ -48,10 +47,8 @@ export async function AppSidebar({ user }: { user: SidebarUserInfo }) {
           <SidebarTrigger className="ml-auto text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:mx-auto" />
         </div>
         <Button
-          // This must be a document navigation. A lazily-created running chat
-          // can show /chat/:id while Next still has the `/` route mounted.
           nativeButton={false}
-          render={<NewResearchLink />}
+          render={<Link href="/" />}
           size="sm"
           // Icon rail: exact 32px circle; the glyph centers via mx-auto (see above).
           className="h-9 justify-start gap-2 rounded-lg transition-transform active:scale-[0.96] group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:rounded-full group-data-[collapsible=icon]:p-0!"

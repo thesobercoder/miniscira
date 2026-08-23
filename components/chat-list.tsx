@@ -33,7 +33,7 @@ import {
   type ChatListState,
   titleChatListRow,
 } from "@/lib/chat-list-events"
-import { browserIsOnChat, navigateToNewResearch } from "@/lib/chat-route"
+import { chatPath } from "@/lib/chat-route"
 
 type ChatRow = ChatListRow
 
@@ -47,6 +47,7 @@ const ORDER = ["Today", "Yesterday", "Earlier"] as const
 
 function DeleteChat({ id, title }: { id: string; title: string }) {
   const router = useRouter()
+  const pathname = usePathname()
   const [busy, setBusy] = useState(false)
   const [open, setOpen] = useState(false)
 
@@ -65,12 +66,8 @@ function DeleteChat({ id, title }: { id: string; title: string }) {
     // to be closed here — leaving it open stranded it with Delete disabled.
     setOpen(false)
     setBusy(false)
-    // usePathname can still be `/` after a lazily-created chat promoted the
-    // visible URL with history.replaceState. Inspect the real browser URL and
-    // hard-navigate so deleting the focused running chat cannot leave its
-    // transcript mounted on the new-research URL.
-    if (browserIsOnChat(id)) {
-      navigateToNewResearch()
+    if (pathname === chatPath(id)) {
+      router.replace("/")
       return
     }
     router.refresh()

@@ -8,19 +8,9 @@ export function chatPath(id: string): `/chat/${string}` {
  */
 export function replaceWithChatPath(id: string): string {
   const path = chatPath(id)
-  window.history.replaceState(window.history.state, "", path)
+  // Next.js 16 documents native replaceState as a supported router API. A
+  // null state lets Next's patched method copy its internal tree and dispatch
+  // ACTION_RESTORE, keeping usePathname in sync without remounting this chat.
+  window.history.replaceState(null, "", path)
   return path
-}
-
-/**
- * Read the browser's actual URL rather than Next's mounted pathname. A chat
- * created from `/` updates history without remounting so the two can differ.
- */
-export function browserIsOnChat(id: string): boolean {
-  return window.location.pathname === chatPath(id)
-}
-
-/** A fresh research page must reset the mounted chat, not only its URL. */
-export function navigateToNewResearch(): void {
-  window.location.assign("/")
 }
