@@ -26,6 +26,21 @@ Read this document before you change code or repository structure.
 
 Optimize code for clarity over cleverness. Use small named functions, explicit error states, one source of truth, narrow types, and comments that explain why an invariant exists. Avoid speculative abstractions, duplicate state, fire-and-forget promises without an error path, and provider-specific behavior in ordinary UI components.
 
+## Writing standard
+
+Use simplified technical English in every project document. This includes the README, product docs, PRDs, backlog entries, plans, runbooks, architecture notes, code comments, release notes, and user-facing technical text.
+
+- Use short, direct sentences and common words.
+- State the goal, decision, action, and result clearly.
+- Define a technical term the first time it is needed.
+- Keep exact API names, commands, file paths, and code identifiers unchanged.
+- Prefer concrete examples over abstract language.
+- Remove jargon, idioms, marketing language, filler, and unnecessary adjectives.
+- Do not make the text less accurate to make it simpler. Split a hard idea into clear steps instead.
+- Write for a technical reader who may not know this codebase or speak English as a first language.
+
+This is a mandatory project standard, not an optional style preference. Review new and changed documents for it before commit.
+
 ## Toolchain
 
 - Use Bun. The durable binary is `/opt/data/bin/bun` on Soham's Umbrel deployment.

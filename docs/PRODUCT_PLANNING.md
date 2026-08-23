@@ -25,6 +25,7 @@ raw backlog idea
 
 ## 2. PRD
 
+- Follow the mandatory simplified technical English standard in `docs/DEVELOPMENT_PRINCIPLES.md`.
 - When an idea is selected, create `tasks/prd-<feature-name>.md`.
 - Link the backlog entry to the PRD.
 - Define goals, user stories, scope, non-goals, functional and technical requirements, acceptance criteria, deployment, observability, rollback, and open questions.
