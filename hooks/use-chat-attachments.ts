@@ -35,6 +35,7 @@ export const DOC_ACCEPT =
 type Options = {
   chatId?: string
   projectId?: string
+  initialDocuments?: readonly UploadedDoc[]
   /** Read lazily: the chat row may not exist until the first message is sent. */
   currentChatId: () => string | undefined
 }
@@ -42,6 +43,7 @@ type Options = {
 export function useChatAttachments({
   chatId,
   projectId,
+  initialDocuments = [],
   currentChatId,
 }: Options) {
   // Staged in the composer for the NEXT message; cleared when it's sent.
@@ -57,14 +59,22 @@ export function useChatAttachments({
   // Sent attachments, grouped by the user-turn index they rode along with.
   const [attachmentsByTurn, setAttachmentsByTurn] = useState<
     Record<number, UploadedDoc[]>
-  >({})
+  >(() => {
+    const byTurn: Record<number, UploadedDoc[]> = {}
+    for (const doc of initialDocuments) {
+      if (doc.messageIndex == null) continue
+      byTurn[doc.messageIndex] ??= []
+      byTurn[doc.messageIndex].push(doc)
+    }
+    return byTurn
+  })
 
   // Re-hydrate this chat's attachments (by turn) so they render on the right
   // message after a reload.
   // Mount-only: a different chat is a different route, which remounts this
   // component, so chatId never changes underneath us.
   useMountEffect(() => {
-    if (!chatId) return
+    if (!chatId || initialDocuments.length > 0) return
     let active = true
     fetch(`/api/documents?chatId=${chatId}`)
       .then((r) => (r.ok ? r.json() : { documents: [] }))
@@ -223,13 +233,13 @@ export function useChatAttachments({
 
   /** Persist the binding once the chat row is guaranteed to exist. */
   const persistTurnBinding = useCallback(
-    (attached: readonly UploadedDoc[], turnIndex: number) => {
+    async (attached: readonly UploadedDoc[], turnIndex: number) => {
       const id = currentChatId()
-      if (attached.length === 0 || !id) return
+      if (attached.length === 0 || !id) return true
       // A failed binding means the attachments render on this turn now but not
       // after a reload — worth telling the reader, since re-attaching is the
       // only fix and nothing else would reveal it.
-      void mutateOrToast("/api/documents", {
+      return await mutateOrToast("/api/documents", {
         method: "PATCH",
         body: {
           ids: attached.map((d) => d.id),

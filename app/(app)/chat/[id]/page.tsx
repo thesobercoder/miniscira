@@ -6,14 +6,23 @@ import { ResearchChat } from "@/components/research-chat"
 import { auth } from "@/lib/auth"
 import type { ChatEvent } from "@/lib/chat-events"
 import { db } from "@/lib/db"
-import { chat, chatEvent, project } from "@/lib/db/schema"
+import { chat, chatEvent, document, project } from "@/lib/db/schema"
+import { initialQuery } from "@/lib/urls"
 
 export default async function ChatPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{
+    q?: string | string[]
+    mode?: string | string[]
+  }>
 }) {
   const { id } = await params
+  const query = await searchParams
+  const initialPrompt = initialQuery(query.q)
+  const requestedMode = Array.isArray(query.mode) ? query.mode[0] : query.mode
 
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) redirect("/sign-in")
@@ -27,6 +36,21 @@ export default async function ChatPage({
     .from(chatEvent)
     .where(eq(chatEvent.chatId, id))
     .orderBy(asc(chatEvent.seq))
+
+  const documents = initialPrompt
+    ? await db
+        .select({
+          id: document.id,
+          filename: document.filename,
+          status: document.status,
+          kind: document.kind,
+          url: document.blobUrl,
+          mimeType: document.mimeType,
+          messageIndex: document.messageIndex,
+        })
+        .from(document)
+        .where(eq(document.chatId, id))
+    : []
 
   const [proj] = row.projectId
     ? await db
@@ -54,6 +78,13 @@ export default async function ChatPage({
       chatId={id}
       initialEvents={events.map((e) => e.event) as ChatEvent[]}
       initialSession={initialSession}
+      initialPrompt={initialPrompt}
+      initialMode={requestedMode === "deep" ? "deep" : "search"}
+      initialDocuments={documents.map((doc) => ({
+        ...doc,
+        status: doc.status as "processing" | "ready" | "error",
+        kind: doc.kind as "document" | "image",
+      }))}
       projectId={row.projectId ?? undefined}
       projectInstructions={proj?.instructions ?? undefined}
       projectLinks={proj?.links ?? undefined}

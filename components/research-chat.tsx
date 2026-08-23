@@ -35,7 +35,7 @@ import { useMountEffect } from "@/hooks/use-mount-effect"
 import { buildClientContext, conversationRecap } from "@/lib/chat-context"
 import { type ChatEvent, partText } from "@/lib/chat-events"
 import { chatCreatedEvent, chatTitledEvent } from "@/lib/chat-list-events"
-import { chatPath } from "@/lib/chat-route"
+import { chatTurnPath } from "@/lib/chat-route"
 import {
   messagesBeforeReplacement,
   nextReplacementTurnIndex,
@@ -157,6 +157,8 @@ export function ResearchChat({
   initialEvents = [],
   initialSession,
   initialPrompt,
+  initialMode = "search",
+  initialDocuments = [],
   projectId,
   projectInstructions,
   projectLinks,
@@ -165,6 +167,8 @@ export function ResearchChat({
   initialEvents?: readonly ChatEvent[]
   initialSession?: SessionState
   initialPrompt?: string
+  initialMode?: Mode
+  initialDocuments?: readonly UploadedDoc[]
   projectId?: string
   projectInstructions?: string | null
   projectLinks?: string[]
@@ -206,7 +210,7 @@ export function ResearchChat({
   } = useEveChat({ chatId, initialEvents, initialSession })
 
   const [input, setInput] = useState("")
-  const [mode, setMode] = useState<Mode>("search")
+  const [mode, setMode] = useState<Mode>(initialMode)
   // Sticky model choice; rides to the agent as clientContext.chatModel where the
   // dynamic model resolver (agent/agent.ts) picks it up.
   const { chatModel, chatModelName, pickChatModel } = useChatModel()
@@ -228,6 +232,7 @@ export function ResearchChat({
   } = useChatAttachments({
     chatId,
     projectId,
+    initialDocuments,
     currentChatId: () => chatIdRef.current,
   })
 
@@ -250,10 +255,6 @@ export function ResearchChat({
       if (!res.ok || !json.chat) return null
       chatIdRef.current = json.chat.id
       createdRef.current = true
-      // Let the App Router own both the URL and mounted route. This avoids a
-      // split state where the address says /chat/:id while the root page is
-      // still mounted, which made New Research reuse the running transcript.
-      router.replace(chatPath(json.chat.id))
       return json.chat.id
     } catch {
       return null
@@ -337,7 +338,14 @@ export function ResearchChat({
       return false
     }
     setChatId(id)
-    if (!replacement) persistTurnBinding(attached, turnIndex)
+    if (!replacement) {
+      const bound = await persistTurnBinding(attached, turnIndex)
+      if (!bound) {
+        abandonTurn()
+        setInput((current) => current || text)
+        return false
+      }
+    }
 
     // The chat row exists in the database now. Surface it in the sidebar
     // immediately without a refresh. chat-list.tsx listens for these events
@@ -367,6 +375,13 @@ export function ResearchChat({
           }
         })
         .catch(() => {})
+
+      // A brand-new conversation starts on its real App Router route. The
+      // destination consumes q exactly once and owns the Eve session from the
+      // first send, so no live transport is abandoned during navigation and no
+      // root-page tree is left mounted under a /chat/:id URL.
+      router.replace(chatTurnPath(id, text, mode))
+      return true
     }
 
     // Attachments ride to the model natively as file parts — eve's message
