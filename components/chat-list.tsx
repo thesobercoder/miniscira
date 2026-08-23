@@ -31,6 +31,7 @@ import {
   CHAT_TITLED_EVENT,
   type ChatListRow,
   type ChatListState,
+  removeChatListRow,
   titleChatListRow,
 } from "@/lib/chat-list-events"
 import { chatPath } from "@/lib/chat-route"
@@ -45,7 +46,15 @@ function bucket(date: Date) {
 
 const ORDER = ["Today", "Yesterday", "Earlier"] as const
 
-function DeleteChat({ id, title }: { id: string; title: string }) {
+function DeleteChat({
+  id,
+  title,
+  onDeleted,
+}: {
+  id: string
+  title: string
+  onDeleted: (id: string) => void
+}) {
   const router = useRouter()
   const pathname = usePathname()
   const [busy, setBusy] = useState(false)
@@ -66,6 +75,7 @@ function DeleteChat({ id, title }: { id: string; title: string }) {
     // to be closed here — leaving it open stranded it with Delete disabled.
     setOpen(false)
     setBusy(false)
+    onDeleted(id)
     if (pathname === chatPath(id)) {
       router.replace("/")
       return
@@ -178,7 +188,13 @@ export function ChatList({ chats }: { chats: ChatRow[] }) {
                   >
                     <span className="truncate">{c.title}</span>
                   </SidebarMenuButton>
-                  <DeleteChat id={c.id} title={c.title} />
+                  <DeleteChat
+                    id={c.id}
+                    title={c.title}
+                    onDeleted={(id) =>
+                      setList((current) => removeChatListRow(current, id))
+                    }
+                  />
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>

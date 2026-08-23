@@ -28,6 +28,10 @@ export function addChatListRow(state: ChatListState, row: ChatListRow) {
   return { ...state, rows: [row, ...state.rows] }
 }
 
+export function removeChatListRow(state: ChatListState, id: string) {
+  return { ...state, rows: state.rows.filter((chat) => chat.id !== id) }
+}
+
 export function titleChatListRow(
   state: ChatListState,
   detail: { id: string; title: string }

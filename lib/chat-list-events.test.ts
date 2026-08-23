@@ -5,6 +5,7 @@ import {
   type ChatListRow,
   type ChatListState,
   chatCreatedEvent,
+  removeChatListRow,
   titleChatListRow,
 } from "@/lib/chat-list-events"
 
@@ -39,5 +40,12 @@ describe("chat list events", () => {
     expect(
       titleChatListRow(state, { id: row.id, title: "Renamed branch" }).rows
     ).toEqual([{ ...row, title: "Renamed branch" }])
+  })
+
+  test("removes a deleted optimistic row immediately", () => {
+    const other = { ...row, id: "other-chat", title: "Other chat" }
+    const state: ChatListState = { source: [], rows: [row, other] }
+
+    expect(removeChatListRow(state, row.id).rows).toEqual([other])
   })
 })
