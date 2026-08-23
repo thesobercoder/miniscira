@@ -57,12 +57,14 @@ type McpServerItem = {
 }
 
 type Transport = "http" | "sse"
+type AddTab = "manual" | "browse"
 
 export function McpView({ initial }: { initial: McpServerItem[] }) {
   const [items, setItems] = useState(initial)
   const [creating, setCreating] = useState(false)
   const [testing, setTesting] = useState<string | null>(null)
   const [connecting, setConnecting] = useState<string | null>(null)
+  const [addTab, setAddTab] = useState<AddTab>("manual")
 
   const connect = async (s: McpServerItem) => {
     setConnecting(s.id)
@@ -114,6 +116,7 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
   const [transport, setTransport] = useState<Transport>("http")
   const [headerKey, setHeaderKey] = useState("")
   const [headerValue, setHeaderValue] = useState("")
+  const [headerPlaceholder, setHeaderPlaceholder] = useState("Bearer …")
 
   const addServer = async (
     payload: {
@@ -162,6 +165,7 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
     setUrl("")
     setHeaderKey("")
     setHeaderValue("")
+    setHeaderPlaceholder("Bearer …")
   }
 
   const inCatalogAlready = (entry: McpCatalogEntry) =>
@@ -188,8 +192,12 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
     setTransport(entry.transport)
     setHeaderKey(entry.headerKey ?? "")
     setHeaderValue("")
-    toast.info(`Paste your ${entry.name} key below, then hit Add.`)
-    document.getElementById("mcp-hv")?.focus()
+    setHeaderPlaceholder(entry.headerPlaceholder ?? "your API key")
+    setAddTab("manual")
+    toast.info(
+      `Paste your ${entry.name} key in the visible field, then hit Add.`
+    )
+    requestAnimationFrame(() => document.getElementById("mcp-hv")?.focus())
   }
 
   const test = async (s: McpServerItem) => {
@@ -254,7 +262,11 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
         call their tools in any chat.
       </p>
 
-      <Tabs defaultValue="manual" className="mb-8">
+      <Tabs
+        value={addTab}
+        onValueChange={(value) => setAddTab(value as AddTab)}
+        className="mb-8"
+      >
         <TabsList>
           <TabsTrigger value="manual">Add manually</TabsTrigger>
           <TabsTrigger value="browse">Browse servers</TabsTrigger>
@@ -308,7 +320,7 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                       own name — the value field holds a credential and must
                       announce as more than an unlabeled textbox. */}
                   <span className="font-medium text-sm leading-none">
-                    Header (optional)
+                    API key / header value (optional)
                   </span>
                   <div className="flex gap-1.5">
                     <Input
@@ -321,10 +333,12 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                     />
                     <Input
                       id="mcp-hv"
+                      type="password"
                       aria-label="Header value"
+                      autoComplete="off"
                       value={headerValue}
                       onChange={(e) => setHeaderValue(e.target.value)}
-                      placeholder="Bearer …"
+                      placeholder={headerPlaceholder}
                       className="font-mono text-xs"
                     />
                   </div>

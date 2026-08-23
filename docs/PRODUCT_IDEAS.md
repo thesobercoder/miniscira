@@ -17,10 +17,6 @@ Remove an entry after the user explicitly approves its PRD.
 
 [Draft PRD](../tasks/prd-document-generation.md). Awaiting approval.
 
-### Clone and analyze GitHub repositories
-
-[Draft PRD](../tasks/prd-github-repository-analysis.md). Awaiting approval.
-
 ### Archive and recover chat threads
 
 [Draft PRD](../tasks/prd-thread-archiving.md). Awaiting approval.
