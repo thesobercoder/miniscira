@@ -509,9 +509,28 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                     </span>
                   )}
                 </div>
-                <p className="mt-0.5 truncate font-mono text-muted-foreground text-xs">
-                  {s.url}
-                </p>
+                <div className="mt-0.5 flex min-w-0 items-center gap-2">
+                  <p className="truncate font-mono text-muted-foreground text-xs">
+                    {s.url}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="link"
+                    className="h-auto shrink-0 px-0 text-muted-foreground text-xs"
+                    aria-expanded={configuringOAuth === s.id}
+                    onClick={() => {
+                      setConfiguringOAuth((current) =>
+                        current === s.id ? null : s.id
+                      )
+                      setOAuthClientId("")
+                      setOAuthClientSecret("")
+                    }}
+                  >
+                    {s.hasOAuthClient
+                      ? "Change OAuth client"
+                      : "Set OAuth client"}
+                  </Button>
+                </div>
               </div>
               {authAction(s) && (
                 <Button
@@ -534,20 +553,6 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                       : "Connect"}
                 </Button>
               )}
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-8"
-                onClick={() => {
-                  setConfiguringOAuth((current) =>
-                    current === s.id ? null : s.id
-                  )
-                  setOAuthClientId("")
-                  setOAuthClientSecret("")
-                }}
-              >
-                OAuth client
-              </Button>
               <Button
                 size="sm"
                 variant="outline"
