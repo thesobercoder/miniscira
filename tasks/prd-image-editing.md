@@ -1,16 +1,16 @@
 # Draft PRD: Natural-Language Image Editing
 
-**Status:** Draft — requires explicit user approval before implementation  
-**Backlog:** [Edit uploaded images with natural-language instructions](../docs/PRODUCT_IDEAS.md#edit-uploaded-images-with-natural-language-instructions)  
-**Repository:** `/opt/data/miniscira-src`  
-**Drafted:** 2026-08-23  
+**Status:** Draft — requires explicit user approval before implementation
+**Backlog:** [MiniScira Backlog](../docs/PRODUCT_IDEAS.md)
+**Repository:** `/opt/data/miniscira-src`
+**Drafted:** 2026-08-23
 **Scope:** Full backlog scope; no implementation is authorized by this document.
 
 ## 1. Overview
 
 MiniScira already lets a signed-in user upload images as vision attachments and generate new images with `generate_image`. It does not let the user ask for a durable edit of an existing image. The current generation tool explicitly excludes editing, generated files have no database artifact record or version lineage, image routing assumes one `IMAGE_MODEL`, and the timeline only understands generation progress/success/failure.
 
-This feature adds conversational image editing. A user attaches an image or refers unambiguously to an earlier image in the current chat, describes the change in natural language, and MiniScira automatically invokes an editing-capable image backend. The original remains unchanged. Every successful result is stored as a new durable, authorized artifact with lineage back to its source image and originating chat turn. Progress, success, and actionable failure states appear directly in the conversation.
+This feature adds conversational image editing across chats containing multiple images. A user can click any eligible image to make it the current editing target, see that target clearly in the editing workspace and composer, describe the change in natural language, and switch targets without losing conversational context. Each submitted edit still has exactly one explicit source image. MiniScira automatically invokes an editing-capable image backend. The original remains unchanged. Every successful result is stored as a new durable, authorized artifact with lineage back to its source image and originating chat turn. Progress, success, and actionable failure states appear directly in the conversation.
 
 The ordinary UI must not expose provider, endpoint, or backend selection. Operators configure eligible image models and capability metadata; MiniScira routes automatically and fails clearly when no configured route can edit.
 
@@ -42,6 +42,19 @@ At 2026-08-23T04:48:40Z, the configured gateway at `http://10.21.0.1:8317/v1`:
 
 This verifies that the live gateway exposes the OpenAI-compatible edit endpoint and expected required field names without submitting a real image or incurring an edit. It does **not** prove that every catalog image model supports editing, the accepted image formats/sizes, multi-image behavior, mask semantics, fidelity, latency, or output quality. Those remain implementation spike and deployment acceptance gates.
 
+### 2.3 Product reference screenshots
+
+The user supplied four ChatGPT image-editing screenshots as interaction references, not visual specifications to copy. They demonstrate useful principles:
+
+- an image-local **Edit** action makes the entry point discoverable;
+- a focused image workspace gives the current source image visual priority;
+- the editing composer remains visibly bound to the current image;
+- image-specific actions can live near the canvas while conversation-level actions remain separate;
+- aspect-ratio and localized-selection controls use progressive disclosure rather than crowding the normal chat;
+- the active editing target must be obvious through more than canvas prominence when a chat contains multiple images.
+
+MiniScira must adapt these principles to its existing component vocabulary, spacing, typography, colors, motion tokens, timeline, and responsive behavior. It must not copy ChatGPT's layout, labels, control grouping, or styling.
+
 ## 3. Problem Statement
 
 Users can discuss an uploaded image, but asking “remove the person in the background” cannot produce a revised file. They must leave MiniScira, lose conversational context, manually use another editor, and re-upload the result. This breaks the product's durable, visible-work workflow and makes iterative visual work cumbersome.
@@ -59,6 +72,8 @@ A correct solution must address more than an image API call:
 ## 4. Goals
 
 - Let a signed-in user request common natural-language edits to an attached or previously produced image.
+- Let a user converse with multiple images in one chat, select any eligible image as the current editing target, and switch targets deliberately.
+- Make the selected source unmistakable in the image surface and composer before submission.
 - Automatically select an editing-capable configured model without exposing provider controls in the normal composer.
 - Preserve the source file byte-for-byte and store every successful edit as a new immutable version.
 - Persist user, chat, turn, source, prompt, model route, dimensions, MIME type, size, status, and timestamps needed for provenance and operations.
@@ -176,11 +191,29 @@ These are release gates or post-release measurements, not promises about an exte
 - [ ] A backend lacking mask support is not selected for a masked request.
 - [ ] An invalid mask fails before provider invocation with corrective guidance.
 
+### US-009: Select one image from a multi-image conversation
+
+**Description:** As a user, I want to click an image in a conversation and make it the current editing target so that I can move naturally among several images without referring to filenames or guessing which one MiniScira will change.
+
+**Acceptance criteria:**
+
+- [ ] Every eligible uploaded, generated, or edited image exposes the same accessible selection/edit entry point.
+- [ ] Clicking an eligible image opens or updates the focused editing workspace and sets that artifact as the sole active source.
+- [ ] The active source is shown with a selected state on its thumbnail or image card and as an `Editing` context item attached to the composer.
+- [ ] The context item includes a thumbnail, accessible name, provenance or version label, and a remove/clear action.
+- [ ] Switching to another image updates both the selected image state and composer context before any edit can be submitted.
+- [ ] Only one image can be the active edit source at a time; other images remain available as conversational or visual references but are not silently submitted as edit inputs.
+- [ ] Clearing the active source returns the composer to ordinary chat mode without deleting or detaching any image from the conversation.
+- [ ] If the selected image becomes deleted, inaccessible, missing, or not ready, submission is blocked with a specific recovery message.
+- [ ] Reloading or reconnecting restores a durable editing target only when the draft state was intentionally persisted; otherwise no image is implicitly selected.
+- [ ] Keyboard, screen-reader, touch, narrow-screen, reduced-motion, and browser-back/close behavior are verified.
+
 ## 7. Scope
 
 ### 7.1 In scope for the full backlog
 
-- One required source image per edit.
+- Multiple eligible images may coexist in one conversation and focused editing workspace.
+- One explicitly active source image per submitted edit; ordinary reference images may remain in conversation context but are not sent to the edit endpoint unless a later approved multi-input edit contract requires them.
 - Optional single mask image.
 - Source selection from ready uploaded images and successful generated/edited image artifacts owned by the caller.
 - Common edits: object addition/removal, background replacement, recoloring, canvas extension/outpainting, local changes via mask, and restyling.
@@ -210,21 +243,34 @@ These are release gates or post-release measurements, not promises about an exte
 ### 8.1 Source selection
 
 - **UX-1:** The primary flow is “attach image + instruction + send.” No extra mode toggle is required.
-- **UX-2:** Every rendered image result exposes an accessible “Edit this image” action that stages its durable artifact reference; the user then types the instruction.
+- **UX-2:** Every eligible rendered image exposes a consistent accessible “Edit image” action. Clicking the image or invoking that action stages its durable artifact reference and opens or updates the focused editing workspace.
 - **UX-3:** Textual references resolve as follows: explicit selected artifact ID first; image attached to the current turn second; unambiguous ordinal/name reference third; “last/this image” to the most recent eligible image before the turn fourth; otherwise ask for clarification.
 - **UX-4:** Filename matching is advisory only. Execution always receives and authorizes a durable source ID.
 - **UX-5:** A user may analyze an image without editing it. The agent must distinguish verbs/intent and not edit merely because an image is attached.
 
-### 8.2 Timeline and result presentation
+### 8.2 Focused editing workspace
 
-- **UX-6:** Pending state label: “Editing image,” with a provider-neutral summary of the instruction and source thumbnail.
-- **UX-7:** Long-running state remains connected to the durable Eve tool call and survives reconnects; do not introduce a separate browser-only job state.
-- **UX-8:** Success label: “Edited image.” Show the output with `object-contain`, descriptive alt text derived from the user instruction, source/version provenance, and open/download actions.
-- **UX-9:** Failure label is specific (“Image editing unavailable,” “Edit blocked,” “Edit timed out,” etc.) and includes a short next action.
-- **UX-10:** Never show raw provider stack traces, model payloads, keys, or internal paths.
-- **UX-11:** The user can retry a failed edit and can start a new edit from any successful version.
-- **UX-12:** UI states cover loading, empty/no-source, ambiguity, unsupported, validation, moderation, transient provider error, permanent provider error, post-provider storage failure, missing backing file, and deleted source/result.
-- **UX-13:** All controls are keyboard reachable; progress has a live-region announcement that does not repeatedly spam screen readers; animation obeys existing motion tokens and reduced-motion preferences.
+- **UX-6:** The workspace is image-first but remains part of the current chat. It may use an expanded in-chat surface or responsive overlay, but closing it must return to the same conversation and scroll context.
+- **UX-7:** The active image occupies the primary canvas. When multiple eligible images exist, provide a compact thumbnail switcher or equivalent current-chat image navigator; do not show an undifferentiated attachment grid.
+- **UX-8:** Selection uses the existing accent token for a restrained border/ring and a semantic `Editing` label. Do not rely on color alone: include selected semantics, visible text, and screen-reader announcement.
+- **UX-9:** The composer shows one persistent source context item immediately before or above the input. It includes thumbnail, short title or version, origin indicator (`Uploaded`, `Generated`, or `Edited vN`), and clear action.
+- **UX-10:** Selecting another image replaces the active source atomically. The previous image must lose its selected state before the new edit can be submitted.
+- **UX-11:** The send action is disabled when the edit instruction is blank, source authorization is unresolved, source upload is incomplete, or the source is missing/deleted.
+- **UX-12:** Aspect ratio and localized selection/mask controls, if enabled by the approved implementation phase, use contextual popovers or tool modes and apply only to the active source. They must not appear as permanent controls in ordinary chat.
+- **UX-13:** Desktop may use a larger canvas with a compact source strip; narrow screens use a full-width canvas and horizontally scrollable thumbnails with a sticky composer. All targets meet touch sizing and safe-area requirements.
+- **UX-14:** Workspace transitions use existing motion tokens, last 150–250 ms, communicate state rather than decorate, and become instant or crossfade-only under reduced motion.
+- **UX-15:** The UI must preserve familiar MiniScira controls and avoid copying ChatGPT's exact toolbar, pills, icon arrangement, dark canvas treatment, or wording.
+
+### 8.3 Timeline and result presentation
+
+- **UX-16:** Pending state label: “Editing image,” with a provider-neutral summary of the instruction and source thumbnail.
+- **UX-17:** Long-running state remains connected to the durable Eve tool call and survives reconnects; do not introduce a separate browser-only job state.
+- **UX-18:** Success label: “Edited image.” Show the output with `object-contain`, descriptive alt text derived from the user instruction, source/version provenance, and open/download actions.
+- **UX-19:** Failure label is specific (“Image editing unavailable,” “Edit blocked,” “Edit timed out,” etc.) and includes a short next action.
+- **UX-20:** Never show raw provider stack traces, model payloads, keys, or internal paths.
+- **UX-21:** The user can retry a failed edit and can start a new edit from any successful version.
+- **UX-22:** UI states cover loading, empty/no-source, ambiguity, unsupported, validation, moderation, transient provider error, permanent provider error, post-provider storage failure, missing backing file, and deleted source/result.
+- **UX-23:** All controls are keyboard reachable; progress has a live-region announcement that does not repeatedly spam screen readers; animation obeys existing motion tokens and reduced-motion preferences.
 
 ## 9. Functional Requirements
 
@@ -232,6 +278,7 @@ These are release gates or post-release measurements, not promises about an exte
 
 - **FR-1:** Add a dedicated Eve tool named `edit_image`; do not overload `generate_image` with optional source behavior.
 - **FR-2:** The tool input contract must include `sourceArtifactId`, `instruction`, optional `maskArtifactId`, and optional normalized edit intent/options that are backend-neutral.
+- **FR-2A:** The browser may display and navigate many eligible images, but each submitted tool call contains exactly one authorized `sourceArtifactId`. UI-only selection state is never inferred by the server from visual position or filename.
 - **FR-3:** The tool must reject missing, ambiguous, inaccessible, deleted, non-image, non-ready, oversized, or unsupported-format sources before contacting a provider.
 - **FR-4:** Agent instructions must route explicit edits to `edit_image`, generation from scratch to `generate_image`, image questions to vision/prose, and charts/data to `run_code`.
 - **FR-5:** The agent must ask a focused source clarification instead of guessing when deterministic resolution fails.
@@ -564,14 +611,16 @@ Use the repository's approved browser automation approach chosen during implemen
 2. Click “Edit this image” on result -> “make the wall blue” -> child version appears.
 3. Branch twice from the same parent and verify both children/source links.
 4. Refer to “last image” and verify deterministic source.
-5. Two ambiguous images -> clarification, zero provider calls.
-6. Ask “what is in this image?” -> no edit call.
-7. Ask to generate a new lighthouse -> generation call, no edit call.
-8. Generation-only deployment -> clear unsupported state, no generated substitute.
-9. Mask route success and invalid-mask preflight failure.
-10. Provider timeout/rate limit/moderation/storage failure states and retry affordances.
-11. Cross-user artifact URL/ID denial.
-12. Desktop, narrow viewport, keyboard, screen-reader labels/live region, and reduced motion.
+5. Click image A, switch to image B, submit an edit, and verify only image B's durable ID reaches the tool while image A remains unchanged.
+6. Clear the active image and verify the composer returns to ordinary chat mode without deleting conversation attachments.
+7. Two ambiguous images with no explicit UI selection -> clarification, zero provider calls.
+8. Ask “what is in this image?” -> no edit call.
+9. Ask to generate a new lighthouse -> generation call, no edit call.
+10. Generation-only deployment -> clear unsupported state, no generated substitute.
+11. Mask route success and invalid-mask preflight failure.
+12. Provider timeout/rate limit/moderation/storage failure states and retry affordances.
+13. Cross-user artifact URL/ID denial.
+14. Desktop, narrow viewport, touch, keyboard, screen-reader selected state/live region, browser close/back, and reduced motion.
 
 ### 16.4 Model routing evals
 
@@ -690,6 +739,7 @@ Also run focused image-edit tests, `evals/image-editing.eval.ts`, existing `eval
 | AC-16 | Enabled backend meets objective quality thresholds | fixture manifest, automated scoring, human qualification report |
 | AC-17 | Backup/restore includes rows, blobs, and lineage | deployment acceptance 7 |
 | AC-18 | No secrets/private bytes in logs/events | log capture tests and security review |
+| AC-19 | A user can select and switch among multiple current-chat images with one unmistakable active edit target | US-009; UX-2, UX-6–15; FR-2A; E2E 5–7, 14 |
 
 Release requires every AC to have passing evidence. A health endpoint alone is not acceptance evidence.
 
@@ -714,7 +764,7 @@ Derive execution TODOs from this list only after explicit PRD approval. Keep one
 15. **T-15 — Add `edit_image` Eve tool and agent instructions.** Principal-derived execution, narrow schema, source resolution contract, no provider details in model-facing input, and structured output.
 16. **T-16 — Add routing eval suite.** Positive/clarification/negative fixtures across supported default chat models; meet 100% class thresholds.
 17. **T-17 — Add timeline classification/rendering.** Dedicated editing node, progress/source thumbnail/result/provenance/failures/retry, durable replay, accessibility, motion tokens, and component tests.
-18. **T-18 — Add explicit “Edit this image” composer flow.** Stage artifact reference, preserve normal upload/analyze/generate behavior, handle ambiguity, narrow/mobile UX, and browser checks.
+18. **T-18 — Add multi-image focused editing workspace and composer flow.** Add consistent image-local entry points, current-chat eligible-image navigation, one active source state, selected styling/semantics, composer source context, atomic switching/clearing, preserved normal upload/analyze/generate behavior, ambiguity handling, responsive/touch/accessibility states, and browser checks. Adapt to MiniScira's design system rather than copying the reference UI.
 19. **T-19 — Add browser/E2E harness and cases.** Cover all cases in 16.3 with provider/storage stubs and authorization fixture users.
 20. **T-20 — Add image-quality eval runner and fixtures.** Commit manifest, automated scorers, report format, thresholds, and human review packet; qualify each enabled route.
 21. **T-21 — Add observability and reconciliation.** Sanitized metrics/logs, missing/corrupt blob scanner, storage/DB mismatch alerts, and no-secret log tests.
@@ -801,15 +851,16 @@ Derive execution TODOs from this list only after explicit PRD approval. Keep one
 4. **Default limits:** maximum input/output bytes, pixel count, dimensions, concurrent edits per user, requests per minute/day, and total timeout.
 5. **Animated input:** reject GIF/animated WebP/AVIF for editing (recommended initially) or normalize the first frame with explicit UI warning?
 6. **HEIC/BMP:** normalize server-side if a safe decoder is available, or reject for editing while retaining vision-upload support?
-7. **Mask UX:** full scope includes optional masks; is first release allowed to expose mask only through a second attachment role, or is a visual mask painter required? This PRD recommends attachment-role only and keeps a painter out of scope.
-8. **Prompt provenance:** store the full edit instruction in the artifact record (recommended for version history) or redact after a retention period?
-9. **Cancellation:** should the UI expose Cancel when provider cancellation cannot guarantee avoided billing, or only show timeout/retry?
-10. **Fallback:** how many automatic transient attempts and route fallbacks are acceptable? Recommended: max 1 retry on the same route and max 1 alternate route, bounded by one total deadline.
-11. **Output format:** preserve provider output when safe, or normalize all edited results to PNG initially? Recommended: PNG for deterministic quality/alpha, with JPEG/WebP later for storage efficiency.
-12. **Provider disclosure:** what exact privacy copy should explain that bytes leave the MiniScira host for the configured gateway/provider?
-13. **Historical generated images:** invest in a verified chat-event backfill now, or leave old generation URLs as legacy and only register new outputs? Recommended: new outputs only unless ownership can be proven automatically.
-14. **Human quality review owner:** who approves backend qualification reports and model upgrades?
-15. **Route source of truth:** approve `IMAGE_MODELS_JSON`, or does the gateway have a reliable capability endpoint that should become authoritative in addition to `/models`?
+7. **Mask UX:** the reference screenshots demonstrate a useful localized-selection mode, but the current request explicitly locks multi-image target selection, not a painter. Is the first release allowed to expose masks through a second attachment role, or should a visual brush/mask mode become required? Current recommendation: keep the painter out of the first implementation unless separately approved.
+8. **Workspace presentation:** should the focused editor use an expanded in-chat surface or a route-backed full-screen overlay that returns to the same scroll position? Recommendation: route-backed responsive overlay on desktop and mobile, with the chat retained underneath and browser back closing the editor.
+9. **Prompt provenance:** store the full edit instruction in the artifact record (recommended for version history) or redact after a retention period?
+10. **Cancellation:** should the UI expose Cancel when provider cancellation cannot guarantee avoided billing, or only show timeout/retry?
+11. **Fallback:** how many automatic transient attempts and route fallbacks are acceptable? Recommended: max 1 retry on the same route and max 1 alternate route, bounded by one total deadline.
+12. **Output format:** preserve provider output when safe, or normalize all edited results to PNG initially? Recommended: PNG for deterministic quality/alpha, with JPEG/WebP later for storage efficiency.
+13. **Provider disclosure:** what exact privacy copy should explain that bytes leave the MiniScira host for the configured gateway/provider?
+14. **Historical generated images:** invest in a verified chat-event backfill now, or leave old generation URLs as legacy and only register new outputs? Recommended: new outputs only unless ownership can be proven automatically.
+15. **Human quality review owner:** who approves backend qualification reports and model upgrades?
+16. **Route source of truth:** approve `IMAGE_MODELS_JSON`, or does the gateway have a reliable capability endpoint that should become authoritative in addition to `/models`?
 
 ## 22. Decisions Locked Unless PRD Is Revised
 
@@ -820,6 +871,9 @@ Derive execution TODOs from this list only after explicit PRD approval. Keep one
 - Ownership is enforced from authenticated principal through metadata and byte delivery.
 - Provider-bound images use server-read bytes, not private-host URLs.
 - Generated and edited images converge on a durable artifact model compatible with the future Library.
+- A conversation may contain many eligible images, but each edit has exactly one explicit active source selected by durable artifact ID.
+- The active source is visibly and accessibly represented on both the image surface and composer; switching targets is deliberate and atomic.
+- The focused editing UX takes interaction principles from the supplied references but uses MiniScira's own design system and component vocabulary.
 - Durable Eve tool events remain the progress/reconnect source; no browser-only job system.
 - Failed attempts are not editable versions.
 - No implementation begins until explicit approval and derived TODO/test/eval plan.
