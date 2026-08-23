@@ -13,7 +13,7 @@ MiniScira stores previous conversations, but the agent cannot search or read the
 
 This feature gives the agent two simple tools:
 
-1. Search the titles of previous threads with fuzzy matching.
+1. Search the titles of previous threads with PostgreSQL ranking.
 2. Read selected previous threads or a bounded part of them.
 
 The agent can use active and archived threads. Archive state changes how threads are organized. It does not remove their value as context.
@@ -42,14 +42,17 @@ Implementation and release testing must treat the agent flow as the primary flow
 
 ### 3.1 Shared title search
 
-- Search thread titles only.
-- Use case-insensitive fuzzy matching.
+- Search thread titles only in the first release.
+- Run search in PostgreSQL. Do not load every title into application memory and rank it there.
+- Use `pg_trgm` for case-insensitive typo-tolerant matching.
 - Exact title matches rank first.
-- Prefix matches rank before weaker fuzzy matches.
+- Prefix matches rank before weaker trigram matches.
 - More recent threads break otherwise equal scores.
-- Use one shared title-matching function for user and agent search.
-- Do not build message indexing, full-text message search, embeddings, vectors, or a separate search service.
-- Do not add a database migration for search unless later evidence proves it is required.
+- Use one shared SQL-backed search function for the user picker and agent tool.
+- Apply ownership, project scope, archive rules, current-thread exclusion, ranking, ordering, and limits in the database query.
+- Add only the PostgreSQL extension and indexes required for measured title search.
+- Do not use embeddings, vectors, an external search service, or an in-process fuzzy-search package.
+- Message-text search is not part of the first release. It may later use PostgreSQL full-text search over a safe visible-message projection. It must not search raw `chat_event.event` JSON because that data can contain hidden reasoning, tool payloads, system data, and superseded content.
 
 ### 3.2 Agent behavior
 
@@ -101,6 +104,7 @@ Implementation and release testing must treat the agent flow as the primary flow
 - `chat_event` already stores the persisted thread transcript.
 - `GET /api/chats` already lists the signed-in user's thread IDs, titles, and dates.
 - The sidebar already loads the signed-in user's thread titles ordered by `updatedAt`.
+- Production uses PostgreSQL 16 through `pgvector/pgvector:pg16`. Thread search can use ordinary PostgreSQL indexes and extensions. It does not need vector search.
 - The app already uses Next.js App Router navigation.
 - `lib/chat-events.ts` is the only place that may inspect `.type` on opaque Eve events.
 - Eve tool authorization comes from `ctx.session.auth.current`.
@@ -115,7 +119,7 @@ Implementation and release testing must treat the agent flow as the primary flow
 - Let the user open a thread picker with `Ctrl/Cmd+K`.
 - Let the user find a thread by fuzzy title matching.
 - Keep the UI as simple as the ChatGPT reference pattern.
-- Reuse existing chat data and avoid new search infrastructure.
+- Reuse existing chat data and PostgreSQL. Avoid a second search system.
 - Preserve user and project isolation.
 
 ## 6. Non-goals
@@ -125,8 +129,8 @@ Implementation and release testing must treat the agent flow as the primary flow
 - Message snippets or highlighted message matches.
 - Exact-message deep links.
 - Search indexing tables or background index workers.
-- PostgreSQL full-text search, `pg_trgm`, embeddings, or semantic search.
-- A hosted search service.
+- Embeddings, vector search, semantic search, or a hosted search service.
+- Message-text search in the first release. A later approved phase may use PostgreSQL full-text search over a safe visible-message projection.
 - Saved searches, search operators, filters, analytics, or alerts.
 - Building archive controls, auto-archive rules, or the archived-thread page.
 - Replacing durable memory.
@@ -159,20 +163,23 @@ Implementation and release testing must treat the agent flow as the primary flow
 
 ## 8. User stories
 
-### US-001: shared fuzzy title matching
+### US-001: shared PostgreSQL title search
 
 **Description:** As a user and agent, I want the same predictable title matching so search behaves consistently.
 
 **Acceptance criteria:**
 
-- [ ] A pure shared function accepts a normalized query and owned thread title records.
+- [ ] One server-side query helper accepts the authenticated scope, normalized query, current-thread exclusion, and bounded result limit.
+- [ ] PostgreSQL filters ownership and project scope before ranking or limiting results.
 - [ ] Matching is case-insensitive.
 - [ ] Exact matches rank before prefix matches.
-- [ ] Prefix matches rank before weaker fuzzy matches.
+- [ ] Prefix matches rank before weaker trigram matches.
+- [ ] `pg_trgm` supplies typo-tolerant candidate matching and ranking.
 - [ ] Recency breaks equal scores.
 - [ ] Results are deterministic.
 - [ ] Empty queries return the defined recent groups instead of fuzzy results.
-- [ ] Unit tests cover exact, prefix, partial, misspelled, multi-word, empty, duplicate-score, and Unicode titles.
+- [ ] Database integration tests cover exact, prefix, partial, misspelled, multi-word, short, empty, duplicate-score, Unicode, and punctuation-heavy titles.
+- [ ] Query-plan tests confirm that representative non-empty searches use the intended title-search index.
 
 ### US-002: user thread picker
 
@@ -205,7 +212,7 @@ Implementation and release testing must treat the agent flow as the primary flow
 - [ ] Active and archived threads are searched by default.
 - [ ] The current thread is excluded by default.
 - [ ] Results contain thread ID, title, updated date, project ID when present, archived state, and app-relative link.
-- [ ] The tool uses the same title matcher as the user picker.
+- [ ] The tool uses the same PostgreSQL query helper as the user picker.
 - [ ] Tool tests prove user and project isolation.
 
 ### US-004: agent reads a selected previous thread
@@ -257,11 +264,14 @@ Implementation and release testing must treat the agent flow as the primary flow
 
 ### Shared search
 
-- **FR-011:** Normalize Unicode, case, and whitespace before matching.
-- **FR-012:** Use one shared deterministic fuzzy title matcher.
+- **FR-011:** Normalize query whitespace and use explicit case-insensitive PostgreSQL expressions for matching.
+- **FR-012:** Use one shared deterministic PostgreSQL title-search query.
 - **FR-013:** Cap user results at 20 and agent results at 8.
 - **FR-014:** Do not return chat content from title search.
 - **FR-015:** Enforce ownership and project scope before matching or returning records.
+- **FR-025:** Rank exact matches first, then prefixes, then trigram matches, then use recency and stable thread ID ordering as tie-breakers.
+- **FR-026:** Define separate behavior for queries shorter than three characters so short prefixes remain useful without forcing broad trigram scans.
+- **FR-027:** Run `EXPLAIN (ANALYZE, BUFFERS)` against representative owned data before release and record the accepted query plan without titles or user data.
 
 ### Agent tools
 
@@ -277,9 +287,9 @@ Implementation and release testing must treat the agent flow as the primary flow
 
 ## 10. Simple technical design
 
-### 10.1 No new search database
+### 10.1 PostgreSQL title search
 
-Use existing `chat` rows. Fetch only owned thread metadata needed for search:
+Use existing `chat` rows and search them in PostgreSQL. Select only owned thread metadata needed for search:
 
 - `id`
 - `title`
@@ -287,9 +297,17 @@ Use existing `chat` rows. Fetch only owned thread metadata needed for search:
 - `projectId`
 - archive state when available
 
-Run the shared fuzzy matcher in normal application code. Do not add a search table, message projection, vector column, index worker, or search service.
+Enable `pg_trgm` through a committed migration. Add a trigram index on the normalized title expression used by the query. Keep the existing owner and project indexes available for scope filtering. Use one parameterized SQL query that:
 
-If representative performance tests later prove this approach is too slow, revise and re-approve the PRD before adding infrastructure.
+1. filters by authenticated owner and project scope;
+2. excludes the current thread when required;
+3. handles empty queries as recent-thread retrieval;
+4. handles queries shorter than three characters as exact or prefix search;
+5. handles longer queries as exact, prefix, and trigram candidate search;
+6. ranks candidates by match class, trigram similarity, recency, and stable ID; and
+7. applies the result limit in PostgreSQL.
+
+Do not add a search table, vector column, embedding job, index worker, external service, or application-memory scan. If representative query plans later prove the scoped trigram query is insufficient, revise and re-approve the PRD before adding a visible-message search projection or other infrastructure.
 
 ### 10.2 User picker data
 
@@ -330,6 +348,7 @@ These limits must be verified against Eve model context and current tool-output 
 Cover:
 
 - exact title match;
+- PostgreSQL query plan and index use;
 - case-insensitive match;
 - prefix match;
 - partial and misspelled title;
@@ -398,11 +417,13 @@ Any privacy, authorization, or prompt-injection failure blocks release.
 
 ## 13. Performance targets
 
-Use representative data sets of 1,000 and 10,000 thread titles.
+Use representative PostgreSQL data sets of 1,000, 10,000, and 100,000 thread titles across multiple users and projects.
 
 - Picker opens within 100 ms after the keyboard event when data is already loaded.
-- Fuzzy results update within 100 ms at p95 for 1,000 titles.
-- Fuzzy results update within 250 ms at p95 for 10,000 titles.
+- Title results update within 100 ms at p95 for 1,000 owned titles.
+- Title results update within 250 ms at p95 for 10,000 owned titles.
+- A scoped search remains within 500 ms at p95 in the 100,000-row mixed-owner data set on the reference self-hosted deployment.
+- Representative non-empty searches use the intended PostgreSQL index and do not sort or transfer every owned title in application memory.
 - Agent title search completes within 500 ms at p95 on the reference self-hosted deployment.
 - Thread reads remain bounded and do not load unbounded transcripts into the model.
 
@@ -414,7 +435,7 @@ If these targets fail, measure the actual bottleneck before changing the archite
 
 1. Approve this PRD.
 2. Confirm the archive-state field and current Eve read APIs.
-3. Implement the shared title matcher and tests.
+3. Implement the shared PostgreSQL title query, migration, and tests.
 4. Add agent search and read tools behind a feature flag.
 5. Add agent instructions and run evals.
 6. Add the user picker and browser tests.
@@ -427,7 +448,7 @@ If these targets fail, measure the actual bottleneck before changing the archite
 
 - Disable agent tools and the user picker feature flags.
 - Roll back the application image or commit.
-- No search schema rollback is needed because this design adds no search schema.
+- The `pg_trgm` extension may remain installed after application rollback. Remove the title-search index only through a tested migration when needed; it contains no user content and does not change chat rows.
 - Existing chats and events remain unchanged.
 
 ## 15. Ordered implementation tasks
@@ -435,9 +456,9 @@ If these targets fail, measure the actual bottleneck before changing the archite
 Create TODOs only after explicit PRD approval.
 
 1. Confirm exact archive state and Eve transcript reduction APIs.
-2. Freeze shared title-matching behavior with unit fixtures.
-3. Implement the shared fuzzy title matcher.
-4. Implement and test authorized thread metadata retrieval.
+2. Freeze shared title-ranking behavior with database fixtures.
+3. Add the `pg_trgm` migration and title index.
+4. Implement and test the authorized PostgreSQL thread-title query.
 5. Implement `search_previous_threads`.
 6. Implement bounded `read_previous_thread`.
 7. Update agent instructions and citations.
@@ -447,13 +468,14 @@ Create TODOs only after explicit PRD approval.
 11. Run focused, full, browser, security, and performance tests.
 12. Deploy, verify the primary agent flow, verify the secondary user flow, and push the clean repository state.
 
-Do not start with search infrastructure, schema design, message indexing, semantic retrieval, or a custom routing mechanism.
+Do not start with embeddings, vector search, raw-event search, an external service, or a custom routing mechanism. PostgreSQL title search and its measured index are the initial search infrastructure.
 
 ## 16. Open questions
 
 1. What canonical archive field will the archive PRD add?
-2. What maintained fuzzy-matching package already used by the repository should provide the shared matcher? If none is a direct dependency, compare one small maintained package with a small tested function before the TODO plan locks the choice. Do not add a custom search system.
+2. What exact `pg_trgm` threshold and ranking weights perform best on representative MiniScira titles? Lock them from measured fixtures before implementation.
 3. Should the agent read the whole bounded thread from the start, the most recent messages, or a requested range? Proposed default: return the most recent visible messages within the limit, with a continuation option.
+4. Should a later phase search visible message text with PostgreSQL full-text search? If yes, it needs a separate approved design for a safe visible-message projection, update path, language configuration, authorization, ranking, snippets, migration, and rollback.
 
 ## 17. Approval gate
 
@@ -473,9 +495,9 @@ The implementation agent must receive:
 - `AGENTS.md` and the linked project guidance.
 - The user-provided ChatGPT UI images as behavioral references, not as a license to copy branding.
 - The locked rule that agent continuity is primary and user title search is secondary.
-- The locked title-only fuzzy search scope.
+- The locked title-only PostgreSQL search scope.
 - The rule that active and archived threads are available to agents.
-- The rule that no message index, semantic search, or custom search service may be added without a revised approved PRD.
+- The rule that embeddings, vector search, raw-event search, and external search services are excluded. A visible-message PostgreSQL search projection needs a revised approved PRD.
 - The ordered tasks. The approved TODO plan must add the exact verification commands and fixture mapping before implementation starts.
 
 If a simple existing repository or framework pattern can solve a requirement, use it. Do not invent a new system.
