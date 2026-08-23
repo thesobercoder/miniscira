@@ -247,7 +247,7 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
     <div className="mx-auto w-full max-w-3xl px-4 py-8 md:px-6">
       <div className="mb-1 flex items-center gap-2">
         <RiPlugLine className="size-5 text-primary-strong" />
-        <h1 className="font-semibold text-xl">MCP servers</h1>
+        <h1 className="font-semibold text-xl">MCP Servers</h1>
       </div>
       <p className="mb-6 text-muted-foreground text-sm">
         Connect remote MCP tool servers (HTTP or SSE). The agent can list and

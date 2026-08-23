@@ -28,9 +28,9 @@ const NAV = [
   },
   {
     href: "/mcps",
-    label: "MCP servers",
+    label: "MCP Servers",
     icon: RiPlugLine,
-    tooltip: "MCP servers",
+    tooltip: "MCP Servers",
   },
 ]
 

@@ -6,6 +6,17 @@ Add items only when a concrete need appears. Before implementation, turn the sel
 
 ## Backlog
 
+### Artifact Library across all chats
+
+- Add a **Library** destination in the main sidebar immediately below **Lookouts** and above **MCP Servers**.
+- Show every artifact the signed-in user has created or received across all chats, including generated images, uploaded files, research exports, and future PDF, DOCX, PPTX, and XLSX outputs.
+- Provide useful type, chat, project, and date filters plus filename and content search where indexing is supported.
+- Show artifact previews and metadata, with direct links back to the originating chat and turn.
+- Allow users to download artifacts and perform safe lifecycle actions without deleting the source chat implicitly.
+- Enforce strict per-user authorization and make missing, expired, or deleted backing files explicit rather than leaving broken entries.
+
+Before implementation, create a focused PRD covering the artifact data model, existing upload/generated-file discovery, sidebar and Library UX, previews, search and filtering, source-chat provenance, retention and deletion semantics, authorization, migrations, and end-to-end tests.
+
 ### Edit uploaded images with natural-language instructions
 
 - Let users upload an image and describe the desired changes conversationally.
