@@ -238,12 +238,11 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
   const [name, setName] = useState("")
   const [url, setUrl] = useState("")
   const [transport, setTransport] = useState<Transport>("http")
-  // This must be a real value, not only a placeholder. Otherwise a user who
-  // enters a bearer token without touching the name field sends no header.
-  const [headerKey, setHeaderKey] = useState("Authorization")
+  const [headerKey, setHeaderKey] = useState("")
   const [headerValue, setHeaderValue] = useState("")
   const [headerPlaceholder, setHeaderPlaceholder] =
     useState("Bearer your-token")
+  const [headerError, setHeaderError] = useState<string | null>(null)
 
   const addServer = async (
     payload: {
@@ -254,7 +253,7 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
       authType?: McpAuthType
     },
     successMessage: string
-  ) => {
+  ): Promise<boolean> => {
     setCreating(true)
     try {
       const res = await fetch("/api/mcp", {
@@ -270,10 +269,11 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
       const added = json.server
       if (!res.ok || !added) {
         toast.error(json.error ?? "Couldn't add server")
-        return
+        return false
       }
       setItems((prev) => [added, ...prev])
       toast.success(successMessage)
+      return true
     } finally {
       setCreating(false)
     }
@@ -281,16 +281,24 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
 
   const create = async () => {
     if (!name.trim() || !url.trim()) return
+    setHeaderError(null)
+    if (headerKey.trim() && !headerValue.trim()) {
+      setHeaderError("Enter a header value or clear the header name.")
+      return
+    }
     const credential = headerValue.trim()
+    const usesHeaderAuth = Boolean(headerKey.trim() || credential)
     const headers = credential
       ? { [headerKey.trim() || "Authorization"]: credential }
       : undefined
-    const headerError = validateMcpHeaders(headers ?? null)
-    if (headerError) {
-      toast.error(headerError)
+    const validationError = validateMcpHeaders(headers ?? null, {
+      required: usesHeaderAuth,
+    })
+    if (validationError) {
+      setHeaderError(validationError)
       return
     }
-    await addServer(
+    const added = await addServer(
       {
         name,
         url,
@@ -300,11 +308,13 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
       },
       "MCP server added. Hit Test to check the connection."
     )
+    if (!added) return
     setName("")
     setUrl("")
-    setHeaderKey("Authorization")
+    setHeaderKey("")
     setHeaderValue("")
     setHeaderPlaceholder("Bearer your-token")
+    setHeaderError(null)
   }
 
   const insecureMcpUrl = (() => {
@@ -347,6 +357,7 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
     setHeaderKey(entry.headerKey ?? "")
     setHeaderValue("")
     setHeaderPlaceholder(entry.headerPlaceholder ?? "your API key")
+    setHeaderError(null)
     setAddTab("manual")
     toast.info(
       `Paste your ${entry.name} key in the visible field, then hit Add.`
@@ -487,8 +498,12 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                       id="mcp-hk"
                       aria-label="Header name"
                       value={headerKey}
-                      onChange={(e) => setHeaderKey(e.target.value)}
+                      onChange={(e) => {
+                        setHeaderKey(e.target.value)
+                        setHeaderError(null)
+                      }}
                       placeholder="Authorization"
+                      aria-invalid={headerError != null}
                       className="font-mono text-xs"
                     />
                     <Input
@@ -497,11 +512,20 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                       aria-label="Header value"
                       autoComplete="off"
                       value={headerValue}
-                      onChange={(e) => setHeaderValue(e.target.value)}
+                      onChange={(e) => {
+                        setHeaderValue(e.target.value)
+                        setHeaderError(null)
+                      }}
                       placeholder={headerPlaceholder}
+                      aria-invalid={headerError != null}
                       className="font-mono text-xs"
                     />
                   </div>
+                  {headerError && (
+                    <p className="text-destructive text-xs" role="alert">
+                      {headerError}
+                    </p>
+                  )}
                 </div>
                 <Button
                   onClick={create}

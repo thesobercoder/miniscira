@@ -49,7 +49,9 @@ export const POST = authed(async (request, { userId }) => {
   const parsed = validateMcpServerUrl(url)
   if (!parsed.ok)
     return NextResponse.json({ error: parsed.error }, { status: 400 })
-  const headerError = validateMcpHeaders(headers)
+  const headerError = validateMcpHeaders(headers, {
+    required: authType === "header",
+  })
   if (headerError)
     return NextResponse.json({ error: headerError }, { status: 400 })
 

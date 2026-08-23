@@ -22,14 +22,19 @@ export function sanitizeMcpHeaders(
 }
 
 export function validateMcpHeaders(
-  headers: Record<string, string> | null
+  headers: Record<string, string> | null,
+  options: { required?: boolean } = {}
 ): string | null {
-  if (!headers) return null
+  if (!headers)
+    return options.required ? "Authentication header is required." : null
   for (const [name, value] of Object.entries(headers)) {
     if (!/^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/.test(name))
       return "Header name is invalid."
-    if (name.toLowerCase() === "authorization" && !/^\S+\s+\S/.test(value))
-      return "Authorization must include a scheme, such as Bearer followed by your token."
+    if (
+      name.toLowerCase() === "authorization" &&
+      !/^Bearer [^\s,]+$/i.test(value)
+    )
+      return "Authorization must be Bearer followed by a token."
   }
   return null
 }
