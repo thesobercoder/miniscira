@@ -44,15 +44,16 @@ Implementation and release testing must treat the agent flow as the primary flow
 
 - Search thread titles only in the first release.
 - Run search in PostgreSQL. Do not load every title into application memory and rank it there.
+- Use PostgreSQL full-text search for token and multi-word matching.
 - Use `pg_trgm` for case-insensitive typo-tolerant matching.
 - Exact title matches rank first.
-- Prefix matches rank before weaker trigram matches.
+- Prefix matches rank before full-text and weaker trigram matches.
 - More recent threads break otherwise equal scores.
 - Use one shared SQL-backed search function for the user picker and agent tool.
 - Apply ownership, project scope, archive rules, current-thread exclusion, ranking, ordering, and limits in the database query.
 - Add only the PostgreSQL extension and indexes required for measured title search.
 - Do not use embeddings, vectors, an external search service, or an in-process fuzzy-search package.
-- Message-text search is not part of the first release. It may later use PostgreSQL full-text search over a safe visible-message projection. It must not search raw `chat_event.event` JSON because that data can contain hidden reasoning, tool payloads, system data, and superseded content.
+- Plan message-text search as a second phase in this PRD. It uses PostgreSQL full-text search over a safe visible-message projection. It must not search raw `chat_event.event` JSON because that data can contain hidden reasoning, tool payloads, system data, and superseded content.
 
 ### 3.2 Agent behavior
 
@@ -130,7 +131,7 @@ Implementation and release testing must treat the agent flow as the primary flow
 - Exact-message deep links.
 - Search indexing tables or background index workers.
 - Embeddings, vector search, semantic search, or a hosted search service.
-- Message-text search in the first release. A later approved phase may use PostgreSQL full-text search over a safe visible-message projection.
+- Message-text search in the first release. It is planned as Phase 2 and stays behind a separate release gate.
 - Saved searches, search operators, filters, analytics, or alerts.
 - Building archive controls, auto-archive rules, or the archived-thread page.
 - Replacing durable memory.
@@ -173,7 +174,8 @@ Implementation and release testing must treat the agent flow as the primary flow
 - [ ] PostgreSQL filters ownership and project scope before ranking or limiting results.
 - [ ] Matching is case-insensitive.
 - [ ] Exact matches rank before prefix matches.
-- [ ] Prefix matches rank before weaker trigram matches.
+- [ ] Prefix matches rank before full-text and weaker trigram matches.
+- [ ] PostgreSQL full-text search supplies token and multi-word matching.
 - [ ] `pg_trgm` supplies typo-tolerant candidate matching and ranking.
 - [ ] Recency breaks equal scores.
 - [ ] Results are deterministic.
@@ -269,7 +271,7 @@ Implementation and release testing must treat the agent flow as the primary flow
 - **FR-013:** Cap user results at 20 and agent results at 8.
 - **FR-014:** Do not return chat content from title search.
 - **FR-015:** Enforce ownership and project scope before matching or returning records.
-- **FR-025:** Rank exact matches first, then prefixes, then trigram matches, then use recency and stable thread ID ordering as tie-breakers.
+- **FR-025:** Rank exact matches first, then prefixes, then full-text matches, then trigram matches, then use recency and stable thread ID ordering as tie-breakers.
 - **FR-026:** Define separate behavior for queries shorter than three characters so short prefixes remain useful without forcing broad trigram scans.
 - **FR-027:** Run `EXPLAIN (ANALYZE, BUFFERS)` against representative owned data before release and record the accepted query plan without titles or user data.
 
@@ -297,19 +299,44 @@ Use existing `chat` rows and search them in PostgreSQL. Select only owned thread
 - `projectId`
 - archive state when available
 
-Enable `pg_trgm` through a committed migration. Add a trigram index on the normalized title expression used by the query. Keep the existing owner and project indexes available for scope filtering. Use one parameterized SQL query that:
+Enable `pg_trgm` through a committed migration. Add a stored title search vector with a fixed PostgreSQL text-search configuration, a GIN index for that vector, and a trigram index on the normalized title expression. Keep the existing owner and project indexes available for scope filtering. Use one parameterized SQL query that:
 
 1. filters by authenticated owner and project scope;
 2. excludes the current thread when required;
 3. handles empty queries as recent-thread retrieval;
 4. handles queries shorter than three characters as exact or prefix search;
-5. handles longer queries as exact, prefix, and trigram candidate search;
-6. ranks candidates by match class, trigram similarity, recency, and stable ID; and
+5. handles longer queries as exact, prefix, full-text, and trigram candidate search;
+6. ranks candidates by match class, full-text rank, trigram similarity, recency, and stable ID; and
 7. applies the result limit in PostgreSQL.
 
-Do not add a search table, vector column, embedding job, index worker, external service, or application-memory scan. If representative query plans later prove the scoped trigram query is insufficient, revise and re-approve the PRD before adding a visible-message search projection or other infrastructure.
+Do not add a vector column, embedding job, external index worker, external service, or application-memory scan.
 
-### 10.2 User picker data
+### 10.2 Phase 2: PostgreSQL message search
+
+Title search is the first release. It is not enough for every agent-continuity request because an old decision may not appear in the thread title.
+
+Phase 2 adds PostgreSQL full-text search over a derived visible-message table. It does not index raw `chat_event.event` JSON. The table stores only canonical visible user and assistant text, plus stable source positions needed for a bounded read around a match.
+
+The projection must:
+
+- use the same Eve session scoping, supersede handling, reducer behavior, and visible-text extraction as the rendered transcript;
+- exclude reasoning, tool inputs, tool outputs, system text, client context, malformed events, secrets, and superseded content;
+- update when a durable user message or completed assistant response is persisted;
+- backfill existing threads in bounded, restartable batches;
+- join back to `chat` for every authorization check instead of trusting copied ownership fields; and
+- use PostgreSQL GIN full-text indexing. Add trigram indexing to message text only if measured typo cases justify its storage and write cost.
+
+Agent discovery stays progressive:
+
+1. Search authorized thread titles.
+2. If title results are weak, or the request refers to message content, search the authorized visible-message projection.
+3. Group matches into a small number of threads.
+4. Return thread metadata and an opaque match cursor, not a broad transcript dump.
+5. Call `read_previous_thread` for a bounded window around the selected match.
+
+Phase 2 has its own release gate. Do not enable it until projection equivalence, backfill, authorization, query-plan, bounded-read, and prompt-injection tests pass.
+
+### 10.3 User picker data
 
 Use the simplest canonical data path supported by the current App Router code:
 
@@ -318,15 +345,18 @@ Use the simplest canonical data path supported by the current App Router code:
 
 Do not create duplicate client caches or private routing state.
 
-### 10.3 Agent thread read
+### 10.4 Agent thread read
 
-Read the selected thread from its persisted `chat_event` rows. Reuse the same event projection rules as the visible chat transcript. Keep the response bounded.
+Read the selected thread with the same event projection rules as the visible chat transcript. Keep model output, database work, and reducer work bounded separately.
 
 Suggested initial limits:
 
 - Maximum 100 visible messages per read.
 - Maximum 30,000 returned characters.
 - Optional bounded range or continuation cursor for longer threads.
+- Optional opaque match cursor for a small window around a Phase 2 message match.
+
+Until the visible-message projection is available, title-selected reads may reduce the event log with a measured maximum event count. After Phase 2 equivalence is proven, use the projection as the bounded-read source when possible.
 
 These limits must be verified against Eve model context and current tool-output guidance before implementation.
 
@@ -334,7 +364,7 @@ These limits must be verified against Eve model context and current tool-output 
 
 - Every database query includes the authenticated owner condition.
 - Project-scoped agent search includes the exact owned project condition.
-- Search results never expose message content.
+- Title-search results never expose message content. Phase 2 may return only the minimum approved match excerpt or an opaque match cursor; it never returns a broad transcript dump.
 - Ordinary logs never contain queries, titles, or retrieved messages.
 - Tool errors never reveal whether a foreign thread exists.
 - Retrieved old messages are data, not instructions.
@@ -426,6 +456,8 @@ Use representative PostgreSQL data sets of 1,000, 10,000, and 100,000 thread tit
 - Representative non-empty searches use the intended PostgreSQL index and do not sort or transfer every owned title in application memory.
 - Agent title search completes within 500 ms at p95 on the reference self-hosted deployment.
 - Thread reads remain bounded and do not load unbounded transcripts into the model.
+- Phase 2 message search stays within 500 ms at p95 for the approved representative message data set.
+- Projection updates do not block chat persistence beyond the approved write-latency budget.
 
 If these targets fail, measure the actual bottleneck before changing the architecture.
 
@@ -441,14 +473,18 @@ If these targets fail, measure the actual bottleneck before changing the archite
 6. Add the user picker and browser tests.
 7. Exercise the real agent continuity flow first.
 8. Exercise the user picker flow.
-9. Deploy progressively and inspect privacy-safe errors and latency.
-10. Complete the repository source-control checks.
+9. Release and verify Phase 1 title search.
+10. Implement the Phase 2 visible-message projection behind a separate feature flag.
+11. Backfill in bounded batches and prove projection equivalence with rendered transcripts.
+12. Release and verify progressive message fallback only after the Phase 2 gate passes.
+13. Complete the repository source-control checks.
 
 ### Rollback
 
 - Disable agent tools and the user picker feature flags.
 - Roll back the application image or commit.
 - The `pg_trgm` extension may remain installed after application rollback. Remove the title-search index only through a tested migration when needed; it contains no user content and does not change chat rows.
+- Leave a populated visible-message projection in place during an ordinary rollback. Remove it only through a later reviewed cleanup migration.
 - Existing chats and events remain unchanged.
 
 ## 15. Ordered implementation tasks
@@ -457,7 +493,7 @@ Create TODOs only after explicit PRD approval.
 
 1. Confirm exact archive state and Eve transcript reduction APIs.
 2. Freeze shared title-ranking behavior with database fixtures.
-3. Add the `pg_trgm` migration and title index.
+3. Add the title full-text vector, `pg_trgm` migration, and title indexes.
 4. Implement and test the authorized PostgreSQL thread-title query.
 5. Implement `search_previous_threads`.
 6. Implement bounded `read_previous_thread`.
@@ -466,7 +502,11 @@ Create TODOs only after explicit PRD approval.
 9. Build the `Ctrl/Cmd+K` picker with existing UI primitives.
 10. Add sidebar search affordance and accessibility metadata.
 11. Run focused, full, browser, security, and performance tests.
-12. Deploy, verify the primary agent flow, verify the secondary user flow, and push the clean repository state.
+12. Deploy and verify Phase 1 title search, the primary agent flow, and the secondary user flow.
+13. Design the exact Phase 2 projection schema, stable match cursor, update boundary, backfill, and equivalence fixtures.
+14. Implement the projection and bounded backfill behind a disabled feature flag.
+15. Add PostgreSQL message FTS, progressive fallback, match-window reads, security tests, and agent evals.
+16. Release Phase 2 only after its separate gate passes, then push the clean repository state.
 
 Do not start with embeddings, vector search, raw-event search, an external service, or a custom routing mechanism. PostgreSQL title search and its measured index are the initial search infrastructure.
 
@@ -475,7 +515,13 @@ Do not start with embeddings, vector search, raw-event search, an external servi
 1. What canonical archive field will the archive PRD add?
 2. What exact `pg_trgm` threshold and ranking weights perform best on representative MiniScira titles? Lock them from measured fixtures before implementation.
 3. Should the agent read the whole bounded thread from the start, the most recent messages, or a requested range? Proposed default: return the most recent visible messages within the limit, with a continuation option.
-4. Should a later phase search visible message text with PostgreSQL full-text search? If yes, it needs a separate approved design for a safe visible-message projection, update path, language configuration, authorization, ranking, snippets, migration, and rollback.
+4. Which PostgreSQL text-search configuration should titles use? Proposed default: `simple`, verified with multilingual and punctuation-heavy fixtures.
+5. Which text-search configurations should Phase 2 message projections support? Test `simple` and `english` before locking the first configuration.
+6. What exact title score counts as strong enough to skip Phase 2 message search?
+7. What is the canonical stable visible-message identifier after retries, superseded turns, and multiple Eve sessions?
+8. Should the projection update after each persisted flush or only at durable user-message and completed-assistant boundaries?
+9. What event-count ceiling is safe for interim reads before the Phase 2 backfill is complete?
+10. Does production scale require concurrent GIN index creation?
 
 ## 17. Approval gate
 
@@ -495,9 +541,10 @@ The implementation agent must receive:
 - `AGENTS.md` and the linked project guidance.
 - The user-provided ChatGPT UI images as behavioral references, not as a license to copy branding.
 - The locked rule that agent continuity is primary and user title search is secondary.
-- The locked title-only PostgreSQL search scope.
+- The locked Phase 1 title-only PostgreSQL search scope and planned Phase 2 visible-message PostgreSQL search.
 - The rule that active and archived threads are available to agents.
-- The rule that embeddings, vector search, raw-event search, and external search services are excluded. A visible-message PostgreSQL search projection needs a revised approved PRD.
+- The rule that embeddings, vector search, raw-event search, and external search services are excluded.
+- The rule that Phase 2 cannot ship until its projection, backfill, authorization, performance, bounded-read, and prompt-injection gate passes.
 - The ordered tasks. The approved TODO plan must add the exact verification commands and fixture mapping before implementation starts.
 
 If a simple existing repository or framework pattern can solve a requirement, use it. Do not invent a new system.
