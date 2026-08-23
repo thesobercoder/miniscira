@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm"
 
 import { db } from "@/lib/db"
 import { type McpServer, mcpServer } from "@/lib/db/schema"
-import { DbOAuthProvider } from "@/lib/mcp-oauth"
+import { DbOAuthProvider, oauthAttemptIsActive } from "@/lib/mcp-oauth"
 import { openMcpHeaders, openMcpJson } from "@/lib/mcp-secrets"
 
 /**
@@ -89,6 +89,15 @@ export function publicServer(row: McpServer) {
     hasOAuthClient: row.oauthClient != null,
     oauthClientId:
       typeof oauthClient?.client_id === "string" ? oauthClient.client_id : null,
+    oauthCallbackMode:
+      row.oauthCallbackMode === "manual"
+        ? ("manual" as const)
+        : ("automatic" as const),
+    oauthCallbackUrl: row.oauthCallbackUrl,
+    oauthPending:
+      row.oauthCallbackMode === "manual" &&
+      row.oauthAttemptCallbackUrl != null &&
+      oauthAttemptIsActive(row.oauthAttemptStartedAt),
     offersOAuth:
       row.authType === "oauth" ||
       row.oauthClient != null ||

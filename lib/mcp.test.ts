@@ -19,6 +19,10 @@ function row(overrides: Partial<McpServer> = {}): McpServer {
     oauthTokens: null,
     oauthVerifier: null,
     oauthState: null,
+    oauthCallbackMode: "automatic",
+    oauthCallbackUrl: null,
+    oauthAttemptCallbackUrl: null,
+    oauthAttemptStartedAt: null,
     enabled: true,
     createdAt: new Date("2026-07-31T00:00:00.000Z"),
     updatedAt: new Date("2026-07-31T00:00:00.000Z"),
@@ -73,6 +77,35 @@ describe("publicServer", () => {
 
   test("does not leak the owning user id", () => {
     expect(JSON.stringify(publicServer(row()))).not.toContain("user_1")
+  })
+
+  test("exposes safe callback settings without transient OAuth material", () => {
+    const result = publicServer(
+      row({
+        oauthCallbackMode: "manual",
+        oauthCallbackUrl: "http://localhost:33418/callback",
+        oauthAttemptCallbackUrl: "http://localhost:33418/callback",
+        oauthAttemptStartedAt: new Date(),
+        oauthState: DUMMY_SECRET,
+        oauthVerifier: DUMMY_SECRET,
+      })
+    )
+    expect(result.oauthCallbackMode).toBe("manual")
+    expect(result.oauthCallbackUrl).toBe("http://localhost:33418/callback")
+    expect(result.oauthPending).toBe(true)
+    expect(JSON.stringify(result)).not.toContain(DUMMY_SECRET)
+  })
+
+  test("does not expose an expired manual attempt as pending", () => {
+    const result = publicServer(
+      row({
+        oauthCallbackMode: "manual",
+        oauthAttemptCallbackUrl: "http://localhost:33418/callback",
+        oauthAttemptStartedAt: new Date(Date.now() - 11 * 60 * 1000),
+      })
+    )
+
+    expect(result.oauthPending).toBe(false)
   })
 })
 

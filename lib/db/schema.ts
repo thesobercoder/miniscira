@@ -343,6 +343,12 @@ export const mcpServer = pgTable(
     oauthTokens: jsonb("oauth_tokens").$type<Record<string, unknown>>(),
     oauthVerifier: text("oauth_verifier"),
     oauthState: text("oauth_state"),
+    oauthCallbackMode: text("oauth_callback_mode")
+      .notNull()
+      .default("automatic"), // automatic | manual
+    oauthCallbackUrl: text("oauth_callback_url"),
+    oauthAttemptCallbackUrl: text("oauth_attempt_callback_url"),
+    oauthAttemptStartedAt: timestamp("oauth_attempt_started_at"),
     enabled: boolean("enabled").notNull().default(true),
     createdAt: timestamp("created_at")
       .$defaultFn(() => new Date())

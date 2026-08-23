@@ -22,10 +22,11 @@ export const POST = authedWithParams<Params>(
         return NextResponse.json({ authorized: true })
       return NextResponse.json({ authorized: false, url: result.url })
     } catch (err) {
-      const message = err instanceof Error ? err.message : "OAuth start failed"
+      const message = err instanceof Error ? err.message : ""
       return NextResponse.json(
         {
-          error: message,
+          error:
+            "Couldn't start OAuth. Check the server and Advanced settings.",
           needsClient:
             !row.oauthClient &&
             /registration|register|client information/i.test(message),
@@ -49,6 +50,8 @@ export const DELETE = authedWithParams<Params>(
         oauthTokens: null,
         oauthVerifier: null,
         oauthState: null,
+        oauthAttemptCallbackUrl: null,
+        oauthAttemptStartedAt: null,
       })
       .where(eq(mcpServer.id, id))
     return NextResponse.json({ ok: true })

@@ -7,7 +7,7 @@ import {
   type OAuthClientProvider,
   type OAuthTokens,
 } from "@ai-sdk/mcp"
-import { eq } from "drizzle-orm"
+import { and, eq } from "drizzle-orm"
 import { appBaseUrl } from "@/lib/base-url"
 import { db } from "@/lib/db"
 import { type McpServer, mcpServer } from "@/lib/db/schema"
@@ -17,6 +17,19 @@ import {
   sealMcpJson,
   sealMcpSecret,
 } from "@/lib/mcp-secrets"
+
+export const OAUTH_ATTEMPT_MAX_AGE_MS = 10 * 60 * 1000
+
+export function oauthAttemptIsActive(
+  startedAt: Date | null | undefined,
+  now = Date.now()
+): boolean {
+  return (
+    startedAt instanceof Date &&
+    now - startedAt.getTime() >= 0 &&
+    now - startedAt.getTime() <= OAUTH_ATTEMPT_MAX_AGE_MS
+  )
+}
 
 /**
  * OAuth 2.0 for protected MCP servers, per the MCP authorization spec:
@@ -28,8 +41,15 @@ import {
  * can find the row the flow belongs to.
  */
 
-function oauthRedirectUrl() {
+function automaticOAuthRedirectUrl() {
   return `${appBaseUrl()}/api/mcp/oauth/callback`
+}
+
+export function oauthRedirectUrl(row: McpServer): string {
+  if (row.oauthAttemptCallbackUrl) return row.oauthAttemptCallbackUrl
+  if (row.oauthCallbackMode === "manual" && row.oauthCallbackUrl)
+    return row.oauthCallbackUrl
+  return automaticOAuthRedirectUrl()
 }
 
 export class DbOAuthProvider implements OAuthClientProvider {
@@ -39,7 +59,7 @@ export class DbOAuthProvider implements OAuthClientProvider {
   constructor(private row: McpServer) {}
 
   get redirectUrl(): string {
-    return oauthRedirectUrl()
+    return oauthRedirectUrl(this.row)
   }
 
   get clientMetadata(): OAuthClientMetadata {
@@ -140,6 +160,8 @@ export class DbOAuthProvider implements OAuthClientProvider {
         oauthTokens: null,
         oauthVerifier: null,
         oauthState: null,
+        oauthAttemptCallbackUrl: null,
+        oauthAttemptStartedAt: null,
       })
     } else if (scope === "client") {
       await this.persist({ oauthClient: null })
@@ -155,12 +177,50 @@ export class DbOAuthProvider implements OAuthClientProvider {
 export async function startOAuth(
   row: McpServer
 ): Promise<{ status: "authorized" } | { status: "redirect"; url: string }> {
+  const callbackUrl =
+    row.oauthCallbackMode === "manual" && row.oauthCallbackUrl
+      ? row.oauthCallbackUrl
+      : automaticOAuthRedirectUrl()
+  await db
+    .update(mcpServer)
+    .set({
+      oauthAttemptCallbackUrl: callbackUrl,
+      oauthAttemptStartedAt: new Date(),
+    })
+    .where(eq(mcpServer.id, row.id))
+  row.oauthAttemptCallbackUrl = callbackUrl
+  row.oauthAttemptStartedAt = new Date()
   const provider = new DbOAuthProvider(row)
-  const result = await auth(provider, { serverUrl: row.url })
-  if (result === "AUTHORIZED") return { status: "authorized" }
-  if (!provider.authorizationUrl)
-    throw new Error("Authorization redirect expected but no URL was produced.")
-  return { status: "redirect", url: provider.authorizationUrl.toString() }
+  try {
+    const result = await auth(provider, { serverUrl: row.url })
+    if (result === "AUTHORIZED") {
+      await clearOAuthAttempt(row.id, true)
+      return { status: "authorized" }
+    }
+    if (!provider.authorizationUrl)
+      throw new Error(
+        "Authorization redirect expected but no URL was produced."
+      )
+    return { status: "redirect", url: provider.authorizationUrl.toString() }
+  } catch (error) {
+    await clearOAuthAttempt(row.id, true)
+    throw error
+  }
+}
+
+export async function clearOAuthAttempt(
+  serverId: string,
+  clearVerifier = false
+): Promise<void> {
+  await db
+    .update(mcpServer)
+    .set({
+      oauthState: null,
+      oauthAttemptCallbackUrl: null,
+      oauthAttemptStartedAt: null,
+      ...(clearVerifier ? { oauthVerifier: null } : {}),
+    })
+    .where(eq(mcpServer.id, serverId))
 }
 
 /** Complete the flow with the authorization code from the callback. */
@@ -169,19 +229,36 @@ export async function finishOAuth(
   code: string,
   callbackState?: string
 ): Promise<void> {
-  const provider = new DbOAuthProvider(row)
-  const result = await auth(provider, {
-    serverUrl: row.url,
-    authorizationCode: code,
-    callbackState,
-  })
-  if (result !== "AUTHORIZED")
-    throw new Error("Token exchange did not complete.")
-  // Transient flow material is spent.
-  await db
+  if (!row.oauthState) throw new Error("OAuth attempt is no longer active.")
+  const [claimed] = await db
     .update(mcpServer)
-    .set({ oauthVerifier: null, oauthState: null })
-    .where(eq(mcpServer.id, row.id))
+    .set({
+      oauthState: null,
+      oauthAttemptCallbackUrl: null,
+      oauthAttemptStartedAt: null,
+    })
+    .where(
+      and(eq(mcpServer.id, row.id), eq(mcpServer.oauthState, row.oauthState))
+    )
+    .returning({ id: mcpServer.id })
+  if (!claimed) throw new Error("OAuth callback was already used.")
+
+  const provider = new DbOAuthProvider(row)
+  try {
+    const result = await auth(provider, {
+      serverUrl: row.url,
+      authorizationCode: code,
+      callbackState,
+    })
+    if (result !== "AUTHORIZED")
+      throw new Error("Token exchange did not complete.")
+  } finally {
+    // Transient flow material is spent even if the token exchange fails.
+    await db
+      .update(mcpServer)
+      .set({ oauthVerifier: null })
+      .where(eq(mcpServer.id, row.id))
+  }
 }
 
 /** Parse the server id back out of the state parameter. */
