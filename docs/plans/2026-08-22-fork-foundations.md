@@ -1,16 +1,16 @@
-# MiniScira Fork Foundations Implementation Plan
+# MiniScira fork foundations implementation plan
 
-> **For Hermes:** Use subagent-driven-development to execute this plan task-by-task while preserving MiniScira's production and data-safety invariants.
+> **For Hermes:** Use subagent-driven development. Complete one task at a time. Preserve MiniScira's production and data safety rules.
 
-**Goal:** Establish MiniScira as an independently maintained, portable Docker-first product; fix long-running research-stream reliability; selectively adopt useful upstream fixes; and document clean engineering conventions.
+**Goal:** Make MiniScira an independently maintained, portable Docker-first product. Fix reliability problems in long research streams. Apply selected upstream fixes. Document clear engineering rules.
 
-**Architecture:** Keep `origin` authoritative and retain `upstream` as a read-only source of ideas. Apply upstream changes as narrow local patches after comparing them with the diverged code. Treat the browser, Eve, gateway, Compose stack, Postgres, uploads, and Docker Sandbox as one tested product path.
+**Architecture:** `origin` is the source of truth. Keep `upstream` read-only and use it for ideas and fixes. Compare each upstream change with the diverged local code, then apply only the needed local patch. Test the browser, Eve, gateway, Compose stack, Postgres, uploads, and Docker Sandbox as one product path.
 
 **Tech Stack:** Bun, TypeScript, Next.js 16, React 19, Eve, Postgres/pgvector, Docker Compose, Portainer/Umbrel production validation.
 
 ---
 
-### Task 1: Capture a trustworthy baseline
+### Task 1: Record a reliable baseline
 
 **Files:**
 - Read: `AGENTS.md`
@@ -24,7 +24,7 @@
 3. Inspect recent persisted chat cursors and event counts without changing data.
 4. Confirm whether reported interruptions correlate with container restarts, transport detachments, or model/gateway failures.
 
-### Task 2: Make long-running parent and subagent streams resilient
+### Task 2: Make long parent and subagent streams recover from disconnects
 
 **Files:**
 - Create: `lib/eve-stream-policy.ts`
@@ -41,7 +41,7 @@
 5. Run focused tests, typecheck, and lint.
 6. Exercise a real long-running/delegated turn and verify persisted completion plus rendered output.
 
-### Task 3: Adopt high-value upstream fixes surgically
+### Task 3: Apply selected upstream fixes
 
 **Files:**
 - Modify: `components/settings-provider.tsx`
@@ -61,7 +61,7 @@
 7. Exclude broad refactors, dependency bundles, and score-chasing changes without demonstrated value.
 8. Run focused and full checks.
 
-### Task 4: Reframe documentation around the independent Docker product
+### Task 4: Document the independent Docker product
 
 **Files:**
 - Modify: `README.md`
@@ -77,7 +77,7 @@
 5. Keep Umbrel-specific operations in their dedicated runbook rather than presenting Umbrel as required.
 6. Verify rendered documentation and every command shown.
 
-### Task 5: Strengthen repository engineering guidance
+### Task 5: Improve repository engineering rules
 
 **Files:**
 - Modify: `AGENTS.md`
@@ -91,7 +91,7 @@
 4. Require real user-path verification for research, streaming, uploads, auth, and Sandbox changes.
 5. Keep guidance concise enough that coding agents will actually follow it.
 
-### Task 6: Close obsolete upstream PR
+### Task 6: Close the obsolete upstream PR
 
 **Files:**
 - No source file required unless a durable rationale is missing from documentation/history.
@@ -102,7 +102,7 @@
 3. Thank the original author and preserve credit.
 4. Close only Soham's PR; do not modify upstream branches or issues.
 
-### Task 7: Release the foundational pass
+### Task 7: Release the foundation changes
 
 **Steps:**
 1. Run focused tests for every changed area.
@@ -116,4 +116,4 @@
 
 ### Deferred product work
 
-Do not implement product-backlog items, including uploaded-image editing, until this foundational pass is complete. Preserve the backlog document and its accepted entries.
+Do not implement backlog items, including uploaded-image editing, until the foundation changes are complete. Keep the backlog document and its accepted entries.

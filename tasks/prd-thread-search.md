@@ -1,8 +1,8 @@
-# Draft PRD: Search and Read Previous Threads
+# Draft PRD: search and read previous threads
 
-**Status:** Draft — requires explicit user approval before implementation  
-**Backlog source:** [Search and read previous threads](../docs/PRODUCT_IDEAS.md#search-and-read-previous-threads)  
-**Repository:** `/opt/data/miniscira-src`  
+**Status:** Draft. Requires explicit user approval before implementation.
+**Backlog source:** [Search and read previous threads](../docs/PRODUCT_IDEAS.md#search-and-read-previous-threads)
+**Repository:** `/opt/data/miniscira-src`
 **Last updated:** 2026-08-23
 
 ## 1. Introduction
@@ -11,11 +11,11 @@ MiniScira persists a user's conversations as ordered Eve events, but users can c
 
 This feature adds authenticated search over thread titles and visible message text, direct navigation to a matching message, explicit archived-state labels, and a user-scoped/project-scoped agent retrieval tool. Prior-thread content must always retain provenance. The agent may quote or summarize retrieved excerpts only with explicit thread-and-message citations; it must never merge old-thread content into the current conversation as if the user had just said it.
 
-This PRD defines product behavior and an implementation plan only. It does not authorize implementation. The separate archive-and-recover feature may introduce the archive field and archive UI; this PRD consumes that state when available and must not independently grow into a full archiving implementation.
+This PRD defines only product behavior and an implementation plan. It does not authorize implementation. The separate archive-and-recover feature may introduce the archive field and archive UI; this PRD consumes that state when available and must not expand into a full archiving implementation.
 
-## 2. Current-State Findings and Constraints
+## 2. Current-state findings and constraints
 
-The implementation must account for these repository facts:
+The implementation must follow these repository facts:
 
 - `chat` stores owner, optional `projectId`, title, Eve cursor, and timestamps; it does not currently have archive state.
 - `chat_event` stores opaque JSON Eve events ordered by `(chatId, seq)`. It has no owner/project columns and no searchable message projection.
@@ -29,9 +29,9 @@ The implementation must account for these repository facts:
 - The existing Postgres deployment includes pgvector, but MiniScira's current document retrieval intentionally defaults to local lexical scoring rather than sending content to an external embedding/reranking service.
 - Startup must not mutate schema. All schema and index changes require committed Drizzle migrations.
 
-## 3. Product Decisions Locked by This Draft
+## 3. Product decisions locked by this draft
 
-These decisions are part of the proposed specification. Implementation must not improvise alternatives without revising and re-approving the PRD.
+These decisions are part of this draft specification. Implementation must not improvise alternatives without revising and re-approving the PRD.
 
 1. **Searchable content:** thread titles and visible user/assistant message text only. Exclude reasoning, tool inputs/outputs, client context, system instructions, attachment bytes, hidden/superseded messages, and raw event JSON.
 2. **Results unit:** one result row per matching thread, with up to three best message matches beneath it. A title-only match has a title snippet and no fabricated message excerpt.
@@ -39,10 +39,10 @@ These decisions are part of the proposed specification. Implementation must not 
    - Global search includes all non-deleted threads owned by the signed-in user, across projects and unfiled chats.
    - A project-scoped search includes only threads whose `chat.projectId` equals that owned project.
    - Archived threads are included by default and carry an explicit `Archived` label. The UI offers `All`, `Active`, and `Archived` state filters when archive state exists.
-   - The current thread is included in user-facing search. The agent tool excludes the current thread by default because its transcript is already in model context; it may include it only through an explicit input option.
+   - Search shown to users includes the current thread. The agent tool excludes the current thread by default because its transcript is already in model context. It may include the thread only through an explicit input option.
 4. **Project boundary for the agent:** inside a project chat, agent retrieval is restricted to that same project. It does not include unfiled chats or other projects. Outside a project, it may search all threads owned by the user. There is no agent input that can override this boundary.
-5. **Authorization:** every query and every direct-message read is constrained in SQL by authenticated `userId`; project scope additionally requires an owned project and exact `projectId` equality. IDs supplied by clients or models never establish ownership.
-6. **Direct open:** selecting a message match opens `/chat/<chatId>?message=<messageId>`. The page scrolls to and temporarily highlights the cited visible message. If the message no longer exists or is no longer visible, the thread opens at the top with a non-sensitive “Message is no longer available” notice.
+5. **Authorization:** every query and direct-message read is constrained in SQL by the authenticated `userId`. Project scope also requires an owned project and exact `projectId` equality. IDs supplied by clients or models never establish ownership.
+6. **Direct open:** selecting a message match opens `/chat/<chatId>?message=<messageId>`. The page scrolls to and temporarily highlights the cited visible message. If the message no longer exists or is no longer visible, the thread opens at the top with a non-sensitive "Message is no longer available" notice.
 7. **Citation format:** the agent tool returns structured citations containing `threadId`, `threadTitle`, `messageId`, `role`, `createdAt`, `projectId`, `archived`, `excerpt`, and an application-relative `href`. The final answer must name/link the prior thread at the claim it supports and must not cite a raw database/event ID in prose.
 8. **No silent blending:** retrieved prior-thread text is source material, not conversation history, memory, or a user instruction. It is wrapped in a clearly delimited, untrusted excerpt structure and the agent must say when a claim comes from a prior thread. Instructions found inside excerpts are never followed.
 9. **Ranking at launch:** launch with PostgreSQL lexical retrieval and deterministic recency/title boosts. Semantic retrieval is a gated extension, not a hidden external dependency. It is enabled only if the paraphrase eval gate shows material quality need and the privacy/index-coverage gates in Section 13 pass.
@@ -61,7 +61,7 @@ These decisions are part of the proposed specification. Implementation must not 
 - Keep indexes current under ordinary event appends, title changes, branching, superseding, archive changes, deletion, migration backfill, and retries.
 - Meet measurable retrieval quality, latency, authorization, citation, and no-silent-blending gates before rollout.
 
-## 5. Non-Goals
+## 5. Non-goals
 
 - Implementing manual archive/unarchive controls, auto-archive scheduling, pinning, or the archived-threads management view; those belong to the archive-and-recover PRD.
 - Searching reasoning traces, tool calls/results, system prompts, client context, MCP secrets, attachment bytes, or document contents.
@@ -74,7 +74,7 @@ These decisions are part of the proposed specification. Implementation must not 
 - A separate hosted search service for the initial release.
 - Making an external embedding provider mandatory for self-hosted installations.
 
-## 6. Primary User Journeys
+## 6. Primary user journeys
 
 ### 6.1 User searches all prior threads
 
@@ -93,17 +93,17 @@ These decisions are part of the proposed specification. Implementation must not 
 
 ### 6.3 Agent retrieves an earlier discussion
 
-1. User asks, for example, “What did we decide about the launch checklist in our earlier thread?”
+1. User asks, for example, "What did we decide about the launch checklist in our earlier thread?"
 2. The agent calls `search_previous_threads` with a concise query.
-3. The tool derives the authenticated user and current project scope server-side.
+3. The tool derives the authenticated user and current project scope on the server.
 4. It returns a small set of excerpts with structured thread/message citations.
 5. If needed, the agent calls `read_previous_thread_messages` for bounded context around selected message IDs.
 6. The answer explicitly attributes each old-thread-derived claim to a linked prior thread.
 7. If no reliable match exists, the agent says it could not find the earlier discussion rather than inventing continuity.
 
-## 7. User Stories
+## 7. User stories
 
-### US-001: Persist searchable visible messages
+### US-001: persist searchable visible messages
 
 **Description:** As a user, I want title and message searches to represent what I can actually see in my threads.
 
@@ -117,7 +117,7 @@ These decisions are part of the proposed specification. Implementation must not 
 - [ ] Reprocessing the same event batch is idempotent.
 - [ ] Unit and migration tests pass; typecheck/lint pass.
 
-### US-002: Backfill existing threads safely
+### US-002: backfill existing threads safely
 
 **Description:** As an existing user, I want old threads searchable without losing or rewriting their transcripts.
 
@@ -131,7 +131,7 @@ These decisions are part of the proposed specification. Implementation must not 
 - [ ] A verification query compares eligible source messages to projected messages and reports coverage by user/project without exposing content.
 - [ ] Migration/rollback test proves old application code can continue operating while the new table exists unused.
 
-### US-003: Search thread titles and messages
+### US-003: search thread titles and messages
 
 **Description:** As a signed-in user, I want to search thread titles and visible messages so that I can recover earlier work quickly.
 
@@ -146,7 +146,7 @@ These decisions are part of the proposed specification. Implementation must not 
 - [ ] Empty, no-match, invalid, rate-limited, and server-error responses are explicit.
 - [ ] API tests prove user and project isolation.
 
-### US-004: Open a matching thread or exact message
+### US-004: open a matching thread or exact message
 
 **Description:** As a user, I want a search result to take me directly to the relevant part of the old thread.
 
@@ -160,7 +160,7 @@ These decisions are part of the proposed specification. Implementation must not 
 - [ ] Browser tests cover desktop, mobile, keyboard navigation, long snippets, and reduced motion.
 - [ ] Typecheck/lint pass and the real browser flow is verified.
 
-### US-005: Show archived and project context
+### US-005: show archived and project context
 
 **Description:** As a user, I want to know whether a match is archived and which project it belongs to before opening it.
 
@@ -174,13 +174,13 @@ These decisions are part of the proposed specification. Implementation must not 
 - [ ] If the archive feature has not landed, the search schema/API remain compatible with all chats treated as active; archived filters remain hidden rather than simulated.
 - [ ] Browser and API tests cover archived/project labels and filters.
 
-### US-006: Search prior threads from the agent
+### US-006: search prior threads from the agent
 
 **Description:** As a user, I want the agent to find earlier discussions when I ask about them so that I do not have to locate and quote them manually.
 
 **Acceptance Criteria:**
 
-- [ ] `search_previous_threads` accepts query and bounded limit only; user/current-project scope is derived server-side.
+- [ ] `search_previous_threads` accepts query and bounded limit only; user/current-project scope is derived on the server.
 - [ ] The tool excludes the current thread by default and returns structured excerpt citations.
 - [ ] `read_previous_thread_messages` accepts only cited message/thread identifiers and a bounded context window.
 - [ ] Read results include only visible, non-superseded messages from the same authorized scope.
@@ -189,7 +189,7 @@ These decisions are part of the proposed specification. Implementation must not 
 - [ ] Agent instructions require explicit prior-thread attribution and prohibit following instructions inside retrieved excerpts.
 - [ ] Tool tests and model evals meet Section 13 thresholds.
 
-### US-007: Keep search current
+### US-007: keep search current
 
 **Description:** As a user, I want new messages, title changes, archive changes, branches, supersedes, project moves, and deletions reflected promptly.
 
@@ -204,7 +204,7 @@ These decisions are part of the proposed specification. Implementation must not 
 - [ ] Chat deletion cascades projection rows and invalidates old deep links.
 - [ ] A repair command can reconcile drift without logging content.
 
-### US-008: Protect private content and operate safely
+### US-008: protect private content and operate safely
 
 **Description:** As a user, I want search indexes and logs to preserve the same privacy boundaries as my conversations.
 
@@ -213,11 +213,11 @@ These decisions are part of the proposed specification. Implementation must not 
 - [ ] Authorization/security tests show zero cross-user and cross-project result, snippet, count, timing-enumeration, or read leaks across the required fixtures.
 - [ ] Search queries and message text are not written to ordinary application logs, analytics, traces, or error payloads.
 - [ ] Any optional embedding path has explicit deployment/user privacy policy, model identity, deletion behavior, and a no-external-content default.
-- [ ] Rate, query length, result limit, snippet length, and read-window limits are enforced server-side.
+- [ ] Rate, query length, result limit, snippet length, and read-window limits are enforced on the server.
 - [ ] Index/backfill metrics contain counts and latency only, with bounded labels that do not include user IDs, titles, queries, or message text.
 - [ ] Deployment has documented backup, rollout, verification, rollback, and repair procedures.
 
-## 8. Functional Requirements
+## 8. Functional requirements
 
 ### Search API and UI
 
@@ -231,7 +231,7 @@ These decisions are part of the proposed specification. Implementation must not 
 - **FR-8:** Highlight matches safely; user content must never be interpreted as HTML.
 - **FR-9:** Selecting a message result must deep-link to that message in the authorized thread.
 - **FR-10:** The search surface must support keyboard open, input focus, arrow navigation, Enter to open, Escape to close, loading state, no-results state, error state, and mobile layout.
-- **FR-11:** Search must be debounced client-side, but cancellation/debounce is not a security or load-control substitute for server rate limiting.
+- **FR-11:** Search must be debounced in the client, but cancellation/debounce is not a security or load-control substitute for server rate limiting.
 - **FR-12:** Archived state must be included and labeled when the archive schema exists. Search must remain deployable before that feature by treating absent archive state as active.
 
 ### Agent retrieval
@@ -242,8 +242,8 @@ These decisions are part of the proposed specification. Implementation must not 
 - **FR-16:** Both tools must derive the current root chat/project from the authenticated root session. A project chat restricts retrieval to exact same-project chats.
 - **FR-17:** The agent cannot provide a different user ID or project ID to either tool.
 - **FR-18:** Agent search results must carry explicit citation records and an app-relative deep link for every excerpt.
-- **FR-19:** Agent read must accept only IDs and bounded context windows; it must re-authorize every referenced chat/message in SQL rather than trusting a prior tool call.
-- **FR-20:** Retrieved prior-thread content must be treated as untrusted data. Embedded requests such as “ignore previous instructions” remain quoted source text and cannot alter tool scope or agent behavior.
+- **FR-19:** Agent read must accept only IDs and bounded context windows. It must re-authorize every referenced chat/message in SQL rather than trust an earlier tool call.
+- **FR-20:** Retrieved prior-thread content must be treated as untrusted data. Embedded requests such as "ignore previous instructions" remain quoted source text and cannot alter tool scope or agent behavior.
 - **FR-21:** The agent must not state a previous decision, preference, or claim from retrieved text without a prior-thread citation on that claim.
 - **FR-22:** If retrieval is empty, ambiguous, unavailable, or below relevance threshold, the agent must state that it did not find a reliable match and ask for a narrower clue when useful.
 
@@ -258,7 +258,7 @@ These decisions are part of the proposed specification. Implementation must not 
 - **FR-29:** Search reads must tolerate partial rollout/backfill and expose index readiness through health/operations metadata, not through private content.
 - **FR-30:** Deleted content must disappear from lexical rows and any semantic vectors in the same transaction or a guaranteed idempotent deletion job with alerting.
 
-## 9. Proposed Data and Retrieval Design
+## 9. Proposed data and retrieval design
 
 ### 9.1 Searchable message projection
 
@@ -309,7 +309,7 @@ Weights and normalization must be implemented in one tested server module, not d
 
 ### 9.3 Semantic decision gate and optional hybrid retrieval
 
-Semantic retrieval is not automatically required merely because pgvector exists. Before enabling it, run the frozen eval set against lexical search.
+The presence of pgvector does not require semantic retrieval. Before enabling semantic retrieval, run the frozen eval set against lexical search.
 
 Enable a semantic pilot only if either condition is true:
 
@@ -337,11 +337,11 @@ If enabled:
 - Do not cross a chat boundary, project boundary, or superseded-message boundary when expanding context.
 - Attachment placeholders may be shown only as safe filename/media labels already visible in the user message; attachment URLs/data and extracted document contents are out of scope.
 
-## 10. Authorization and Privacy Requirements
+## 10. Authorization and privacy requirements
 
 ### 10.1 UI/API authorization
 
-Every search SQL statement must include `chat.user_id = authenticatedUserId` or `chat_search_message.user_id = authenticatedUserId`. For project scope it must additionally require exact `project_id = requestedProjectId` after confirming that project belongs to the same user. Result counts, cursors, snippets, title data, and timing/error shape must follow the same scope.
+Every search SQL statement must include `chat.user_id = authenticatedUserId` or `chat_search_message.user_id = authenticatedUserId`. For project scope, it must also require exact `project_id = requestedProjectId` after confirming that the project belongs to the same user. Result counts, cursors, snippets, title data, and timing/error shape must follow the same scope.
 
 A direct-open URL is not authorization. `/chat/:id` must retain ownership enforcement, and message-anchor resolution must join through the authorized chat plus matching owner/project fields. Foreign or malformed identifiers return the same generic not-found behavior as missing identifiers where enumeration would otherwise be possible.
 
@@ -370,7 +370,7 @@ If the current session cannot be mapped to a chat, the safe default is user-wide
 - Deletion must remove every derived lexical and semantic representation.
 - Backups containing the projection have the same privacy/retention classification as the chat database.
 
-## 11. API and Tool Contracts
+## 11. API and tool contracts
 
 Exact route names may follow repository naming conventions, but the shape must remain equivalent.
 
@@ -466,9 +466,9 @@ Input:
 
 Output repeats authorized thread metadata and returns ordered, bounded visible messages, each with its own `messageId`, role, timestamp, excerpt, and href. It must not return whole raw events or unbounded transcripts.
 
-## 12. Non-Functional Requirements
+## 12. Non-functional requirements
 
-- **NFR-1 Latency:** at the target fixture of 100,000 searchable messages for one user, warm lexical UI search p95 must be ≤500 ms server-side and p99 ≤1,000 ms; agent search p95 must be ≤750 ms excluding model reasoning time.
+- **NFR-1 Latency:** at the target fixture of 100,000 searchable messages for one user, warm lexical UI search p95 must be ≤500 ms on the server and p99 ≤1,000 ms; agent search p95 must be ≤750 ms excluding model reasoning time.
 - **NFR-2 Freshness:** eligible live events and metadata changes must appear correctly within five seconds p95.
 - **NFR-3 Availability:** lexical search remains usable if semantic indexing/provider fails.
 - **NFR-4 Scale:** queries must be index-backed and must not reduce full transcripts or sequentially scan every owned chat at request time.
@@ -479,7 +479,7 @@ Output repeats authorized thread metadata and returns ordered, bounded visible m
 - **NFR-9 Compatibility:** deployment may run old and new application versions during rolling restart without corrupting event storage or search projection.
 - **NFR-10 Cost:** lexical search has no per-query model/API cost. Semantic cost, if enabled, must be measured and capped before approval.
 
-## 13. Test and Eval Plan
+## 13. Test and eval plan
 
 ### 13.1 Unit tests
 
@@ -543,7 +543,7 @@ Create a frozen fixture corpus with at least 40 cases and expected thread/messag
 
 | Category | Minimum cases | Expected behavior |
 |---|---:|---|
-| Explicit recall (“What did we decide in the X thread?”) | 8 | Calls prior-thread search; cites correct thread/message. |
+| Explicit recall ("What did we decide in the X thread?") | 8 | Calls prior-thread search; cites correct thread/message. |
 | Title/keyword lookup | 6 | Retrieves exact lexical target in top 3. |
 | Paraphrase/semantic recall | 8 | Retrieves meaning-equivalent target in top 5 or honestly reports no reliable match. |
 | Ambiguous multiple matches | 4 | Presents/asks about ambiguity; does not merge threads. |
@@ -573,7 +573,7 @@ All thresholds are release gates, measured over at least three seeded model runs
 
 Any failure in authorization, citation validity, prompt-injection resistance, or silent blending is a hard blocker regardless of aggregate score.
 
-## 14. Observability and Operations
+## 14. Observability and operations
 
 Collect only privacy-safe aggregate metrics:
 
@@ -603,7 +603,7 @@ Alerts:
 
 No dashboard, log, trace, or alert may contain raw queries, titles, excerpts, message text, user email, or unbounded user IDs.
 
-## 15. Deployment Plan
+## 15. Deployment plan
 
 1. **Pre-deploy review:** approve this PRD; finalize the archive dependency, projection identity, semantic policy, and exact route/tool names.
 2. **Backup:** take a verified database backup and record the running application image/commit. No schema change proceeds without a restore path.
@@ -623,7 +623,7 @@ Feature flags should independently control:
 - semantic indexing;
 - semantic serving.
 
-## 16. Rollback Plan
+## 16. Rollback plan
 
 ### Application rollback
 
@@ -650,9 +650,9 @@ Feature flags should independently control:
 - If a concurrent index build fails, remove the failed index and retry without blocking chat writes.
 - If rollback to old code is unsafe after a later schema contraction, restore the compatible database backup rather than forcing an incompatible binary.
 
-## 17. Ordered Implementation Tasks (Create TODOs Only After Approval)
+## 17. Ordered implementation tasks (create todos only after approval)
 
-### T-01: Freeze event/message projection contract
+### T-01: freeze event/message projection contract
 
 - Inspect representative production-safe event shapes and Eve type definitions.
 - Define visible-message eligibility, session-scoped turn identity, segment ordering, supersede mapping, branch identity, and stable `messageId` algorithm.
@@ -661,7 +661,7 @@ Feature flags should independently control:
 - **Depends on:** PRD approval.
 - **Maps to:** US-001, FR-23–FR-25.
 
-### T-02: Design schema and committed migration
+### T-02: design schema and committed migration
 
 - Add projection/outbox/checkpoint tables and indexes to `lib/db/schema.ts`.
 - Generate and review committed Drizzle migration under `lib/db/migrations/`.
@@ -669,7 +669,7 @@ Feature flags should independently control:
 - **Depends on:** T-01.
 - **Maps to:** US-001, US-002, NFR-9.
 
-### T-03: Implement and test the pure projection parser
+### T-03: implement and test the pure projection parser
 
 - Add exported event predicates/accessors without violating the opaque-event invariant.
 - Convert eligible events into deterministic projection mutations.
@@ -678,7 +678,7 @@ Feature flags should independently control:
 - **Depends on:** T-01.
 - **Maps to:** US-001, FR-23–FR-28.
 
-### T-04: Connect durable live indexing
+### T-04: connect durable live indexing
 
 - Integrate projection changes atomically with event persistence or via the approved durable outbox.
 - Cover browser event batches, lookout-created chats/events, branching, title changes, project moves, archive changes, supersedes, and deletion.
@@ -686,7 +686,7 @@ Feature flags should independently control:
 - **Depends on:** T-02, T-03.
 - **Maps to:** US-007, FR-26–FR-30.
 
-### T-05: Build resumable backfill and repair commands
+### T-05: build resumable backfill and repair commands
 
 - Reuse the projection parser.
 - Add bounded checkpointing, idempotency, counters, dry-run/verify mode, and privacy-safe output.
@@ -694,14 +694,14 @@ Feature flags should independently control:
 - **Depends on:** T-02, T-03.
 - **Maps to:** US-002, US-007.
 
-### T-06: Implement lexical retrieval service
+### T-06: implement lexical retrieval service
 
 - Add one shared server-only module for query normalization, authorization filters, title/message ranking, grouping, snippets, cursor pagination, and limits.
 - Add representative-size query-plan/performance tests.
 - **Depends on:** T-02, sufficient T-05 fixtures.
 - **Maps to:** US-003, FR-2–FR-8, NFR-1–NFR-4.
 
-### T-07: Add authenticated user search API
+### T-07: add authenticated user search API
 
 - Add a route distinct from docs search, wrapped with `authed`.
 - Validate project ownership/state/cursor and return the locked response shape.
@@ -709,7 +709,7 @@ Feature flags should independently control:
 - **Depends on:** T-06.
 - **Maps to:** US-003, US-005, FR-1–FR-12.
 
-### T-08: Build accessible search UI
+### T-08: build accessible search UI
 
 - Add sidebar affordance/shortcut and responsive result surface using existing UI primitives/motion tokens.
 - Implement loading/empty/error/filter/pagination/keyboard/mobile states.
@@ -719,7 +719,7 @@ Feature flags should independently control:
 - **Likely files:** `components/app-sidebar.tsx`, new search components, adjacent tests.
 - **Maps to:** US-003, US-005, FR-8–FR-12, NFR-5.
 
-### T-09: Implement exact-message deep links
+### T-09: implement exact-message deep links
 
 - Map projected stable message IDs to rendered message DOM IDs.
 - Parse `?message=`, re-authorize, scroll/highlight, and handle stale/hidden targets generically.
@@ -728,17 +728,17 @@ Feature flags should independently control:
 - **Likely files:** chat route/page, projection/render hooks/components.
 - **Maps to:** US-004, FR-9.
 
-### T-10: Add agent search/read tools
+### T-10: add agent search/read tools
 
 - Implement `search_previous_threads` and bounded `read_previous_thread_messages`.
-- Derive principal/current-project scope server-side and re-authorize reads.
+- Derive principal/current-project scope on the server and re-authorize reads.
 - Return structured citations and untrusted-content boundaries.
 - Add tool tests, including delegated/root-session cases.
 - **Depends on:** T-06, T-09.
 - **Likely files:** `agent/tools/`, shared retrieval/auth modules, tests.
 - **Maps to:** US-006, FR-13–FR-22.
 
-### T-11: Update agent instructions and citation rendering contract
+### T-11: update agent instructions and citation rendering contract
 
 - Teach the agent when to use prior-thread retrieval, how to cite app-relative thread/message links, and how to avoid silent blending/injection.
 - Ensure app-relative citation links render and navigate safely without weakening web citation rules.
@@ -747,16 +747,16 @@ Feature flags should independently control:
 - **Likely files:** `agent/instructions/00-core.md`, citation/rendering tests as needed.
 - **Maps to:** US-006, FR-18–FR-22.
 
-### T-12: Build and run agent eval suite
+### T-12: build and run agent eval suite
 
 - Create frozen fixtures and cases from Section 13.
-- Run at least three seeded runs where applicable.
+- Run at least three seeded runs when applicable.
 - Record routing, recall, citations, no-match honesty, no-silent-blending, injection, and isolation results.
 - Block release on any hard-gate failure.
 - **Depends on:** T-10, T-11.
 - **Maps to:** all agent eval requirements.
 
-### T-13: Decide semantic pilot from evidence
+### T-13: decide semantic pilot from evidence
 
 - Measure lexical paraphrase Recall@5.
 - If gate passes, document lexical-only launch and skip semantic implementation.
@@ -764,7 +764,7 @@ Feature flags should independently control:
 - **Depends on:** T-12.
 - **Maps to:** Section 9.3 and semantic thresholds.
 
-### T-14: Run full verification and real user flows
+### T-14: run full verification and real user flows
 
 - Run focused tests, authorization suite, browser tests, agent evals, performance tests, and standard repository gates.
 - Exercise user search → snippet → exact message and agent retrieval → read → cited answer against real app services.
@@ -772,13 +772,13 @@ Feature flags should independently control:
 - **Depends on:** T-08–T-13.
 - **Maps to:** all acceptance criteria.
 
-### T-15: Deploy progressively and verify rollback
+### T-15: deploy progressively and verify rollback
 
 - Execute Section 15, verify operations metrics and hard gates at each stage, test feature-flag rollback and lexical fallback, then complete source-control requirements.
 - **Depends on:** T-14.
 - **Maps to:** US-008, Sections 14–16.
 
-## 18. Traceability Matrix
+## 18. Traceability matrix
 
 | Requirement/story | Implementation tasks | Verification evidence |
 |---|---|---|
@@ -794,7 +794,7 @@ Feature flags should independently control:
 | Semantic decision gate | T-13 | Recorded lexical baseline and hybrid comparison if needed. |
 | Deployment/rollback | T-15 | Backup IDs, flag rollout evidence, rollback drill, clean pushed repository. |
 
-## 19. Exact Verification Commands
+## 19. Exact verification commands
 
 Run focused test files first, then the applicable full gates. Final filenames may be adjusted during implementation, but the approved task plan must replace placeholders with exact paths before coding begins.
 
@@ -811,16 +811,16 @@ git diff --check
 
 Run the new prior-thread eval file(s) plus citation/tool-restraint regressions with the repository's supported Eve eval command determined from current package/Eve documentation before implementation handoff. The TODO plan must record that exact command; it must not be guessed.
 
-Database/deployment verification must additionally include:
+Database and deployment verification must also include:
 
-- migration apply against a production-like copy;
+- migration apply against a copy similar to production;
 - migration compatibility with the previous application version;
 - backfill interrupt/resume and idempotency;
 - representative `EXPLAIN (ANALYZE, BUFFERS)` without exposing content;
 - backup restore or documented rollback drill;
 - production log inspection for private content.
 
-## 20. Success Metrics
+## 20. Success metrics
 
 Release success is defined by acceptance gates, not adoption alone:
 
@@ -839,7 +839,7 @@ Post-launch product metrics, if collected without query/message content:
 - agent retrieval invocation and empty-result rates;
 - stale-anchor fallback rate.
 
-## 21. Open Questions Requiring Approval or Investigation
+## 21. Open questions requiring approval or investigation
 
 1. **Archive dependency:** Will the archive-and-recover PRD land first, and what exact field/state owns `archived`? This PRD must consume one canonical state rather than duplicate it.
 2. **Stable message identity:** Can one searchable row map directly to one `chat_event.id` for all visible assistant segments, or does Eve/render behavior require a deterministic segment mapping table?
@@ -854,10 +854,10 @@ Post-launch product metrics, if collected without query/message content:
 11. **Semantic model:** If lexical paraphrase recall misses the threshold, which local/self-hosted embedding model and dimensions are supported across Docker targets?
 12. **Read citation UX:** Should prior-thread citations render as ordinary inline links, a distinct internal-thread chip, or both? Any special UI must remain accessible and show archived state without turning citations into an uncited source list.
 13. **Lookout-generated chats:** Are they searchable/retrievable under identical rules, and should the UI label them as Lookout-generated?
-14. **Current thread in UI search:** This draft includes it. Confirm whether users expect “previous threads” to exclude the open thread in global search as the agent tool does.
+14. **Current thread in UI search:** This draft includes it. Confirm whether users expect "previous threads" to exclude the open thread in global search as the agent tool does.
 15. **Retention:** If future retention policy removes old raw events but keeps chat summaries, should derived search rows be deleted at the same time? Default privacy rule says yes unless a separately approved retention policy says otherwise.
 
-## 22. Approval Gate
+## 22. Approval gate
 
 Before implementation:
 
@@ -868,7 +868,7 @@ Before implementation:
 - [ ] Every acceptance criterion maps to an exact test/eval command and fixture.
 - [ ] No implementation begins from this draft alone.
 
-## 23. Codex/Implementation Handoff Contract
+## 23. Codex/implementation handoff contract
 
 After approval, any implementation agent must receive:
 

@@ -1,49 +1,49 @@
-# PRD: Archive and Recover Chat Threads
+# PRD: archive and recover chat threads
 
-- **Status:** Draft — requires explicit user approval before implementation
+- **Status:** Draft — needs explicit user approval before implementation
 - **Backlog source:** `docs/PRODUCT_IDEAS.md` → “Archive and recover chat threads”
 - **Repository:** `/opt/data/miniscira-src`
 - **Primary surfaces:** chat persistence, chat APIs, sidebar/history UI, archived-thread view, user settings, Eve schedules, Lookout execution
 
-## 1. Introduction
+## 1. Problem
 
-MiniScira currently treats every chat as active until the user permanently deletes it. As history grows, the sidebar and project views become crowded, while deletion is too destructive for threads the user may want later.
+MiniScira keeps every chat active until the user permanently deletes it. As history grows, the sidebar and project views become crowded, while deletion is too destructive for threads the user may want later.
 
-This feature adds a reversible archive state. Users can manually archive and recover their own threads, browse archived threads in a dedicated view, and optionally enable automatic archival after one week without real chat activity. Archival must preserve the complete thread and remain separate from deletion and future retention policies.
+Add a reversible archive state. Users can manually archive and recover their own threads, browse archived threads in a dedicated view, and optionally enable automatic archival after one week without real chat activity. Archival must preserve the complete thread and remain separate from deletion and future retention policies.
 
-The feature must not infer inactivity from `chat.updatedAt`. Today that field is changed by transcript appends, title edits, Eve cursor persistence, Lookout completion, and other maintenance. A dedicated activity timestamp is required so automatic archival reflects actual conversation activity rather than incidental database writes.
+The feature must not infer inactivity from `chat.updatedAt`. Today that field is changed by transcript appends, title edits, Eve cursor persistence, Lookout completion, and other maintenance. A dedicated activity timestamp is required so automatic archival reflects actual conversation activity rather than unrelated database writes.
 
-## 2. Goals
+## 2. goals
 
 - Let a signed-in user archive and unarchive an owned chat without losing messages, events, documents, artifacts, session metadata, project membership, or Lookout provenance.
-- Remove archived chats from ordinary history surfaces and expose them in a dedicated, accessible archived-thread view.
+- Remove archived chats from normal history views and expose them in a dedicated, accessible archived-thread view.
 - Offer an opt-in per-user policy with an initial supported threshold of one week of inactivity.
-- Define one authoritative inactivity timestamp and update it only for genuine thread activity.
+- Define one authoritative inactivity timestamp and update it only for real thread activity.
 - Prevent automatic archival of pinned chats, active research runs, and chats conservatively considered needed by a currently running Lookout.
 - Preserve strict user ownership checks for every read and mutation.
 - Make scheduler execution bounded, idempotent, race-safe, observable, and compatible with the existing Eve/in-database scheduling architecture.
 - Deploy the schema and application changes without deleting or rewriting existing thread content.
 
-## 3. Locked Product Decisions
+## 3. Fixed product decisions
 
 These decisions remove implementation ambiguity for the initial release:
 
 1. **Archive is a state on the existing chat row, not a move to another table.** Events and related records retain their existing foreign keys.
 2. **Archive and delete remain separate actions.** Archive is reversible; delete remains permanent and retains its existing destructive confirmation.
 3. **The initial auto-archive choices are `Off` and `After 1 week`.** The stored shape may support future thresholds, but the UI must not expose unsupported values.
-4. **Auto-archive is off by default for existing and new users.** No chat is automatically archived merely by deploying the migration.
+4. **Auto-archive is off by default for existing and new users.** No chat is automatically archived only by deploying the migration.
 5. **Pinned threads are an explicit persisted state introduced by this feature.** Pinning protects a thread from auto-archive; it is not a general redesign of sidebar ordering in this release.
 6. **A pinned chat cannot be manually archived.** The user must unpin it first. The API returns a typed conflict rather than silently clearing the pin.
 7. **A research run that is active cannot be manually or automatically archived.** The archive mutation must fail safely with a typed conflict if a run starts concurrently.
 8. **Archived chats are readable but not writable as conversations.** Opening an archived chat shows its transcript and an archived banner; sending, retrying, editing a prior prompt, or otherwise starting a turn requires unarchiving first.
 9. **Unarchiving does not count as chat activity and does not rewrite the original activity timestamp.** This preserves accurate inactivity history. The scheduler must provide a grace period by excluding chats whose archive state changed recently, preventing immediate re-archival before the user can resume work.
-10. **Direct links to an owned archived chat remain valid.** They render the read-only archived state rather than returning 404 or silently recovering the chat.
+10. **Direct links to an owned archived chat stay valid.** They render the read-only archived state rather than returning 404 or silently recovering the chat.
 11. **Normal chat lists return active chats only by default.** Archived inclusion must be explicit.
 12. **Permanent deletion remains available from the archived view with the same warning that messages are permanently removed.** No bulk deletion or retention timer is included.
 13. **Manual and automatic archival are distinguishable in persisted metadata** for UI copy, debugging, and observability.
 14. **Auto-archive uses UTC instants.** “One week” means 7 × 24 hours since `lastActivityAt`, not a calendar-week boundary or user timezone computation.
 
-## 4. Definitions and Semantics
+## 4. Definitions and rules
 
 ### 4.1 Archived
 
@@ -80,7 +80,7 @@ It **does not count**:
 - Lookout schedule bookkeeping such as leases, `lastRunAt`, `nextRunAt`, or status updates;
 - project metadata changes, document background processing, or settings changes.
 
-The implementation must centralize activity-touch behavior so raw `updatedAt` writes cannot accidentally become inactivity signals. Existing `updatedAt` may continue to support compatibility and list ordering where appropriate, but automatic archival must never read it.
+The implementation must centralize activity-touch behavior so raw `updatedAt` writes cannot accidentally become inactivity signals. Existing `updatedAt` may continue to support compatibility and list ordering when useful, but automatic archival must never read it.
 
 ### 4.3 Active research run
 
@@ -113,9 +113,9 @@ The active-run lease on the result chat remains the primary protection. The pare
 
 To prevent a chat that is still older than the threshold from being re-archived immediately after recovery, auto-archive must exclude chats whose archive state was changed within the prior 24 hours. This can be represented by a dedicated `archiveStateChangedAt` timestamp. Resuming the conversation updates `lastActivityAt` normally and makes the grace period irrelevant.
 
-## 5. User Stories
+## 5. user stories
 
-### US-001: Persist archive, activity, pin, and run-protection state
+### US-001: persist archive, activity, pin, and run-protection state
 
 **Description:** As a developer, I need explicit thread lifecycle fields so archival is reversible and inactivity is computed correctly.
 
@@ -131,7 +131,7 @@ To prevent a chat that is still older than the threshold from being re-archived 
 - [ ] Migration applies to a representative pre-feature database and preserves row counts and foreign-key relationships.
 - [ ] Typecheck and migration verification pass.
 
-### US-002: Maintain correct activity and active-run state
+### US-002: maintain correct activity and active-run state
 
 **Description:** As a user, I want automatic archival to reflect actual conversation inactivity so background bookkeeping neither delays archival nor archives work in progress.
 
@@ -147,7 +147,7 @@ To prevent a chat that is still older than the threshold from being re-archived 
 - [ ] Unit/integration tests distinguish real activity from every listed non-activity example.
 - [ ] Typecheck and focused tests pass.
 
-### US-003: Manually archive an owned thread
+### US-003: manually archive an owned thread
 
 **Description:** As a user, I want to archive a finished thread so it leaves my active history without being deleted.
 
@@ -158,13 +158,13 @@ To prevent a chat that is still older than the threshold from being re-archived 
 - [ ] Successful archive sets `archivedAt`, `archiveReason = manual`, and `archiveStateChangedAt` without changing thread content or `lastActivityAt`.
 - [ ] The archived row disappears from active sidebar/project/history lists after success without interrupting another chat's live stream.
 - [ ] Archiving the currently open thread navigates to `/` only after the server confirms success.
-- [ ] Pinned and active-run chats cannot be archived; the UI shows the server's actionable conflict message.
+- [ ] Pinned and active-run chats cannot be archived; the UI shows the server's clear conflict message.
 - [ ] Repeated archive requests are idempotent and return the current archived state.
 - [ ] Network/server failure leaves the row visible and reports an accessible error toast/status.
 - [ ] Browser verification covers mouse, keyboard, narrow viewport, loading, success, and failure states.
 - [ ] Typecheck and focused tests pass.
 
-### US-004: Pin and unpin a thread
+### US-004: pin and unpin a thread
 
 **Description:** As a user, I want to protect an important thread from automatic archival.
 
@@ -178,7 +178,7 @@ To prevent a chat that is still older than the threshold from being re-archived 
 - [ ] Browser verification covers keyboard operation and visible state after reload.
 - [ ] Typecheck and focused tests pass.
 
-### US-005: Browse archived threads
+### US-005: browse archived threads
 
 **Description:** As a user, I want a dedicated view of archived threads so I can find and manage conversations removed from active history.
 
@@ -187,14 +187,14 @@ To prevent a chat that is still older than the threshold from being re-archived 
 - [ ] `/archived` is an authenticated route linked from the sidebar navigation with an archive icon and correct active state.
 - [ ] The view lists only the signed-in user's archived chats, newest archive first, with title, last activity date, archived date, reason, project context when available, and Lookout context when available.
 - [ ] Active chats do not appear in `/archived`; archived chats do not appear in the normal sidebar, normal `GET /api/chats`, or project chat lists.
-- [ ] The view has distinct loading, empty, error, and populated states and remains usable on narrow screens.
+- [ ] The view has distinct loading, empty, error, and populated states and stays usable on narrow screens.
 - [ ] Each row supports Open, Recover, and Delete; Delete keeps the existing permanent-removal confirmation.
 - [ ] Opening an archived chat renders the complete transcript read-only with an archived banner and Recover action.
 - [ ] Composer submission, retry, edit/resubmit, and other turn-starting actions are disabled until recovery, with explanatory copy.
 - [ ] Browser verification covers accessibility, empty state, long titles, large lists, direct links, and responsive layout.
 - [ ] Typecheck and focused tests pass.
 
-### US-006: Recover an archived thread
+### US-006: recover an archived thread
 
 **Description:** As a user, I want to recover an archived thread so I can resume the conversation without losing context.
 
@@ -208,7 +208,7 @@ To prevent a chat that is still older than the threshold from being re-archived 
 - [ ] Browser verification covers recovery from list and detail views, reload persistence, and failure behavior.
 - [ ] Typecheck and focused tests pass.
 
-### US-007: Configure one-week auto-archive
+### US-007: configure one-week auto-archive
 
 **Description:** As a user, I want to opt into automatic archival after one week of inactivity so old history is tidied without deleting it.
 
@@ -217,21 +217,21 @@ To prevent a chat that is still older than the threshold from being re-archived 
 - [ ] Settings contains a “Thread archiving” section with choices Off and After 1 week.
 - [ ] Copy states that archival is reversible, based on real chat activity, excludes pinned/running work, and does not delete data.
 - [ ] The setting persists per user through the authenticated settings API and survives reload.
-- [ ] Invalid values are rejected server-side with `400`; omitted fields remain unchanged.
+- [ ] Invalid values are rejected on the server with `400`; omitted fields do not change.
 - [ ] Enabling the setting does not synchronously archive chats in the settings request; the scheduler performs bounded background work.
 - [ ] Browser verification covers save progress, success, error rollback, keyboard operation, and mobile layout.
 - [ ] Typecheck and focused tests pass.
 
-### US-008: Auto-archive eligible inactive threads
+### US-008: auto-archive eligible inactive threads
 
 **Description:** As an opted-in user, I want an automatic process to archive only eligible inactive threads.
 
 **Acceptance Criteria:**
 
-- [ ] An Eve-authored schedule periodically claims a bounded batch of eligible chats using database-side predicates and a lease/claim strategy safe under overlapping ticks.
+- [ ] An Eve-authored schedule periodically claims a bounded batch of eligible chats using database predicates and a lease/claim strategy safe under overlapping ticks.
 - [ ] Eligibility requires: owner setting equals 7 days, `archivedAt` null, `pinnedAt` null, `lastActivityAt <= now - 7 days`, recovery grace elapsed, active-run lease absent/expired, and no linked Lookout with a live execution lease.
 - [ ] The final archive update repeats all eligibility predicates atomically; a concurrent turn, pin, manual state change, or Lookout lease prevents archival.
-- [ ] Eligible chats receive `archivedAt = now`, `archiveReason = inactivity`, and `archiveStateChangedAt = now`; content and `lastActivityAt` remain unchanged.
+- [ ] Eligible chats receive `archivedAt = now`, `archiveReason = inactivity`, and `archiveStateChangedAt = now`; content and `lastActivityAt` do not change.
 - [ ] The job is idempotent and overlapping ticks cannot produce inconsistent state.
 - [ ] One user's setting or rows cannot affect another user's chats.
 - [ ] Failure of one candidate does not prevent later candidates from being processed; failures are logged without titles, messages, event payloads, or secrets.
@@ -239,7 +239,7 @@ To prevent a chat that is still older than the threshold from being re-archived 
 - [ ] A database integration test proves the conditional update and ownership boundary.
 - [ ] Typecheck and focused tests pass.
 
-### US-009: Preserve authorization and deletion boundaries
+### US-009: preserve authorization and deletion boundaries
 
 **Description:** As a user, I need thread lifecycle operations to remain private and deletion to remain explicitly destructive.
 
@@ -253,7 +253,7 @@ To prevent a chat that is still older than the threshold from being re-archived 
 - [ ] Authorization tests cover each endpoint and both active/archived states.
 - [ ] Typecheck and focused tests pass.
 
-### US-010: Deploy, observe, and roll back safely
+### US-010: deploy, observe, and roll back safely
 
 **Description:** As an operator, I want the feature to deploy and roll back without losing durable user data.
 
@@ -266,7 +266,7 @@ To prevent a chat that is still older than the threshold from being re-archived 
 - [ ] A rollback rehearsal confirms the previous application can run with additive columns present, or documents the required compatibility release strategy.
 - [ ] Full repository quality gates and `git diff --check` pass.
 
-## 6. Functional Requirements
+## 6. functional requirements
 
 - **FR-1:** The system must represent archival on the existing `chat` row with nullable timestamp and reason fields.
 - **FR-2:** Archiving must preserve every child row, blob reference, project/Lookout association, and Eve session field.
@@ -294,7 +294,7 @@ To prevent a chat that is still older than the threshold from being re-archived 
 - **FR-24:** Cross-user lifecycle reads and writes must not reveal chat title, archive status, pin status, timestamps, or existence beyond current repository authorization conventions.
 - **FR-25:** UI state changes must reconcile from server-confirmed state and must not call `router.refresh()` in a way that remounts an unrelated active Eve stream.
 
-## 7. API Contract
+## 7. API contract
 
 Exact route naming may follow adjacent conventions, but implementation must preserve these operations and semantics. Recommended routes:
 
@@ -333,7 +333,7 @@ Exact route naming may follow adjacent conventions, but implementation must pres
 - Event append and any turn-start operation reject archived chats with `409 CHAT_ARCHIVED`.
 - Cursor maintenance may continue for a previously running request only while the active-run guard permits it, but it never changes `lastActivityAt` by itself.
 - Title edits on archived chats are not required in the MVP and should be disabled/rejected consistently rather than partially supported.
-- Delete behavior remains unchanged and ownership-scoped.
+- Delete behavior does not change and ownership-scoped.
 
 ### Settings API
 
@@ -341,7 +341,7 @@ Exact route naming may follow adjacent conventions, but implementation must pres
 - `PATCH /api/settings` accepts `autoArchiveAfterDays: null | 7`; invalid values return `400` rather than being silently normalized.
 - Existing settings fields and optimistic save behavior remain compatible.
 
-## 8. Data Model and Migration
+## 8. data model and migration
 
 ### 8.1 Proposed fields
 
@@ -375,7 +375,7 @@ The migration must add database constraints for archive reason/state consistency
 - active owner history: `(user_id, last_activity_at DESC)` with `archived_at IS NULL` where supported;
 - archived owner history: `(user_id, archived_at DESC)` with `archived_at IS NOT NULL`;
 - scheduler candidates: `(last_activity_at)` filtered to active/unpinned rows, plus owner lookup through settings;
-- existing primary/foreign keys remain unchanged.
+- existing primary/foreign keys do not change.
 
 Implementation must inspect generated SQL and use an explicit hand-edited migration when Drizzle generation cannot express a needed check/partial index safely.
 
@@ -391,7 +391,7 @@ Use a database fixture containing:
 
 Record pre/post counts and representative field values. Verify migration application, repeated migration no-op behavior, constraints, indexes, and that a previous compatible application version tolerates additive columns.
 
-## 9. UI and Design Considerations
+## 9. UI and design
 
 - Reuse existing sidebar menu/action, alert-dialog, button, toast, and settings patterns.
 - Archive must use a non-destructive archive icon and neutral copy; Delete retains the destructive icon/color and irreversible warning.
@@ -405,7 +405,7 @@ Record pre/post counts and representative field values. Verify migration applica
 - Dates must use the existing locale-aware presentation conventions and expose exact timestamps accessibly where useful.
 - Respect existing motion tokens and reduced-motion behavior; no new one-off easing curves.
 
-## 10. Scheduler and Concurrency Design
+## 10. Scheduler and concurrency
 
 - Add a dedicated authored Eve schedule (recommended hourly). Do not overload Lookout claim logic or introduce QStash.
 - The scheduled function should call a testable library module, for example `lib/chat-archive-schedule.ts`, rather than embedding SQL/eligibility rules in the schedule file.
@@ -416,7 +416,7 @@ Record pre/post counts and representative field values. Verify migration applica
 - The scheduler must continue after per-row errors and leave rows retryable.
 - Expired active-run leases recover from process crashes; fresh leases categorically exclude the row.
 
-## 11. Authorization and Privacy
+## 11. authorization and privacy
 
 - Continue using authenticated route wrappers in `lib/api-auth.ts`.
 - Prefer SQL ownership predicates (`id AND user_id`) or a centralized ownership helper; do not rely on client filtering.
@@ -426,7 +426,7 @@ Record pre/post counts and representative field values. Verify migration applica
 - Logs and metrics may include aggregate counts and opaque run IDs, not chat titles, prompts, event JSON, email, nickname, or document names.
 - Archived chats remain private under their existing visibility semantics; archival does not change sharing/visibility.
 
-## 12. Non-Goals
+## 12. Non-goals
 
 - Moving archived data to cold storage, another database/table, or compressed blobs.
 - Deleting archived chats automatically or adding retention/expiration policies.
@@ -443,7 +443,7 @@ Record pre/post counts and representative field values. Verify migration applica
 - Changing Lookout scheduling frequencies or delivery behavior.
 - Replacing Eve schedules, database leases, or the existing two-process deployment model.
 
-## 13. Test Plan and Traceability
+## 13. test plan and traceability
 
 | Requirement area | Unit tests | Integration/API tests | Browser/real-flow checks |
 |---|---|---|---|
@@ -491,7 +491,7 @@ Required scheduler cases:
 
 ### Browser/end-to-end approach
 
-The repository currently has no Playwright dependency or test script. Do not silently add a large E2E framework solely for this PRD. During implementation, either:
+The repository has no Playwright dependency or test script. Do not silently add a large E2E framework solely for this PRD. During implementation, either:
 
 - add the smallest approved browser harness as a separately reviewed testing dependency; or
 - execute and document repeatable browser automation against the running app with seeded users/data.
@@ -504,7 +504,7 @@ In either case, the final acceptance evidence must exercise the actual authentic
 
 If implementation later changes agent-visible context or adds a previous-thread retrieval tool, that expansion requires a separate approved PRD/eval plan with leakage and relevance cases.
 
-## 14. Ordered Implementation Tasks (After Approval Only)
+## 14. ordered implementation tasks (after approval only)
 
 - [ ] **T-01 — Confirm decisions and test harness.** Resolve open questions, obtain explicit PRD approval, and select the API integration/browser test harness. No production code before approval.
 - [ ] **T-02 — Add schema and migration.** Update `lib/db/schema.ts`; generate and inspect a committed migration under `lib/db/migrations/`; add constraints, backfill, and indexes; verify against representative data. Covers US-001.
@@ -522,7 +522,7 @@ If implementation later changes agent-visible context or adds a previous-thread 
 - [ ] **T-14 — Full quality gates and traceability review.** Run focused tests, `/opt/data/bin/bun run typecheck`, `/opt/data/bin/bun run lint`, `/opt/data/bin/bun test`, `/opt/data/bin/bun run check`, re-run affected tests after formatter changes, and `git diff --check`; confirm every acceptance criterion has evidence.
 - [ ] **T-15 — Production rollout and acceptance.** Back up production DB, migrate, roll out both Next.js and Eve processes, verify schedule registration, run production acceptance with non-sensitive fixtures, monitor first scheduled runs, then commit/push intended changes per repository policy.
 
-## 15. Requirement-to-Task Traceability
+## 15. Requirement-to-task traceability
 
 | Story / requirements | Implementation tasks | Verification gate |
 |---|---|---|
@@ -537,7 +537,7 @@ If implementation later changes agent-visible context or adds a previous-thread 
 | US-009; FR-23–24 | T-06, T-12 | authorization suite + delete regression |
 | US-010 | T-13, T-14, T-15 | backup/migrate/rollback/full gates/production acceptance |
 
-## 16. Deployment Plan
+## 16. deployment plan
 
 1. **Pre-deploy:** confirm explicit PRD approval; create implementation TODOs; verify clean tree; back up the database; capture chat/chat_event/document counts and representative relationships.
 2. **Migration:** apply the committed additive migration using the explicit migration workflow before enabling code paths that require the columns. Do not use normal startup schema mutation.
@@ -548,7 +548,7 @@ If implementation later changes agent-visible context or adds a previous-thread 
 7. **Observe:** monitor aggregate schedule counts, errors, duration, database load, and unexpected `409` rates. Inspect logs for accidental titles/content/PII.
 8. **Source control:** after successful production deployment, commit every intended change, push to `origin`, and verify clean tree and local HEAD equals `origin/main`.
 
-## 17. Rollback Plan
+## 17. rollback plan
 
 - **Preferred rollback:** disable/leave all users' auto-archive settings off if an emergency feature flag is approved, or stop registering the new schedule, then roll back application code to the last compatible image. Manual archive data remains intact.
 - **Schema compatibility:** design the migration as additive so the previous application ignores the extra columns. Do not drop lifecycle columns during routine application rollback.
@@ -557,9 +557,9 @@ If implementation later changes agent-visible context or adds a previous-thread 
 - **Data restoration:** restore the pre-deploy database backup only for catastrophic migration corruption, understanding that this also discards legitimate post-backup user activity. Prefer forward repair.
 - **Verification after rollback:** active chat, existing events, Lookout execution, settings, and deletion must still work; verify both Next.js and Eve processes and inspect schedule registration.
 
-## 18. Observability and Success Metrics
+## 18. observability and success metrics
 
-### Operational signals
+### Operational metrics
 
 - Scheduler runs, duration, candidates scanned/claimed, chats archived, skips by reason, and errors.
 - Archive/recover/pin API success and typed-conflict counts without chat/user identifiers.
@@ -577,7 +577,7 @@ If implementation later changes agent-visible context or adds a previous-thread 
 
 No external analytics dependency is required for MVP. Self-hosted operators may rely on privacy-safe structured logs and database checks.
 
-## 19. Risks and Mitigations
+## 19. risks and mitigations
 
 - **Risk: `updatedAt` causes false inactivity decisions.** Mitigation: dedicated `lastActivityAt`, centralized touch helpers, explicit negative tests.
 - **Risk: scheduler races with a new turn.** Mitigation: turn-start atomic state update plus final conditional archive update.
@@ -589,7 +589,7 @@ No external analytics dependency is required for MVP. Self-hosted operators may 
 - **Risk: migration affects existing history.** Mitigation: additive nullable fields, deterministic backfill, backup, row-count/FK verification, no initial auto-archive.
 - **Risk: optimistic UI remounts a live conversation.** Mitigation: follow existing chat-list event model and avoid broad refreshes during unrelated active streams.
 
-## 20. Open Questions Requiring Approval
+## 20. Open questions that need approval
 
 1. **Pin UI scope:** Is the locked MVP behavior acceptable—pin protects from auto-archive and shows an indicator, but does not reorder the sidebar?
 2. **Archived conversation behavior:** Approve read-only-until-recovered, rather than silently recovering on send?
@@ -600,6 +600,6 @@ No external analytics dependency is required for MVP. Self-hosted operators may 
 7. **Browser test harness:** Approve adding a small Playwright setup, or require repeatable external browser automation without a repository dependency?
 8. **Emergency scheduler disable:** Should deployment add an operator environment flag for the auto-archive schedule, or is removing/disabling schedule registration during rollback sufficient?
 
-## 21. Approval Gate
+## 21. approval gate
 
 This document is a draft. Implementation must not begin until the user explicitly approves the PRD and resolves or accepts the recommendations in §20. After approval, derive the ordered tasks into the execution TODO list and preserve the requirement/test traceability above.

@@ -1,14 +1,8 @@
-# MiniScira on Umbrel — Docker Sandbox Architecture and Operations
+# MiniScira on Umbrel: Docker Sandbox architecture and operations
 
-This is the canonical code-facing runbook for Soham's MiniScira fork on Umbrel.
-It documents the local architecture, security boundary, build and deployment
-process, upstream-sync policy, verification requirements, rollback path, and
-known failure modes.
+This is the main operations runbook for Soham's MiniScira fork on Umbrel. It describes the local architecture, security boundary, build and deployment steps, upstream sync rules, required tests, rollback steps, and known failures.
 
-> **Scope:** personal, single-user/household deployment on one trusted Umbrel
-> Docker Engine. The sandbox deliberately runs as sibling containers on that
-> Engine. This is acceptable for this installation, but it is not a
-> hostile-multi-tenant isolation design.
+> **Scope:** This design is for a personal or household deployment on one trusted Umbrel Docker Engine. The Sandbox runs as sibling containers on that Engine. This is acceptable here, but it does not isolate mutually hostile tenants.
 
 ## 1. Current production contract
 
@@ -35,9 +29,7 @@ known failure modes.
 | Control network | `miniscira_docker-control`, Docker `internal: true` |
 | Production Compose fingerprint after rollout | SHA-256 `a97f83b9fa4848ad6798931ea349b3595b81d6445c010ef39f4110b67c32794b` |
 
-Image IDs prove what was validated at rollout time. Local mutable tags may move after
-a rebuild, so always inspect the running container's `Image` ID before and after
-maintenance.
+Image IDs show which exact images passed rollout tests. Local tags are mutable and may point to new images after a rebuild. Always inspect the running container's `Image` ID before and after maintenance.
 
 ## 2. Architecture in plain language
 
@@ -80,16 +72,14 @@ Umbrel / Portainer Docker Engine
         Internet package/source registries
 ```
 
-### What “runs directly on Umbrel” means
+### What "runs directly on Umbrel" means
 
-This is not Docker-in-Docker. Eve asks the normal Umbrel Docker Engine to create
-short-lived sibling containers. Therefore sandbox CPU and memory are consumed by
-the Umbrel host directly, and the containers are visible in Portainer.
+This is not Docker-in-Docker. Eve asks the normal Umbrel Docker Engine to create short-lived sibling containers. The sandboxes use CPU and memory directly on the Umbrel host, and Portainer can see them.
 
 MiniScira itself does **not** receive the Docker socket. It can reach only the
 private middleware. The middleware is the component with direct Engine access.
 
-### Why Portainer's endpoint proxy is not used
+### Why MiniScira does not use Portainer's endpoint proxy
 
 Portainer's authenticated endpoint proxy was tested first. Normal Docker attached
 `exec` requires an HTTP upgrade response (`101 UPGRADED`) and a bidirectional byte
@@ -99,9 +89,7 @@ stream. The Portainer path returned `200` or `502`, causing:
 unable to upgrade to tcp, received 200
 ```
 
-The direct-socket middleware preserves the native Docker stream while retaining a
-policy layer between MiniScira and the Engine. No Portainer token is present in
-the MiniScira container.
+The direct-socket middleware preserves Docker's native stream and keeps a policy layer between MiniScira and the Engine. The MiniScira container has no Portainer token.
 
 ## 3. Service and network boundaries
 
@@ -144,7 +132,7 @@ the MiniScira container.
 - Durable data is in the external production volume.
 - Do not delete or recreate the DB volume during app or sandbox maintenance.
 
-## 4. Source-of-truth files
+## 4. Authoritative files
 
 ### Application fork
 
@@ -212,8 +200,7 @@ Directory: `/opt/data/scripts`
 
 ## 5. Docker middleware policy
 
-The middleware is **default deny**. It permits only the Docker operations Eve
-needs.
+The middleware denies requests by default. It allows only the Docker operations that Eve needs.
 
 ### Allowed classes
 
@@ -227,7 +214,7 @@ needs.
 - Inspect allowlisted base/Template images; delete Template images.
 - Disconnect an owned Sandbox Container from the configured sandbox network.
 
-### Container-create enforcement
+### Container create rules
 
 A request must:
 
@@ -253,7 +240,7 @@ It rejects:
 
 The middleware forces `no-new-privileges=true`.
 
-### Root Exec restriction
+### Root Exec rule
 
 General root Exec is blocked. Eve's fixed base setup is allowed only when argv is
 exactly:
@@ -266,22 +253,18 @@ The fixed script creates `/workspace` and verifies that Bash exists. If a future
 Eve release changes this script, Template initialization will return `403` until
 the constant and tests are intentionally updated.
 
-### Ownership caveat
+### Ownership limit
 
 Later lifecycle operations currently identify an owned resource by exact
 `eve.sandbox=1`. The middleware adds `miniscira.middleware.owner=eve-sandbox-v1`
 at creation, but Docker/Eve Template lifecycle did not preserve it at every
 step, so it cannot be the sole runtime ownership key.
 
-This is acceptable for this trusted personal deployment because Production
-services do not carry `eve.sandbox=1` and container creation remains tightly
-validated. It is **not** sufficient for mutually hostile tenants sharing the same
-middleware.
+This is acceptable for this trusted personal deployment. Production services do not use `eve.sandbox=1`, and the middleware strictly checks container creation. This is not enough for mutually hostile tenants that share the middleware.
 
-## 6. Native Docker stream handling — critical invariant
+## 6. Required Docker stream behavior
 
-Docker attached Exec and archive transfer are bidirectional streams. The proxy
-must forward client-to-Docker and Docker-to-client concurrently.
+Docker attached Exec and archive transfers send data in both directions. The proxy must forward client-to-Docker and Docker-to-client traffic at the same time.
 
 Two regressions have occurred:
 
@@ -304,8 +287,7 @@ Required regression proof after **every middleware change**:
 5. Observe exit `0`, stdout `42`.
 6. Inspect processes and confirm no lingering `cat` process.
 
-A Python-only `spawn()` smoke test is insufficient because it does not prove file
-upload works.
+A Python-only `spawn()` smoke test is not enough because it does not test file upload.
 
 ## 7. Egress policy
 
@@ -339,8 +321,7 @@ or the entire Internet merely to make one dependency install.
 
 ## 8. Build procedure
 
-Hermes does not rely on local Docker socket access. Build local images through
-Portainer's Docker build API.
+Hermes does not use a local Docker socket. Build local images through Portainer's Docker build API.
 
 ### Prerequisites
 
@@ -350,7 +331,7 @@ Portainer's Docker build API.
 - Working tree changes are understood and `git diff --check` is clean.
 - No secret file is included in a build context.
 
-### App image
+### Build the app image
 
 The app Dockerfile uses the entire repository. The build context must omit at
 least `.git`, `.next`, `node_modules`, and temporary artifacts. Use a unique tag
@@ -365,7 +346,7 @@ miniscira:selfhost-YYYYMMDD-N
 
 Then inspect and record the resulting immutable image ID.
 
-### Middleware image
+### Build the middleware image
 
 ```bash
 python3 -m py_compile /opt/data/miniscira-docker-api-proxy/proxy.py
@@ -378,7 +359,7 @@ python3 /opt/data/skills/devops/portainer-automation/scripts/portainer_build_ima
 After a mutable-tag rebuild, a Stack update is required to recreate the running
 container. A healthy old container does not prove it uses the new image ID.
 
-### Egress image
+### Build the egress image
 
 ```bash
 python3 /opt/data/skills/devops/portainer-automation/scripts/portainer_build_image.py \
@@ -389,7 +370,7 @@ python3 /opt/data/skills/devops/portainer-automation/scripts/portainer_build_ima
 
 ## 9. Test and acceptance gates
 
-### Repository checks
+### Run repository checks
 
 From `/opt/data/miniscira-src`:
 
@@ -409,7 +390,7 @@ Also run the focused wrapper test:
 /opt/data/bin/bun test scripts/eve-docker-wrapper.test.mjs
 ```
 
-### Scratch acceptance
+### Test in scratch
 
 ```bash
 MINISCIRA_VALIDATION_IMAGE=miniscira:<candidate-tag> \
@@ -443,7 +424,7 @@ The current validator's direct Eve test executes Python and egress checks. If it
 is changed, preserve or add a `writeTextFile` regression so the UI-stall failure
 cannot return unnoticed.
 
-### Production acceptance
+### Test in production
 
 After deployment, verify all of the following:
 
@@ -471,8 +452,7 @@ After deployment, verify all of the following:
 - Do not attach the app or middleware to `sandbox-egress`.
 - Do not mount `/data/docker.sock` into the app.
 
-A Stack update with the same mutable image tag is how the middleware/egress
-container is recreated onto the newly built image ID.
+To move the middleware or egress container to a newly built image ID, update the Stack even when the mutable image tag has not changed.
 
 ## 11. Backup and rollback
 
@@ -492,7 +472,7 @@ A deployment backup should include:
 - upload archive or verified volume snapshot for destructive storage changes;
 - baseline data counts and endpoint status.
 
-### Code/image rollback
+### Roll back code or images
 
 If no migration changed schema:
 
@@ -501,15 +481,15 @@ If no migration changed schema:
 3. Wait for app and DB health.
 4. Verify both health endpoints and data counts.
 
-Named volumes make image rollback non-destructive.
+Image rollback does not delete data because the stack uses named volumes.
 
-### Migration rollback
+### Roll back a migration
 
 If new migrations ran and are not backward compatible, code rollback alone is
 unsafe. Restore the pre-upgrade database backup, then restore the previous
 Compose/image.
 
-### Automatic rollback helper caveat
+### Limits of the automatic rollback helper
 
 `deploy-miniscira-docker-sandbox-prod.py` automatically restores the prior
 Compose on a failed rollout, but it is tied to specific old/new image strings and
@@ -518,7 +498,7 @@ version.
 
 ## 12. Routine service checks
 
-### Fast health check
+### Run a fast health check
 
 - Browser: `http://umbrel.local:8325`
 - Hermes/container context:
@@ -532,7 +512,7 @@ for path in ('/api/health', '/eve/v1/health'):
 PY
 ```
 
-### Inspect via Portainer
+### Inspect services through Portainer
 
 Prefer `/opt/data/bin/portainerctl` for inventory, or the Portainer API using
 `X-API-Key`. Never print the token.
@@ -545,7 +525,7 @@ Check:
 - middleware and app logs;
 - Docker Engine disk usage before pruning.
 
-### Sandbox process interpretation
+### Read Sandbox process state
 
 Normal idle Session:
 
@@ -593,9 +573,9 @@ merge base:    0f53a750fbf7aa78b7d4d451e89ecc71955aba6e
 local/upstream divergence: 25 local-only commits, 2 upstream-only commits
 ```
 
-This information becomes stale; always fetch and recompute it.
+These values become stale. Always fetch the remotes and calculate them again.
 
-### Never sync upstream on Production `main` directly
+### Never sync upstream directly on production `main`
 
 1. Make the working tree clean. Commit the Sandbox implementation/docs first or
    save an explicit patch bundle.
@@ -613,7 +593,7 @@ This information becomes stale; always fetch and recompute it.
 12. Only then merge/fast-forward the accepted branch into local `main` and push
     `origin`.
 
-### Conflict policy
+### Resolve conflicts by ownership
 
 Local/fork implementation generally wins for:
 
@@ -646,7 +626,7 @@ Manual semantic merge is required when upstream changes:
 
 Do not resolve those files with blanket `--ours` or `--theirs`.
 
-### Upstream Eve upgrade checklist
+### Check an upstream Eve upgrade
 
 Before accepting a new `eve` version, inspect the installed/dist bindings for:
 
@@ -662,7 +642,7 @@ Before accepting a new `eve` version, inspect the installed/dist bindings for:
 Then update middleware policy only as narrowly as required and run adversarial
 probes again.
 
-### Safer Git commands
+### Use these Git commands
 
 ```bash
 cd /opt/data/miniscira-src
@@ -682,7 +662,7 @@ git merge upstream/main --no-ff
 If branch creation/switch fails, stop immediately. Confirm the branch name before
 merging.
 
-## 15. Patch-development workflow
+## 15. Patch development workflow
 
 For any Sandbox patch:
 
@@ -700,9 +680,7 @@ For any Sandbox patch:
 10. Run exact user-path proof (`writeTextFile` + execution for code-tool issues).
 11. Document the root cause, invariant, image ID, and rollback point.
 
-Do not call a patch complete merely because `/api/health` is 200. Next/Eve health
-proves service readiness, not Sandbox file transfer, Engine policy, egress, or UI
-completion.
+Do not accept a patch only because `/api/health` returns 200. Next and Eve health checks prove that the services are ready. They do not test Sandbox file transfer, Engine policy, egress, or UI completion.
 
 ## 16. Cleanup and retention
 
@@ -737,7 +715,7 @@ completion.
 - Linux ARM64 is not natively supported by `@firecrawl/pdf-inspector`; this build
   targets `linux/amd64`, using emulation on ARM hosts.
 
-## 18. Definition of “working”
+## 18. Definition of "working"
 
 The Sandbox is working only when all of these are true:
 
@@ -753,4 +731,4 @@ The Sandbox is working only when all of these are true:
 - App, Eve, DB, middleware, and Squid remain healthy.
 - Data and uploads remain intact.
 
-Anything less is partial functionality, not acceptance.
+If any item fails, the Sandbox has not passed acceptance.

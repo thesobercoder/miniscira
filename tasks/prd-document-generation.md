@@ -1,37 +1,37 @@
-# PRD: Native Document Generation (PDF, DOCX, PPTX, XLSX)
+# PRD: native document generation (PDF, DOCX, PPTX, XLSX)
 
-- **Status:** Draft — requires explicit user approval before implementation
+- **Status:** Draft — needs explicit user approval before implementation
 - **Backlog source:** [`docs/PRODUCT_IDEAS.md` — Generate editable documents and presentations](../docs/PRODUCT_IDEAS.md#generate-editable-documents-and-presentations)
 - **Repository:** `/opt/data/miniscira-src`
 - **Related future work:** Artifact Library across all chats (not part of this PRD)
-- **Planning rule:** This document defines the full backlog scope. It does not authorize implementation.
+- **Planning rule:** This document defines the full backlog scope. It does not allow implementation.
 
-## 1. Introduction and problem
+## 1. Problem
 
-MiniScira can currently create presentational text/code artifacts whose content lives in persisted Eve events, and `run_code` can save sandbox-generated chart images to durable local blob storage. It cannot produce a validated, durable binary office document as a first-class chat result. Users who ask for a report, letter, deck, or workbook must currently copy content into another application and rebuild structure, styling, tables, charts, citations, and metadata manually.
+MiniScira can create presentational text/code artifacts whose content lives in persisted Eve events, and `run_code` can save sandbox-generated chart images to durable local blob storage. It cannot produce a validated, durable binary office document as a stored chat result. Users who ask for a report, letter, deck, or workbook must currently copy content into another application and rebuild structure, styling, tables, charts, citations, and metadata manually.
 
 Add one agent-facing document-generation capability that creates PDF, DOCX, PPTX, and XLSX files inside the existing isolated Docker Sandbox, validates them before release, stores the accepted bytes durably, records user/chat/turn provenance in Postgres, and presents a preview or structured summary plus a direct download in the originating conversation.
 
-DOCX, PPTX, and XLSX must remain native, editable Office Open XML documents rather than screenshots or a collection of flattened images. PDF is the fixed-layout delivery format and is not required to be natively editable. All formats must be macro-free.
+DOCX, PPTX, and XLSX must remain native, editable Office Open XML documents rather than screenshots or a collection of flattened images. PDF is the fixed layout delivery format and is not required to be natively editable. All formats must be macro-free.
 
-## 2. Evidence from the current repository
+## 2. Current repository facts
 
 The implementation must preserve these existing contracts:
 
-- `agent/sandbox.ts` provides an Eve Docker Sandbox and currently bootstraps Python with `pandas`, `numpy`, and `matplotlib`.
+- `agent/sandbox.ts` provides an Eve Docker Sandbox and bootstraps Python with `pandas`, `numpy`, and `matplotlib`.
 - `agent/tools/run_code.ts` demonstrates user-scoped input staging, Sandbox binary reads/writes, durable upload through `lib/local-blob.ts`, and timeline output containing generated image URLs.
 - The Sandbox has default-deny network policy and only allowlisted proxy egress. Document generation must not require arbitrary Internet access.
 - `/data/uploads` is the durable upload/generated-file volume in Docker deployments and is included with Postgres in backup/restore guidance.
 - `lib/local-blob.ts` flattens attacker-controlled path names and writes bytes to durable local storage.
-- `app/api/files/[...path]/route.ts` currently serves random-suffix URLs without row-level authorization. Generated documents require an authenticated, owner-checked download path; unguessable URLs alone are not sufficient authorization for this feature.
+- `app/api/files/[...path]/route.ts` serves random-suffix URLs without row-level authorization. Generated documents require an authenticated, owner-checked download path; unguessable URLs alone are not sufficient authorization for this feature.
 - `lib/db/schema.ts` has a `document` table for user uploads, but no generated-artifact entity. The existing row semantics (`kind`, upload processing, extracted content) do not fully represent generated artifact provenance, validation, preview, failure, or lifecycle.
-- `agent/tools/artifact.ts` is presentational only and writes nothing to disk. Its current browser download reconstructs text from an event and is not a durable binary-file path.
+- `agent/tools/artifact.ts` is display-only and writes nothing to disk. Its current browser download reconstructs text from an event and is not a durable binary-file path.
 - `components/chat/assistant-turn.tsx` lifts `artifact` tool calls out of the research timeline and renders them as deliverables. The new binary document result should follow this prominence but use a distinct typed tool/result contract.
-- `components/research-chat.tsx` rehydrates ordinary artifacts from persisted Eve events. Durable binary artifacts must additionally survive event compaction, schema evolution, file lifecycle changes, and a page reload through a database-backed record.
+- `components/research-chat.tsx` rehydrates ordinary artifacts from persisted Eve events. Durable binary artifacts must also survive event compaction, schema evolution, file lifecycle changes, and a page reload through a database-backed record.
 - `docs/ENGINEERING_INVARIANTS.md` requires attachment object-URL cleanup and data URLs for model-facing private-host files. Generated downloads are user-facing links and must not be automatically inlined into later model calls.
-- `docs/UMBREL_SANDBOX_OPERATIONS.md` requires exact Sandbox file-write and execution proof and strict network/container isolation. A generation acceptance test must prove binary archive transfer, not merely successful Python process startup.
+- `docs/UMBREL_SANDBOX_OPERATIONS.md` requires exact Sandbox file-write and execution proof and strict network/container isolation. A generation acceptance test must prove binary archive transfer, not only successful Python process startup.
 
-## 3. Goals
+## 3. goals
 
 1. Generate each of `.pdf`, `.docx`, `.pptx`, and `.xlsx` from a natural-language chat request.
 2. Preserve real editability in DOCX, PPTX, and XLSX using native OOXML structures.
@@ -44,7 +44,7 @@ The implementation must preserve these existing contracts:
 9. Fail clearly and retain diagnostic evidence without presenting corrupt or unvalidated output as complete.
 10. Define format-specific tests and model/tool evals that catch technically valid but unusable documents.
 
-## 4. Non-goals
+## 4. non-goals
 
 - Editing an existing PDF/DOCX/PPTX/XLSX through chat in the first implementation.
 - Collaborative real-time office editing in MiniScira.
@@ -60,9 +60,9 @@ The implementation must preserve these existing contracts:
 - Replacing the current uploaded-document model or text/code artifact tool.
 - Automatic deletion of artifacts when a source chat is archived. Chat deletion semantics are an open dependency and must be explicitly implemented/tested before release.
 
-## 5. Users and primary use cases
+## 5. users and primary use cases
 
-### US-001: Generate a fixed-layout PDF report
+### US-001: generate a fixed layout PDF report
 
 **Description:** As a user, I want MiniScira to create a polished PDF report so I can distribute a stable document without rebuilding the answer manually.
 
@@ -77,7 +77,7 @@ The implementation must preserve these existing contracts:
 - [ ] Reloading the chat preserves the artifact card and download.
 - [ ] Typecheck/lint/tests pass and the real flow is verified in a browser.
 
-### US-002: Generate an editable DOCX
+### US-002: generate an editable DOCX
 
 **Description:** As a user, I want an editable Word document so I can continue revising prose, tables, and citations in an office editor.
 
@@ -93,7 +93,7 @@ The implementation must preserve these existing contracts:
 - [ ] Reloading the chat preserves the artifact card and download.
 - [ ] Typecheck/lint/tests pass and the real flow is verified in a browser.
 
-### US-003: Generate an editable PPTX
+### US-003: generate an editable PPTX
 
 **Description:** As a user, I want an editable slide deck so I can revise slide text, layouts, tables, and charts after generation.
 
@@ -110,7 +110,7 @@ The implementation must preserve these existing contracts:
 - [ ] Reloading the chat preserves the artifact card and download.
 - [ ] Typecheck/lint/tests pass and the real flow is verified in a browser.
 
-### US-004: Generate an editable XLSX
+### US-004: generate an editable XLSX
 
 **Description:** As a user, I want an editable workbook so I can inspect formulas, revise data, and continue analysis in a spreadsheet application.
 
@@ -127,7 +127,7 @@ The implementation must preserve these existing contracts:
 - [ ] Reloading the chat preserves the artifact card and download.
 - [ ] Typecheck/lint/tests pass and the real flow is verified in a browser.
 
-### US-005: Choose and apply a safe template
+### US-005: choose and apply a safe template
 
 **Description:** As a user, I want an appropriate visual template selected automatically so the output is coherent without exposing implementation controls.
 
@@ -135,12 +135,12 @@ The implementation must preserve these existing contracts:
 
 - [ ] The tool accepts a stable template ID, not an arbitrary filesystem path or URL.
 - [ ] Initial built-in templates include at least `professional-report`, `simple-letter`, `research-brief`, `presentation-standard`, and `workbook-analysis` where formats apply.
-- [ ] If the user does not specify a style, the agent selects the narrowest applicable built-in template.
+- [ ] If the user does not specify a style, the agent selects the most specific built-in template.
 - [ ] A missing/incompatible template fails before generation with a user-readable error.
 - [ ] Template versions are recorded on the artifact row for reproducibility.
 - [ ] Templates contain no macros, external links, executable content, or hidden secrets.
 
-### US-006: Include tables, charts, citations, and metadata
+### US-006: include tables, charts, citations, and metadata
 
 **Description:** As a user, I want structured evidence and data represented natively so the document remains useful after download.
 
@@ -154,7 +154,7 @@ The implementation must preserve these existing contracts:
 - [ ] Standard metadata includes title, subject/description, author=`MiniScira` unless the user requests another value, keywords when supplied, creation timestamp, format, generator version, and template version where the container permits it.
 - [ ] User-provided metadata is length-limited and XML/control-character sanitized.
 
-### US-007: Preview and summarize the result
+### US-007: preview and summarize the result
 
 **Description:** As a user, I want to inspect what was generated before downloading so I can catch missing sections or obvious formatting limitations.
 
@@ -163,7 +163,7 @@ The implementation must preserve these existing contracts:
 - [ ] No artifact is marked `ready` until primary validation succeeds.
 - [ ] Every ready artifact has a structured summary containing format, filename, size, page/slide/sheet count, section/sheet names where applicable, included charts/tables, citation count, template, and validation warnings.
 - [ ] PDF preview uses the validated stored PDF and is rendered in a sandboxed/no-script context.
-- [ ] DOCX/PPTX preview is derived from a server-side Sandbox conversion to PDF or thumbnails and never executes active content.
+- [ ] DOCX/PPTX preview comes from a Sandbox conversion to PDF or thumbnails on the server and never executes active content.
 - [ ] XLSX preview uses sanitized server-produced JSON/HTML or static images for bounded worksheet ranges/charts; it does not embed an office document in an executable browser context.
 - [ ] If preview conversion fails but the native file passes primary validation, the artifact may be delivered with an explicit `Preview unavailable` warning and complete summary.
 - [ ] Preview assets are owner-authorized and durable or deterministically regenerable.
@@ -183,7 +183,7 @@ The implementation must preserve these existing contracts:
 - [ ] A missing backing file renders `File missing` with provenance intact; it never becomes a broken silent link.
 - [ ] The schema is compatible with a future cross-chat Artifact Library without implementing that UI now.
 
-### US-009: Generate and validate in the isolated Sandbox
+### US-009: generate and validate in the isolated Sandbox
 
 **Description:** As an operator, I want document creation isolated from the app process so malformed inputs and rendering libraries do not weaken the host application.
 
@@ -197,7 +197,7 @@ The implementation must preserve these existing contracts:
 - [ ] Failed validation prevents durable publication as a ready artifact.
 - [ ] The exact Sandbox acceptance proves text and binary writes, generation, binary read-back, validation, upload, download, and cleanup with no lingering `cat` process.
 
-### US-010: Enforce owner-only access
+### US-010: enforce owner-only access
 
 **Description:** As a user, I want only my authenticated account to access my generated documents and previews.
 
@@ -210,11 +210,11 @@ The implementation must preserve these existing contracts:
 - [ ] Filenames cannot inject headers or escape storage/workspace paths.
 - [ ] Authorization tests cover a second user for every artifact endpoint and preview asset.
 
-## 6. Functional requirements
+## 6. functional requirements
 
 ### Generation contract
 
-- **FR-001:** Add a dedicated agent tool, provisionally named `generate_document`, for the four supported formats.
+- **FR-001:** Add a dedicated agent tool, temporarily named `generate_document`, for the four supported formats.
 - **FR-002:** The tool input must be a versioned, Zod-validated document specification, not arbitrary executable Python/JavaScript supplied directly by the model.
 - **FR-003:** The first schema version must include: `format`, `title`, `filename`, `templateId`, `metadata`, ordered content blocks, source references, and format-specific options.
 - **FR-004:** Content blocks must support at minimum headings, paragraphs, bullet/numbered lists, tables, images/charts, citations, references, page/section breaks, and callouts where the target supports them.
@@ -224,7 +224,7 @@ The implementation must preserve these existing contracts:
 - **FR-008:** The tool must surface explicit phases: preparing, generating, validating, previewing, storing, ready/failed.
 - **FR-009:** Generation must be deterministic for the same normalized specification, template version, generator version, and fixed timestamp inputs except where OOXML libraries inject non-semantic package IDs.
 
-### Exact format acceptance
+### Format acceptance
 
 - **FR-010 (PDF):** Output extension `.pdf`; MIME `application/pdf`; PDF header/trailer parse successfully; no encryption; no embedded files, JavaScript, launch actions, or external actions; page count `1..200`; text extraction succeeds for text-bearing fixtures; every page renders without parser errors.
 - **FR-011 (DOCX):** Output extension `.docx`; exact DOCX MIME; valid ZIP with required OOXML parts; no `vbaProject.bin`, OLE objects, ActiveX, attached packages, remote relationships, external template, or DDE field instructions; document opens without repair; paragraphs/tables/drawings remain native objects.
@@ -283,16 +283,16 @@ The implementation must preserve these existing contracts:
 - **FR-046:** A failed generation must record a bounded, sanitized error category and phase; raw document contents, secrets, and full model specifications must not be logged.
 - **FR-047:** Retry creates a new generation attempt and may reuse the same artifact request identity, but must never silently overwrite a previously ready file. Versioning semantics must be visible.
 - **FR-048:** Metrics/logs must capture format, template ID/version, phase durations, byte size, page/slide/sheet counts, warning/error category, library/generator version, Sandbox/session correlation ID, and success/failure—without user content.
-- **FR-049:** Operators must be able to identify orphaned blobs, stuck nonterminal rows, checksum failures, missing previews, and artifacts with missing backing files.
+- **FR-049:** Operators must identify orphaned blobs, stuck nonterminal rows, checksum failures, missing previews, and artifacts with missing backing files.
 - **FR-050:** Deletion must be owner-authorized and define whether it deletes primary bytes, previews, and row or leaves a tombstone. Source chat deletion behavior must be resolved before implementation reaches production.
 
-## 7. Technical decisions and options
+## 7. technical decisions and options
 
-### 7.1 Locked architecture decisions
+### 7.1 Fixed architecture decisions
 
 1. **Sandbox-only binary creation:** The app validates the tool schema and orchestrates storage, but document rendering, conversion, and binary inspection execute inside the existing Eve Docker Sandbox.
 2. **Structured specification, trusted generator:** The model supplies declarative JSON. Repository-owned generator code converts that specification to files. The model does not supply executable generation code for this tool.
-3. **One database-backed artifact entity:** Generated binary files are first-class records separate from uploaded/searchable documents and from event-only text artifacts.
+3. **One database-backed artifact entity:** Generated binary files are dedicated records separate from uploaded/searchable documents and from event-only text artifacts.
 4. **Owner-authorized downloads:** Generated artifacts do not rely on unguessable `/api/files/*` URLs as authorization.
 5. **Native OOXML:** DOCX/PPTX/XLSX use native package objects; full-page image output is a rejection, not an acceptable implementation shortcut.
 6. **Macro-free output:** Only `.docx`, `.pptx`, and `.xlsx`; reject active content and external relationships.
@@ -301,9 +301,9 @@ The implementation must preserve these existing contracts:
 9. **No arbitrary egress:** Remote images/assets must first exist as explicitly authorized uploaded/source artifacts or be omitted. Generation never follows URLs from the model specification.
 10. **Schema migration is explicit:** Use a committed Drizzle migration; normal startup must not mutate schema.
 
-### 7.2 Proposed library baseline (decision required during spike)
+### 7.2 Proposed libraries (decide during the spike)
 
-The current Sandbox image already carries Python and data libraries. The smallest coherent initial stack is therefore Python-based:
+The current Sandbox image already carries Python and data libraries. The smallest practical initial set is therefore Python-based:
 
 | Format/capability | Preferred candidate | Alternatives | Decision criteria |
 |---|---|---|---|
@@ -315,7 +315,7 @@ The current Sandbox image already carries Python and data libraries. The smalles
 | PDF inspection/render | existing `unpdf` in app for text plus Sandbox `pypdf`/`qpdf`/Poppler tools | PDFium/MuPDF | active-content detection, page render, metadata/text extraction, license/image footprint |
 | OOXML validation | ZIP/XML structural validator plus format-specific library reload; LibreOffice open/convert | Open XML SDK in a dedicated .NET validator | repair detection, macro/external relationship detection, schema depth, runtime size |
 
-A time-boxed technical spike must create representative fixtures with at least two candidate stacks where the table shows a meaningful alternative. The spike report locks the libraries before production implementation. If no candidate can meet native chart/accessibility requirements, the PRD must be amended and re-approved rather than silently weakening acceptance.
+A time-limited technical spike must create representative fixtures with at least two candidate stacks where the table shows a meaningful alternative. The spike report locks the libraries before production implementation. If no candidate can meet native chart/accessibility requirements, the PRD must be amended and re-approved rather than silently weakening acceptance.
 
 ### 7.3 Proposed artifact data model
 
@@ -341,7 +341,7 @@ Exact names may follow repository conventions, but the migration must provide eq
 
 Do not store full generated bytes or base64 in Postgres or Eve events. Decide whether the normalized generation specification needs durable retention for retry/reproducibility; if retained, encrypt or minimize it because it contains user content.
 
-## 8. Security and privacy requirements
+## 8. security and privacy requirements
 
 1. Treat model-produced specifications, user content, uploaded assets, templates, generated ZIP packages, PDFs, and LibreOffice output as untrusted.
 2. Validate twice: strict schema/limits before Sandbox execution; signature/package/content validation after generation.
@@ -362,7 +362,7 @@ Do not store full generated bytes or base64 in Postgres or Eve events. Decide wh
 17. Add dependency/SBOM and license review for generator/converter/font packages; pin versions and monitor vulnerabilities.
 18. Preserve current Sandbox control-plane invariants: no Docker socket in the app, exact sandbox label/network, default-deny middleware, no host ports or mounts.
 
-## 9. Validation pipeline
+## 9. validation pipeline
 
 For every tool call:
 
@@ -385,9 +385,9 @@ For every tool call:
 17. Render the result card from opaque artifact ID and persisted metadata.
 18. Clean the per-call Sandbox directory; preserve only normal Eve Sandbox session lifecycle required for reconnect semantics.
 
-## 10. Test matrix
+## 10. test matrix
 
-### 10.1 Common automated matrix
+### 10.1 Common automated tests
 
 Run every format fixture through:
 
@@ -408,7 +408,7 @@ Run every format fixture through:
 - second-user authorization attempts;
 - reload/rehydration, retry/versioning, chat deletion behavior, backup/restore.
 
-### 10.2 Format-specific matrix
+### 10.2 Format-specific tests
 
 | Format | Structural tests | Independent-open/render tests | Native editability tests | Security tests | Visual/content assertions |
 |---|---|---|---|---|---|
@@ -427,7 +427,7 @@ Run every format fixture through:
 - **Migration/rollback:** apply committed migration on representative existing DB; old app compatibility decision; restore pre-migration DB and uploads backup when rollback is not backward compatible.
 - **Production acceptance:** one small real document per format, download and independent open, reload, user authorization probe, data/upload baseline preservation, service health/restarts/logs, immutable image ID verification.
 
-### 10.4 Exact repository verification commands
+### 10.4 Repository verification commands
 
 Implementation must run focused tests first, then at minimum:
 
@@ -449,7 +449,7 @@ MINISCIRA_VALIDATION_IMAGE=miniscira:<candidate-tag> \
 
 The validator must be extended to exercise at least one generated binary file and exact write/generate/read/upload/download validation while preserving the existing `RESULT: ALL PASS`, deny probes, egress denial, isolation, logs, and cleanup gates.
 
-## 11. Model/tool eval plan
+## 11. Model and tool eval plan
 
 Model evals apply because this feature adds an agent tool, routing behavior, structured arguments, tool-result interpretation, and limitation reporting.
 
@@ -462,7 +462,7 @@ Create `evals/generate-document.eval.ts` plus deterministic fixtures. Run agains
 3. PPTX request with exact slide count, table, and chart.
 4. XLSX request from a small data table with formulas and chart.
 5. Ambiguous “make me a report” request: choose a documented default format or ask a targeted question according to the locked UX decision.
-6. Request for editable PDF: explain PDF fixed-layout limitation and offer DOCX plus optional PDF; do not claim PDF is natively editable.
+6. Request for editable PDF: explain PDF fixed layout limitation and offer DOCX plus optional PDF; do not claim PDF is natively editable.
 7. Request for macro-enabled workbook: refuse active content and offer `.xlsx`.
 8. Request for an unsupported chart/layout feature: generate a documented safe fallback or clearly state limitation.
 9. Request containing a remote image URL: do not fetch it through generation; request upload or omit with warning.
@@ -473,7 +473,7 @@ Create `evals/generate-document.eval.ts` plus deterministic fixtures. Run agains
 14. Large/over-limit request: reduce scope with user disclosure or ask before generation; do not evade tool limits.
 15. Existing uploaded data used for XLSX: pass only explicitly user-owned filename inputs and create correct typed structures.
 
-### Eval assertions and thresholds
+### Eval checks and pass thresholds
 
 - **100%** of explicit supported-format requests call `generate_document` with the requested format.
 - **100%** of macro/active-content requests avoid unsupported macro-enabled output.
@@ -488,7 +488,7 @@ Create `evals/generate-document.eval.ts` plus deterministic fixtures. Run agains
 
 The eval harness must inspect tool calls and, for selected cases, execute against a deterministic fake generator result. A separate integration suite executes real Sandbox generation so model variance is not conflated with rendering correctness.
 
-## 12. Success metrics
+## 12. success metrics
 
 - >=95% successful generation/validation rate for supported requests within configured limits in acceptance fixtures.
 - 100% of accepted DOCX/PPTX/XLSX fixtures open without repair warnings in required validators/editors.
@@ -499,7 +499,7 @@ The eval harness must inspect tool calls and, for selected cases, execute agains
 - Preview success >=95% for standard fixtures, with explicit warning fallback for the remainder.
 - No Sandbox network-policy regression, lingering generation processes, or orphaned ready rows in acceptance runs.
 
-## 13. Deployment, migration, observability, and rollback
+## 13. deployment, migration, observability, and rollback
 
 ### Deployment
 
@@ -528,11 +528,11 @@ The eval harness must inspect tool calls and, for selected cases, execute agains
 - Keep previous image IDs and backups through the rollback window.
 - Verify health, baseline data, existing uploads, chat, and Sandbox behavior after rollback; health alone is insufficient.
 
-## 14. Ordered implementation tasks (derive TODOs only after approval)
+## 14. ordered implementation tasks (derive TODOs only after approval)
 
 ### Phase 0 — decisions and fixtures
 
-- [ ] **T-001:** Build a time-boxed generator/validator spike for each format using the candidate libraries in §7.2. Record fidelity, editability, security detection, conversion, performance, image size, license, and accessibility limitations.
+- [ ] **T-001:** Build a time-limited generator/validator spike for each format using the candidate libraries in §7.2. Record fidelity, editability, security detection, conversion, performance, image size, license, and accessibility limitations.
 - [ ] **T-002:** Lock library versions, font set, converter, validators, default limits, ambiguous-format UX, artifact deletion/chat-deletion semantics, and specification retention policy. Amend/reapprove this PRD if acceptance is weakened.
 - [ ] **T-003:** Commit deterministic source specifications and expected structural assertions/golden render fixtures for PDF, DOCX, PPTX, and XLSX.
 
@@ -581,7 +581,7 @@ The eval harness must inspect tool calls and, for selected cases, execute agains
 - [ ] **T-032:** Run full repository, format, security, browser, eval, scratch Sandbox, migration/rollback, backup/restore, and production acceptance matrices.
 - [ ] **T-033:** Verify intended changes are committed/pushed, production runs the accepted immutable image, and working tree/source-control invariants hold.
 
-## 15. Traceability matrix
+## 15. traceability matrix
 
 | Requirement/story | Primary tasks | Verification evidence |
 |---|---|---|
@@ -600,7 +600,7 @@ The eval harness must inspect tool calls and, for selected cases, execute agains
 | Model behavior §11 | T-019, T-028 | Eval report meeting every stated threshold |
 | Release/rollback §13 | T-029–033 | Scratch/production acceptance, backups, rollback drill, Git verification |
 
-## 16. Open questions requiring approval or spike evidence
+## 16. Open questions that need approval or spike evidence
 
 1. When a request says only “make a report,” should MiniScira default to DOCX (editable) or ask the user to choose DOCX/PDF? Proposed default: DOCX when editability is implied; PDF when final/shareable fixed layout is implied; ask only when neither is inferable.
 2. Should generation support producing both native OOXML and a PDF companion in one user request? Proposed behavior: two independent tool calls/artifact records, never one hidden secondary output.
@@ -615,11 +615,11 @@ The eval harness must inspect tool calls and, for selected cases, execute agains
 11. Should XLSX cells beginning with `=`, `+`, `-`, or `@` from user/source text default to literal strings unless explicitly typed as formulas? Proposed: yes; formulas require an explicit formula node in the specification.
 12. Should generated artifacts be indexed as searchable documents automatically? Proposed: no in this PRD; avoid circular ingestion and duplicate storage until separately specified.
 
-## 17. Approval gate
+## 17. approval gate
 
 Implementation must not begin until the user explicitly approves this PRD and the decisions in §16 that materially affect architecture, UX, limits, deletion, or security are locked. After approval, derive the ordered tasks above into the agent TODO list and map each acceptance criterion to exact test/eval commands before changing product code.
 
-## 18. Codex/implementation handoff contract
+## 18. Implementation handoff
 
 - **Source of truth:** `/opt/data/miniscira-src/tasks/prd-document-generation.md`, plus `AGENTS.md`, `docs/PRODUCT_PLANNING.md`, `docs/ENGINEERING_INVARIANTS.md`, `docs/DEVELOPMENT_PRINCIPLES.md`, `docs/DEPLOYMENT.md`, and `docs/UMBREL_SANDBOX_OPERATIONS.md`.
 - **Repository context:** `/opt/data/miniscira-src`; durable app data remains in Postgres and `/data/uploads`; Sandbox operations must retain the existing middleware/network/egress invariants.
@@ -629,4 +629,4 @@ Implementation must not begin until the user explicitly approves this PRD and th
 - **Acceptance:** follow tasks T-001 through T-033 in dependency order; stop and ask if a §16 decision remains unresolved; do not substitute a simpler flattened format; run every required test/eval/acceptance gate; report file-level changes and real execution evidence.
 - **Implementation prompt:** “Implement only the explicitly approved PRD at `tasks/prd-document-generation.md`. Follow `AGENTS.md` and every linked applicable document. Resolve Phase 0 decisions before product code. Do not expand scope, weaken native-format/security acceptance, or improvise unresolved UX/architecture decisions. Keep one atomic TODO in progress, run mapped focused checks after each task and full verification before completion, exercise the real browser and Sandbox flows for all four formats, and report exact files changed plus test/eval/deployment evidence. Stop if ambiguity remains.”
 
-> **Review request:** Please review and explicitly approve or request changes. Draft status alone does not authorize implementation.
+> **Review request:** Please review and explicitly approve or request changes. Draft status alone does not allow implementation.

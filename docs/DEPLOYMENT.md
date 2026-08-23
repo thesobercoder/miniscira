@@ -1,20 +1,10 @@
-# MiniScira — Deployment & Operations Runbook
+# MiniScira deployment and operations runbook
 
-Operational companion to the README quickstart. Everything here applies to
-self-hosted Docker Compose deployments of this repository. The compose file
-ships the full stack: app image, bundled Postgres + pgvector, a one-shot
-migration service, named volumes, and healthchecks. External/managed Postgres
-is supported via the `docker-compose.external-db.yml` override.
+This runbook expands on the README quickstart. It covers self-hosted Docker Compose deployments of this repository. The Compose file includes the app image, Postgres with pgvector, a one-time migration service, named volumes, and health checks. Use the `docker-compose.external-db.yml` override for an external or managed Postgres database.
 
-For Soham's concrete Umbrel/Portainer Stack 30 deployment—including the direct
-Docker-socket middleware, Squid egress policy, image IDs, scratch/production
-acceptance gates, upstream-sync policy, UI-stall diagnosis, and rollback—use
-[`docs/UMBREL_SANDBOX_OPERATIONS.md`](./UMBREL_SANDBOX_OPERATIONS.md) as the
-canonical operator runbook.
+For Soham's Umbrel/Portainer Stack 30 deployment, use [`docs/UMBREL_SANDBOX_OPERATIONS.md`](./UMBREL_SANDBOX_OPERATIONS.md). That runbook is the source of truth for the direct Docker-socket middleware, Squid egress policy, image IDs, scratch and production acceptance tests, upstream sync, UI stall diagnosis, and rollback.
 
-> **One-line rule**: deployment configuration is environment-driven. Every
-> model call goes through the mandatory `AI_GATEWAY_BASE_URL`, with no baked-in
-> gateway fallback. See the matrix below for the other required settings.
+> **Rule:** Environment variables control deployment. Every model call uses the required `AI_GATEWAY_BASE_URL`. There is no built-in gateway fallback. The table below lists the other required settings.
 
 ## Quickstart
 
@@ -28,18 +18,13 @@ docker compose up -d app
 curl http://localhost:3000/api/health               # {"ok":true}
 ```
 
-If you already have a database (e.g. you are adopting a running stack), still
-run the migrate step once — the service detects the existing schema and
-**stamps** the committed migrations as applied without executing DDL
-(baseline adoption).
+If you adopt an existing database, run the migration step once. The service detects the existing schema and marks, or **stamps**, the committed migrations as applied without running DDL. DDL means SQL that changes the schema. This process is called baseline adoption.
 
 ## Environment matrix
 
-`REQUIRED` variables are validated at application startup
-(`lib/env-check.ts`): the app fails fast with a clear error when one is
-missing. Everything else is optional — off or defaulted unless set.
+The app validates `REQUIRED` variables at startup in `lib/env-check.ts`. If one is missing, startup stops with a clear error. All other variables are optional. They stay off or use defaults when unset.
 
-### REQUIRED
+### Required
 
 | Variable | Purpose |
 | --- | --- |
@@ -49,7 +34,7 @@ missing. Everything else is optional — off or defaulted unless set.
 | `BETTER_AUTH_URL` | Browser-facing public origin of the app, such as `http://localhost:3000`, a LAN URL, or the external HTTPS URL behind a reverse proxy. |
 | `POSTGRES_PASSWORD` | Read by compose from ITS interpolation environment (the root `.env`), not the app's `env_file`. Must match `DATABASE_URL`. |
 
-### OPTIONAL (the ones that matter most)
+### Main optional settings
 
 | Variable | Purpose |
 | --- | --- |
@@ -69,10 +54,9 @@ missing. Everything else is optional — off or defaulted unless set.
 | `APP_PORT`, `IMAGE_PLATFORM`, `MINISCIRA_IMAGE` | Compose/build knobs. `APP_PORT` is the published host port (default `3000`). |
 | `DEMO_MODE` | `"true"` serves a landing page instead of the app. Leave unset when self-hosting. |
 
-The full matrix with inline comments lives in `.env.example` — it is the
-single source of truth for deployment configuration.
+`.env.example` contains the full table and inline comments. It is the source of truth for deployment settings.
 
-## Database & migrations
+## Database and migrations
 
 - **Committed migrations are the contract.** Schema changes live in
   `lib/db/migrations/` (Drizzle journal + SQL). Apply them once with the
@@ -133,7 +117,7 @@ single source of truth for deployment configuration.
   gateway supports images depends on its backend; the tool reports failure
   gracefully when it does not.
 
-## Health & readiness
+## Health and readiness
 
 - `GET /api/health` — the Next.js app is up AND the database responds
   (`SELECT 1`). `{"ok":true}`.
@@ -144,11 +128,9 @@ single source of truth for deployment configuration.
   allows up to 60s to production health) — the healthcheck's `start_period`
   is 60s; do not mark the container unhealthy during boot.
 
-## Supervision & process model
+## Supervision and process model
 
-The app runs **two processes that behave like one**: the Next.js server
-(`:3000`) and the eve agent runtime (`:4274`), with `/eve/v1/*` rewritten from
-the app to the agent so the browser sees a single origin (no CORS).
+The app runs two supervised processes: the Next.js server on `:3000` and the Eve agent runtime on `:4274`. The app rewrites `/eve/v1/*` requests to Eve. The browser therefore uses one origin and does not need CORS.
 
 The container entrypoint (`scripts/entrypoint.mjs`) orchestrates startup:
 
@@ -168,7 +150,7 @@ forwarded and zombies reaped. **Restart behavior is measured with
 `RestartCount` and `StartedAt`**: `unless-stopped` reuses the same container
 ID across restarts.
 
-## Storage & volumes
+## Storage and volumes
 
 - `miniscira-db` — Postgres data (`/var/lib/postgresql/data`). All users,
   chats, sessions, lookouts, and vector data live here.
@@ -180,10 +162,9 @@ ID across restarts.
   pre-migration-era database, run the migrate service once to stamp the
   baseline (no DDL).
 
-## Backups & restore
+## Backups and restore
 
-Back up the database and the uploads volume. Both are needed for a full
-restore.
+Back up both the database and the uploads volume. A full restore needs both.
 
 ```bash
 # database (logical dump; run against the db container or your external PG)
@@ -214,7 +195,7 @@ A restore into a fresh database requires the pgvector extension: either use
 the bundled `db` service (it includes pgvector) or run
 `CREATE EXTENSION IF NOT EXISTS vector;` first.
 
-## Upgrades & rollback
+## Upgrades and rollback
 
 Upgrade path:
 
@@ -262,10 +243,9 @@ the pre-upgrade backup before rolling back the code.
 - Publish on the LAN via `APP_PORT` (default `3000`); terminate TLS at the
   proxy.
 
-## Gateway capability surfaces
+## Gateway features
 
-The app depends on an OpenAI-compatible endpoint. Capabilities are exercised
-**independently** — a gateway may support some and not others:
+The app needs an OpenAI-compatible endpoint. It uses each feature separately, so a gateway may support some features but not others:
 
 - **chat / streaming** — required for agent turns.
 - **tools (function calling)** — required for the researcher subagent and
@@ -276,7 +256,7 @@ The app depends on an OpenAI-compatible endpoint. Capabilities are exercised
   a working catalog endpoint yields an empty picker (metadata can label, but
   cannot invent, models).
 
-## Firecrawl & search (degraded mode)
+## Firecrawl and search without providers
 
 - The agent's only web access is the search tools: Exa, Firecrawl,
   xAI (X search), You.com (Reddit). With none configured, the agent cannot
@@ -287,7 +267,7 @@ The app depends on an OpenAI-compatible endpoint. Capabilities are exercised
   the failure and the turn continues — research quality degrades, the app
   does not crash.
 
-## Sandbox & platform notes
+## Sandbox and platform notes
 
 - **The sandbox uses Eve's Docker backend** through a private Docker-API
   middleware sidecar. On the validated Umbrel deployment, only that middleware
@@ -315,13 +295,9 @@ The app depends on an OpenAI-compatible endpoint. Capabilities are exercised
   ARM64 hosts build and run under emulation (`IMAGE_PLATFORM` keeps build and
   runtime in sync); expect slower builds.
 
-## Resource guidance (light)
+## Basic resource guidance
 
-A household/LAN deployment (app + eve + bundled Postgres) is comfortable on
-~2 vCPU / 4 GB RAM. Research turns are the load driver — memory usage grows
-with long transcripts and parallel sub-agent work; give the container headroom
-if you run many simultaneous users. The uploads volume grows with file
-attachments; the Postgres volume grows with chats and vector embeddings.
+For a household or LAN deployment, the app, Eve, and bundled Postgres usually need about 2 vCPU and 4 GB RAM. Research turns use the most resources. Long transcripts and parallel subagent work increase memory use, so allow more capacity for many concurrent users. File attachments grow the uploads volume. Chats and vector embeddings grow the Postgres volume.
 
 ## Troubleshooting
 

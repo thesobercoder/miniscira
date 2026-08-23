@@ -1,20 +1,20 @@
-# Draft PRD: Natural-Language Image Editing
+# Draft PRD: natural-language image editing
 
-**Status:** Draft — requires explicit user approval before implementation
+**Status:** Draft. Requires explicit user approval before implementation.
 **Backlog:** [MiniScira Backlog](../docs/PRODUCT_IDEAS.md)
 **Repository:** `/opt/data/miniscira-src`
 **Drafted:** 2026-08-23
-**Scope:** Full backlog scope; no implementation is authorized by this document.
+**Scope:** Full backlog scope. This document does not authorize implementation.
 
 ## 1. Overview
 
 MiniScira already lets a signed-in user upload images as vision attachments and generate new images with `generate_image`. It does not let the user ask for a durable edit of an existing image. The current generation tool explicitly excludes editing, generated files have no database artifact record or version lineage, image routing assumes one `IMAGE_MODEL`, and the timeline only understands generation progress/success/failure.
 
-This feature adds conversational image editing across chats containing multiple images. A user can click any eligible image to make it the current editing target, see that target clearly in the editing workspace and composer, describe the change in natural language, and switch targets without losing conversational context. Each submitted edit still has exactly one explicit source image. MiniScira automatically invokes an editing-capable image backend. The original remains unchanged. Every successful result is stored as a new durable, authorized artifact with lineage back to its source image and originating chat turn. Progress, success, and actionable failure states appear directly in the conversation.
+This feature adds conversational image editing across chats containing multiple images. A user can click any eligible image to make it the current editing target, see that target clearly in the editing workspace and composer, describe the change in natural language, and switch targets without losing conversational context. Each submitted edit still has exactly one explicit source image. MiniScira automatically invokes an editing-capable image backend. The original remains unchanged. Every successful result is stored as a new durable, authorized artifact with lineage back to its source image and originating chat turn. Progress, success, and failure states with clear next steps appear directly in the conversation.
 
 The ordinary UI must not expose provider, endpoint, or backend selection. Operators configure eligible image models and capability metadata; MiniScira routes automatically and fails clearly when no configured route can edit.
 
-## 2. Evidence and Current Constraints
+## 2. Evidence and current constraints
 
 ### 2.1 Repository constraints inspected
 
@@ -55,9 +55,9 @@ The user supplied four ChatGPT image-editing screenshots as interaction referenc
 
 MiniScira must adapt these principles to its existing component vocabulary, spacing, typography, colors, motion tokens, timeline, and responsive behavior. It must not copy ChatGPT's layout, labels, control grouping, or styling.
 
-## 3. Problem Statement
+## 3. Problem statement
 
-Users can discuss an uploaded image, but asking “remove the person in the background” cannot produce a revised file. They must leave MiniScira, lose conversational context, manually use another editor, and re-upload the result. This breaks the product's durable, visible-work workflow and makes iterative visual work cumbersome.
+Users can discuss an uploaded image, but asking "remove the person in the background" cannot produce a revised file. They must leave MiniScira, lose conversational context, manually use another editor, and re-upload the result. This breaks the product's durable, visible-work workflow and makes iterative visual work cumbersome.
 
 A correct solution must address more than an image API call:
 
@@ -83,7 +83,7 @@ A correct solution must address more than an image API call:
 - Degrade clearly when generation is available but editing is not.
 - Provide unit, integration, migration, security, browser/E2E, live gateway acceptance, and model-eval gates.
 
-## 5. Success Metrics and Service Targets
+## 5. Success metrics and service targets
 
 These are release gates or post-release measurements, not promises about an external provider.
 
@@ -92,13 +92,13 @@ These are release gates or post-release measurements, not promises about an exte
 - **Source safety:** 100% of successful edits preserve the source blob checksum and create a different artifact ID/storage key.
 - **Authorization:** 100% of cross-user source, metadata, and byte-delivery probes return 404/403 without leaking existence or metadata.
 - **Durability:** 100% of successful test edits remain visible and downloadable after page reload and Eve reconnect.
-- **Failure clarity:** 100% of enumerated failure fixtures map to a stable user-facing error class and recovery guidance.
+- **Failure clarity:** 100% of listed failure fixtures map to a stable error class shown to users and recovery guidance.
 - **Latency instrumentation:** record queue/start/provider/storage/total durations. Initial soft target: p50 under 45 seconds and p95 under 120 seconds on the validated production backend; exceeding the target is visible in telemetry but does not convert a valid result into failure.
 - **Quality:** the edit-quality evaluation suite meets the thresholds in section 16 before a backend/model is marked production-capable.
 
-## 6. Personas and User Stories
+## 6. Personas and user stories
 
-### US-001: Edit a newly attached image
+### US-001: edit a newly attached image
 
 **Description:** As a user, I want to attach an image and describe a change in the same message so that MiniScira returns the revised image.
 
@@ -111,18 +111,18 @@ These are release gates or post-release measurements, not promises about an exte
 - [ ] Reloading the chat preserves the source attachment, progress terminal state, and output.
 - [ ] Browser verification covers desktop, narrow screen, keyboard access, and reduced motion.
 
-### US-002: Edit an earlier image in the current chat
+### US-002: edit an earlier image in the current chat
 
-**Description:** As a user, I want to say “make the last image warmer” so that I can iterate without re-uploading it.
+**Description:** As a user, I want to say "make the last image warmer" so that I can iterate without re-uploading it.
 
 **Acceptance criteria:**
 
-- [ ] “Last image” resolves deterministically to the most recent user-owned image artifact visible before the current turn.
+- [ ] "Last image" resolves deterministically to the most recent user-owned image artifact visible before the current turn.
 - [ ] A precise reference such as a selected image/version resolves to that ID.
 - [ ] If two or more plausible images remain and recency does not resolve the wording, the agent asks one focused clarification and does not call the edit backend.
 - [ ] Images from other users or inaccessible chats never enter the candidate set.
 
-### US-003: Preserve versions and branches
+### US-003: preserve versions and branches
 
 **Description:** As a user, I want every edit to preserve previous versions so that I can compare, download, or branch from any result.
 
@@ -134,7 +134,7 @@ These are release gates or post-release measurements, not promises about an exte
 - [ ] The UI labels the source/result relationship and can open the immediate parent.
 - [ ] Deleting a child does not delete its parent; parent deletion behavior follows section 12.
 
-### US-004: Automatic backend routing
+### US-004: automatic backend routing
 
 **Description:** As a user, I want MiniScira to choose a capable backend automatically so that I do not need provider knowledge.
 
@@ -146,7 +146,7 @@ These are release gates or post-release measurements, not promises about an exte
 - [ ] A failed preferred route may fall through only to another explicitly edit-capable route, never to a generation-only model.
 - [ ] The persisted result records selected model ID and attempt summaries for operator diagnosis, while ordinary UI shows provider-neutral messaging.
 
-### US-005: Understand unsupported deployments
+### US-005: understand unsupported deployments
 
 **Description:** As a user, I want a clear explanation when this deployment cannot edit images so that I know the request was understood and what I can do.
 
@@ -157,7 +157,7 @@ These are release gates or post-release measurements, not promises about an exte
 - [ ] The source image remains unchanged and no result row is marked successful.
 - [ ] Operators receive a diagnostic naming the capability/configuration issue without secrets.
 
-### US-006: Recover from failures
+### US-006: recover from failures
 
 **Description:** As a user, I want failures to be specific and retryable when safe so that I do not lose my image or instruction.
 
@@ -169,18 +169,18 @@ These are release gates or post-release measurements, not promises about an exte
 - [ ] A storage failure after provider success never displays a temporary provider URL as a durable result.
 - [ ] Failed attempts are durable enough for diagnosis but never masquerade as artifact versions.
 
-### US-007: Keep images private
+### US-007: keep images private
 
 **Description:** As a user, I want only authorized users to access my source and edited images.
 
 **Acceptance criteria:**
 
-- [ ] Metadata queries and byte delivery verify ownership server-side.
+- [ ] Metadata queries and byte delivery verify ownership on the server.
 - [ ] Guessing another user's artifact ID, document ID, or storage path returns no bytes or metadata.
 - [ ] Provider requests contain only the selected source/mask bytes and required prompt/options.
 - [ ] Logs and events omit base64 image data, credentials, signed URLs, and full private prompts by default.
 
-### US-008: Use a mask when explicitly supplied
+### US-008: use a mask when explicitly supplied
 
 **Description:** As an advanced user, I want to attach an optional mask so that I can constrain an edit to a region.
 
@@ -191,7 +191,7 @@ These are release gates or post-release measurements, not promises about an exte
 - [ ] A backend lacking mask support is not selected for a masked request.
 - [ ] An invalid mask fails before provider invocation with corrective guidance.
 
-### US-009: Select one image from a multi-image conversation
+### US-009: select one image from a multi-image conversation
 
 **Description:** As a user, I want to click an image in a conversation and make it the current editing target so that I can move naturally among several images without referring to filenames or guessing which one MiniScira will change.
 
@@ -220,7 +220,7 @@ These are release gates or post-release measurements, not promises about an exte
 - Automatic model selection, capability probing, deterministic fallback, and unsupported behavior.
 - Immutable artifact/version lineage, including branches.
 - Durable local storage and Postgres metadata.
-- Timeline progress, terminal success/failure, result preview, provenance, open/download, and “edit this version” affordance.
+- Timeline progress, terminal success/failure, result preview, provenance, open/download, and "edit this version" affordance.
 - Privacy, authorization, retention/deletion rules, observability, backups, deployment, rollback, and model qualification.
 - Existing JPEG, PNG, WebP, GIF, AVIF, HEIC, and BMP uploads may still be accepted for vision, but the edit pipeline must normalize only formats its backend contract safely supports.
 
@@ -228,7 +228,7 @@ These are release gates or post-release measurements, not promises about an exte
 
 - No pixel-level canvas editor, brushes, layers, crop handles, filters panel, or Photoshop-style UI.
 - No ordinary-user provider/model/endpoint controls.
-- No destructive overwrite, “save in place,” or mutation of source bytes.
+- No destructive overwrite, "save in place," or mutation of source bytes.
 - No video editing, animation editing, 3D editing, or audio editing.
 - No face swap, identity cloning workflow, watermark removal promise, or bypass of provider safety policy.
 - No guarantee of exact typography, logos, identity, or fine-detail preservation beyond measured backend capability.
@@ -238,15 +238,15 @@ These are release gates or post-release measurements, not promises about an exte
 - No indefinite provider retry loop and no fallback from editing to text-to-image generation.
 - No implementation work before explicit PRD approval and a derived execution TODO/test/eval plan.
 
-## 8. Product and UX Requirements
+## 8. Product and UX requirements
 
 ### 8.1 Source selection
 
-- **UX-1:** The primary flow is “attach image + instruction + send.” No extra mode toggle is required.
-- **UX-2:** Every eligible rendered image exposes a consistent accessible “Edit image” action. Clicking the image or invoking that action stages its durable artifact reference and opens or updates the focused editing workspace.
-- **UX-3:** Textual references resolve as follows: explicit selected artifact ID first; image attached to the current turn second; unambiguous ordinal/name reference third; “last/this image” to the most recent eligible image before the turn fourth; otherwise ask for clarification.
+- **UX-1:** The primary flow is "attach image + instruction + send." No extra mode toggle is required.
+- **UX-2:** Every eligible rendered image exposes a consistent accessible "Edit image" action. Clicking the image or invoking that action stages its durable artifact reference and opens or updates the focused editing workspace.
+- **UX-3:** Textual references resolve as follows: explicit selected artifact ID first; image attached to the current turn second; unambiguous ordinal/name reference third; "last/this image" to the most recent eligible image before the turn fourth; otherwise ask for clarification.
 - **UX-4:** Filename matching is advisory only. Execution always receives and authorizes a durable source ID.
-- **UX-5:** A user may analyze an image without editing it. The agent must distinguish verbs/intent and not edit merely because an image is attached.
+- **UX-5:** A user may analyze an image without editing it. The agent must distinguish analysis from edit requests. An attached image alone must not trigger an edit.
 
 ### 8.2 Focused editing workspace
 
@@ -263,16 +263,16 @@ These are release gates or post-release measurements, not promises about an exte
 
 ### 8.3 Timeline and result presentation
 
-- **UX-16:** Pending state label: “Editing image,” with a provider-neutral summary of the instruction and source thumbnail.
+- **UX-16:** Pending state label: "Editing image," with a provider-neutral summary of the instruction and source thumbnail.
 - **UX-17:** Long-running state remains connected to the durable Eve tool call and survives reconnects; do not introduce a separate browser-only job state.
-- **UX-18:** Success label: “Edited image.” Show the output with `object-contain`, descriptive alt text derived from the user instruction, source/version provenance, and open/download actions.
-- **UX-19:** Failure label is specific (“Image editing unavailable,” “Edit blocked,” “Edit timed out,” etc.) and includes a short next action.
+- **UX-18:** Success label: "Edited image." Show the output with `object-contain`, descriptive alt text derived from the user instruction, source/version provenance, and open/download actions.
+- **UX-19:** Failure label is specific ("Image editing unavailable," "Edit blocked," "Edit timed out," etc.) and includes a short next action.
 - **UX-20:** Never show raw provider stack traces, model payloads, keys, or internal paths.
 - **UX-21:** The user can retry a failed edit and can start a new edit from any successful version.
 - **UX-22:** UI states cover loading, empty/no-source, ambiguity, unsupported, validation, moderation, transient provider error, permanent provider error, post-provider storage failure, missing backing file, and deleted source/result.
 - **UX-23:** All controls are keyboard reachable; progress has a live-region announcement that does not repeatedly spam screen readers; animation obeys existing motion tokens and reduced-motion preferences.
 
-## 9. Functional Requirements
+## 9. Functional requirements
 
 ### Intent and invocation
 
@@ -303,7 +303,7 @@ These are release gates or post-release measurements, not promises about an exte
 
 ### Image preparation and provider call
 
-- **FR-18:** Read source bytes from owned durable storage server-side. Do not send the app's private-host URL to the provider.
+- **FR-18:** Read source bytes from owned durable storage on the server. Do not send the app's private-host URL to the provider.
 - **FR-19:** Verify content by magic bytes/decoder, not browser-supplied MIME alone; reject malformed or decompression-bomb images.
 - **FR-20:** Strip nonessential metadata (including EXIF GPS) from provider-bound normalized copies. Preserve original bytes untouched.
 - **FR-21:** Define bounded normalization for backend-supported formats. Animated images are treated as a single documented frame or rejected; behavior must not be silent.
@@ -332,7 +332,7 @@ These are release gates or post-release measurements, not promises about an exte
 - **FR-38:** Deleting a chat must follow the existing chat retention semantics. This feature must not silently delete artifacts that future Library behavior expects to survive without an approved lifecycle decision.
 - **FR-39:** Missing backing files are explicit (`missing`) and render an actionable state rather than a broken image.
 
-## 10. Proposed Architecture
+## 10. Proposed architecture
 
 ```text
 Browser composer/result action
@@ -369,7 +369,7 @@ Names are proposed and may change during approved implementation only if equival
 - `app/api/artifacts/[id]/route.ts`: authorized metadata.
 - `app/api/artifacts/[id]/file/route.ts`: authorized bytes/download response.
 - `components/timeline/parts.ts` and `components/timeline/nodes/research.tsx`: classify and render `edit_image` separately from generation.
-- `components/chat/*` / `components/research-chat.tsx`: stage explicit artifact references and “Edit this image.”
+- `components/chat/*` / `components/research-chat.tsx`: stage explicit artifact references and "Edit this image."
 - `lib/db/schema.ts` plus committed migration: artifact/version/attempt persistence.
 
 ### 10.2 State machine
@@ -394,7 +394,7 @@ ready -> missing (reconciliation detects absent/corrupt blob)
 
 State transitions must be conditional/idempotent; a late provider response cannot overwrite a timeout/cancel terminal state without an explicit reconciliation policy.
 
-## 11. Storage and Versioning Design
+## 11. Storage and versioning design
 
 ### 11.1 Data model
 
@@ -427,7 +427,7 @@ Required indexes/constraints:
 
 - Uploaded or generated source is root version `v1` for its lineage.
 - Every edit points to exactly one direct parent and the same root.
-- Display labels may use branch-aware “Version” language, but numeric labels are presentation only; parent IDs are the authority.
+- Display labels may use branch-aware "Version" language, but numeric labels are presentation only; parent IDs are the authority.
 - No automatic pruning or overwrite in this PRD.
 - Retention policy applies to blobs and rows together and must preserve tombstone lineage.
 
@@ -440,7 +440,7 @@ Required indexes/constraints:
 - Historical generated images exist only in Eve tool outputs/local files and may lack a direct database owner mapping. Do not infer ownership from URL alone. Leave them as legacy timeline images unless chat-event provenance can be verified in a reviewed migration script.
 - Migration rollback must not delete blobs or existing document rows.
 
-## 12. Privacy, Security, and Lifecycle
+## 12. Privacy, security, and lifecycle
 
 - **PRIV-1:** Images are private user data. Source/mask/output bytes must be sent only to the configured AI gateway route selected for that request.
 - **PRIV-2:** The UI should disclose in deployment/privacy documentation that editing transmits image bytes and instructions to the operator-configured gateway/provider.
@@ -455,7 +455,7 @@ Required indexes/constraints:
 - **PRIV-11:** Provider safety/moderation failures are surfaced without trying to bypass them through another model.
 - **PRIV-12:** Deletion must be auditable and scoped. Database deletion without blob deletion and blob deletion without a corresponding row state are both observable reconciliation failures.
 
-## 13. Automatic Backend Routing
+## 13. Automatic backend routing
 
 ### 13.1 Configuration contract
 
@@ -485,7 +485,7 @@ Add a dedicated environment-backed schema, proposed as `IMAGE_MODELS_JSON`, rath
 - Schema-validate at startup and fail fast on malformed configuration.
 - Unknown model IDs are allowed as dormant metadata but become eligible only when present in the live gateway catalog.
 - Capability claims are conservative. Absence of `edit: true` means not eligible.
-- Provider-specific options are allowlisted and server-side; do not accept arbitrary options from the model/user.
+- The server stores an allowlist of provider-specific options. Do not accept arbitrary options from the model or user.
 
 ### 13.2 Capability probe
 
@@ -515,7 +515,7 @@ Add a dedicated environment-backed schema, proposed as `IMAGE_MODELS_JSON`, rath
 - **All routes temporarily degraded:** `IMAGE_EDIT_TEMPORARILY_UNAVAILABLE`; preserve retry action.
 - Never convert an edit request into `generate_image` as fallback.
 
-## 14. Failure Taxonomy and Recovery
+## 14. Failure taxonomy and recovery
 
 | Code | Trigger | Retry policy | User-facing recovery |
 |---|---|---|---|
@@ -539,7 +539,7 @@ Add a dedicated environment-backed schema, proposed as `IMAGE_MODELS_JSON`, rath
 
 Failures returned through tool output must be structured (`code`, safe `message`, `retryable`, optional `retryAfterMs`, `attemptId`) so timeline copy does not parse provider strings.
 
-## 15. Observability and Cost Controls
+## 15. Observability and cost controls
 
 ### 15.1 Structured events/metrics
 
@@ -574,7 +574,7 @@ Metrics:
 - User-facing timeline remains provider-neutral; operator logs/admin diagnostics may name models.
 - Add a deployment validation command that reports route catalog presence, contract probe status, qualified canary result, storage write/read, and cleanup.
 
-## 16. Test and Evaluation Plan
+## 16. Test and evaluation plan
 
 ### 16.1 Unit tests
 
@@ -607,14 +607,14 @@ Metrics:
 
 Use the repository's approved browser automation approach chosen during implementation; add a real E2E harness if none exists rather than treating component snapshots as user-flow proof.
 
-1. Attach PNG + “remove the red cup” -> progress -> result -> reload -> result persists.
-2. Click “Edit this image” on result -> “make the wall blue” -> child version appears.
+1. Attach PNG + "remove the red cup" -> progress -> result -> reload -> result persists.
+2. Click "Edit this image" on result -> "make the wall blue" -> child version appears.
 3. Branch twice from the same parent and verify both children/source links.
-4. Refer to “last image” and verify deterministic source.
+4. Refer to "last image" and verify deterministic source.
 5. Click image A, switch to image B, submit an edit, and verify only image B's durable ID reaches the tool while image A remains unchanged.
 6. Clear the active image and verify the composer returns to ordinary chat mode without deleting conversation attachments.
 7. Two ambiguous images with no explicit UI selection -> clarification, zero provider calls.
-8. Ask “what is in this image?” -> no edit call.
+8. Ask "what is in this image?" -> no edit call.
 9. Ask to generate a new lighthouse -> generation call, no edit call.
 10. Generation-only deployment -> clear unsupported state, no generated substitute.
 11. Mask route success and invalid-mask preflight failure.
@@ -628,24 +628,24 @@ Create `evals/image-editing.eval.ts` and fixture-driven cases. The eval harness 
 
 **Positive edit cases (must call `edit_image` exactly once):**
 
-- attached image: “Remove the person in the background.”
-- attached image: “Change the wall to sage green but keep everything else.”
-- prior result selected: “Extend this to a landscape banner.”
-- explicit previous image: “Restyle version 2 as a watercolor.”
-- masked request: “Replace only the masked area with flowers.”
+- attached image: "Remove the person in the background."
+- attached image: "Change the wall to sage green but keep everything else."
+- prior result selected: "Extend this to a landscape banner."
+- explicit previous image: "Restyle version 2 as a watercolor."
+- masked request: "Replace only the masked area with flowers."
 
 **Clarification cases (must call neither image tool before asking):**
 
-- two eligible images: “Make it brighter.”
-- “Edit the logo” when no image is attached or selected.
+- two eligible images: "Make it brighter."
+- "Edit the logo" when no image is attached or selected.
 
 **Negative routing cases (must not call `edit_image`):**
 
-- “Describe this image.”
-- “Generate an image of a lighthouse.”
-- “Chart Q1 120, Q2 145.”
-- “Crop this PDF page” when PDF editing is unsupported.
-- “Can your backend edit images?” (answer capability question; no edit).
+- "Describe this image."
+- "Generate an image of a lighthouse."
+- "Chart Q1 120, Q2 145."
+- "Crop this PDF page" when PDF editing is unsupported.
+- "Can your backend edit images?" (answer capability question; no edit).
 
 **Routing pass thresholds:**
 
@@ -670,7 +670,7 @@ Minimum fixture set:
 7. **Masked local edit:** room + binary/alpha mask over rug; change rug pattern only.
 8. **Identity/detail preservation:** synthetic face/character with known attributes; change shirt color only.
 9. **Text preservation:** package with short legible synthetic label; change background only.
-10. **No-op/minimal edit:** “Increase brightness slightly”; detect destructive regeneration.
+10. **No-op/minimal edit:** "Increase brightness slightly"; detect destructive regeneration.
 
 For each backend/model candidate, run at least 3 seeds/attempts per fixture where the provider permits, retain outputs in a non-production eval artifact area, and score:
 
@@ -717,7 +717,7 @@ git diff --check
 
 Also run focused image-edit tests, `evals/image-editing.eval.ts`, existing `evals/image-generation.eval.ts`, migration tests, browser/E2E suite, and the live synthetic acceptance command. `bun run check` may modify files; inspect the diff and rerun affected tests.
 
-## 17. Acceptance Criteria and Traceability
+## 17. Acceptance criteria and traceability
 
 | Acceptance ID | Requirement | Verification |
 |---|---|---|
@@ -743,35 +743,35 @@ Also run focused image-edit tests, `evals/image-editing.eval.ts`, existing `eval
 
 Release requires every AC to have passing evidence. A health endpoint alone is not acceptance evidence.
 
-## 18. Ordered Implementation Task Decomposition
+## 18. Ordered implementation task decomposition
 
 Derive execution TODOs from this list only after explicit PRD approval. Keep one implementation TODO in progress at a time unless an approved delegation plan says otherwise.
 
-1. **T-01 — Lock open product/operator decisions.** Resolve section 19, finalize route config schema, limits, retention, cancellation, and artifact generalization. No code before this gate.
-2. **T-02 — Build live gateway spike and fixtures.** Create synthetic source/mask, verify exact AI SDK request/response for each candidate route, accepted formats, options, timeout, moderation/error shapes, and mask semantics. Keep spike artifacts outside production data and document findings.
-3. **T-03 — Add stable domain types/error taxonomy.** Create image-edit request/result/capability/status/error types and unit tests.
-4. **T-04 — Add route configuration and startup validation.** Parse dedicated image model metadata, intersect live catalog, fail fast on malformed config, and test dormant/unknown/generation-only/edit-capable entries.
-5. **T-05 — Implement capability qualification/probe abstraction.** Add contract/canary status model, cache, diagnostics, and tests without user data.
-6. **T-06 — Add artifact/version schema and committed migration.** Include constraints/indexes/idempotency/attempt records; generate migration; test fresh/populated DB and rollback compatibility.
-7. **T-07 — Add safe migration/backfill path.** Backfill owned upload images idempotently, report missing blobs, leave unverifiable legacy generated URLs untouched.
-8. **T-08 — Refactor local storage for opaque keys and atomic writes.** Add checksum/dimensions metadata, safe delete/read APIs, and failure-injection tests while preserving existing uploads.
-9. **T-09 — Add authorized artifact metadata/file APIs.** Enforce owner checks, safe headers, download names, missing/tombstone states, rate limits, and cross-user tests.
-10. **T-10 — Integrate new uploads and image generation with artifact records.** Preserve document behavior; make all new source/generated images editable and durable; retain existing generation evals.
-11. **T-11 — Implement image normalization/security pipeline.** Decoder/magic-byte checks, pixel/byte limits, EXIF stripping, format normalization, animation policy, mask validation, and malicious fixture tests.
-12. **T-12 — Implement deterministic router and retry policy.** Eligibility filtering, priority, transient fallback, no generation fallback, sanitized attempts, and exhaustive matrix tests.
-13. **T-13 — Implement provider adapter with user credential.** Use structured AI SDK editing prompt, abort/timeouts, provider options allowlist, response validation, metadata capture, and stub integration tests.
-14. **T-14 — Implement artifact orchestration/idempotency.** Authorize source/mask, create attempt/pending artifact, call pipeline, atomically store/complete, handle duplicate/reconnect/concurrency, and test every failure edge.
-15. **T-15 — Add `edit_image` Eve tool and agent instructions.** Principal-derived execution, narrow schema, source resolution contract, no provider details in model-facing input, and structured output.
-16. **T-16 — Add routing eval suite.** Positive/clarification/negative fixtures across supported default chat models; meet 100% class thresholds.
-17. **T-17 — Add timeline classification/rendering.** Dedicated editing node, progress/source thumbnail/result/provenance/failures/retry, durable replay, accessibility, motion tokens, and component tests.
-18. **T-18 — Add multi-image focused editing workspace and composer flow.** Add consistent image-local entry points, current-chat eligible-image navigation, one active source state, selected styling/semantics, composer source context, atomic switching/clearing, preserved normal upload/analyze/generate behavior, ambiguity handling, responsive/touch/accessibility states, and browser checks. Adapt to MiniScira's design system rather than copying the reference UI.
-19. **T-19 — Add browser/E2E harness and cases.** Cover all cases in 16.3 with provider/storage stubs and authorization fixture users.
-20. **T-20 — Add image-quality eval runner and fixtures.** Commit manifest, automated scorers, report format, thresholds, and human review packet; qualify each enabled route.
-21. **T-21 — Add observability and reconciliation.** Sanitized metrics/logs, missing/corrupt blob scanner, storage/DB mismatch alerts, and no-secret log tests.
-22. **T-22 — Update deployment/privacy/backup documentation.** `.env.example`, `docs/DEPLOYMENT.md`, capability matrix, provider disclosure, backup/restore, troubleshooting, rate/cost limits, and unsupported behavior.
-23. **T-23 — Run full verification.** Focused tests, full quality gates, routing eval, quality eval, migration rehearsal, browser/E2E, security review, diff review.
-24. **T-24 — Deploy to a candidate image and run synthetic production acceptance.** Back up DB/uploads, apply migration explicitly, recreate services, verify both processes plus real edit flow, reconnect/reload, authorization, generation-only behavior, backup/restore sample, logs, and cleanup.
-25. **T-25 — Production rollout and source-control completion.** Roll out enabled routes gradually, monitor failure/latency/cost, retain previous immutable image, commit/push intended changes, verify clean tree and local HEAD equals `origin/main`.
+1. **T-01: Lock open product/operator decisions.** Resolve section 19, finalize route config schema, limits, retention, cancellation, and artifact generalization. No code before this gate.
+2. **T-02: Build live gateway spike and fixtures.** Create synthetic source/mask, verify exact AI SDK request/response for each candidate route, accepted formats, options, timeout, moderation/error shapes, and mask semantics. Keep spike artifacts outside production data and document findings.
+3. **T-03: Add stable domain types/error taxonomy.** Create image-edit request/result/capability/status/error types and unit tests.
+4. **T-04: Add route configuration and startup validation.** Parse dedicated image model metadata, intersect live catalog, fail fast on malformed config, and test dormant/unknown/generation-only/edit-capable entries.
+5. **T-05: Implement capability qualification/probe abstraction.** Add contract/canary status model, cache, diagnostics, and tests without user data.
+6. **T-06: Add artifact/version schema and committed migration.** Include constraints/indexes/idempotency/attempt records; generate migration; test fresh/populated DB and rollback compatibility.
+7. **T-07: Add safe migration/backfill path.** Backfill owned upload images idempotently, report missing blobs, leave unverifiable legacy generated URLs untouched.
+8. **T-08: Refactor local storage for opaque keys and atomic writes.** Add checksum/dimensions metadata, safe delete/read APIs, and failure-injection tests while preserving existing uploads.
+9. **T-09: Add authorized artifact metadata/file APIs.** Enforce owner checks, safe headers, download names, missing/tombstone states, rate limits, and cross-user tests.
+10. **T-10: Integrate new uploads and image generation with artifact records.** Preserve document behavior; make all new source/generated images editable and durable; retain existing generation evals.
+11. **T-11: Implement image normalization/security pipeline.** Decoder/magic-byte checks, pixel/byte limits, EXIF stripping, format normalization, animation policy, mask validation, and malicious fixture tests.
+12. **T-12: Implement deterministic router and retry policy.** Eligibility filtering, priority, transient fallback, no generation fallback, sanitized attempts, and exhaustive matrix tests.
+13. **T-13: Implement provider adapter with user credential.** Use structured AI SDK editing prompt, abort/timeouts, provider options allowlist, response validation, metadata capture, and stub integration tests.
+14. **T-14: Implement artifact orchestration/idempotency.** Authorize source/mask, create attempt/pending artifact, call pipeline, atomically store/complete, handle duplicate/reconnect/concurrency, and test every failure edge.
+15. **T-15: Add `edit_image` Eve tool and agent instructions.** Principal-derived execution, narrow schema, source resolution contract, no provider details in model-facing input, and structured output.
+16. **T-16: Add routing eval suite.** Positive/clarification/negative fixtures across supported default chat models; meet 100% class thresholds.
+17. **T-17: Add timeline classification/rendering.** Dedicated editing node, progress/source thumbnail/result/provenance/failures/retry, durable replay, accessibility, motion tokens, and component tests.
+18. **T-18: Add multi-image focused editing workspace and composer flow.** Add consistent image-local entry points, current-chat eligible-image navigation, one active source state, selected styling/semantics, composer source context, atomic switching/clearing, preserved normal upload/analyze/generate behavior, ambiguity handling, responsive/touch/accessibility states, and browser checks. Adapt to MiniScira's design system rather than copying the reference UI.
+19. **T-19: Add browser/E2E harness and cases.** Cover all cases in 16.3 with provider/storage stubs and authorization fixture users.
+20. **T-20: Add image-quality eval runner and fixtures.** Commit manifest, automated scorers, report format, thresholds, and human review packet; qualify each enabled route.
+21. **T-21: Add observability and reconciliation.** Sanitized metrics/logs, missing/corrupt blob scanner, storage/DB mismatch alerts, and no-secret log tests.
+22. **T-22: Update deployment/privacy/backup documentation.** `.env.example`, `docs/DEPLOYMENT.md`, capability matrix, provider disclosure, backup/restore, troubleshooting, rate/cost limits, and unsupported behavior.
+23. **T-23: Run full verification.** Focused tests, full quality gates, routing eval, quality eval, migration rehearsal, browser/E2E, security review, diff review.
+24. **T-24: Deploy to a candidate image and run synthetic production acceptance.** Back up DB/uploads, apply migration explicitly, recreate services, verify both processes plus real edit flow, reconnect/reload, authorization, generation-only behavior, backup/restore sample, logs, and cleanup.
+25. **T-25: Production rollout and source-control completion.** Roll out enabled routes gradually, monitor failure/latency/cost, retain previous immutable image, commit/push intended changes, verify clean tree and local HEAD equals `origin/main`.
 
 ### Task-to-acceptance mapping
 
@@ -783,7 +783,7 @@ Derive execution TODOs from this list only after explicit PRD approval. Keep one
 - T-21/T-22 -> AC-17, AC-18
 - T-23/T-24/T-25 -> all ACs as final evidence gates
 
-## 19. Deployment Plan
+## 19. Deployment plan
 
 ### 19.1 Pre-deployment
 
@@ -798,7 +798,7 @@ Derive execution TODOs from this list only after explicit PRD approval. Keep one
 
 1. Deploy schema-compatible app image with feature off.
 2. Run one-shot committed migration; verify existing uploads/chats.
-3. Enable one qualified route for operator/canary user if a server-side allowlist exists; otherwise enable during a quiet window with strict rate/concurrency limits.
+3. Enable one qualified route for an operator or canary user if the server has an allowlist. Otherwise, enable it during a quiet window with strict rate and concurrency limits.
 4. Run live synthetic edit, mask (if enabled), reload/reconnect, source/result delivery, cross-user denial, and cleanup.
 5. Monitor error codes, p50/p95, route fallbacks, storage mismatches, volume growth, and provider usage/cost.
 6. Expand enablement only after acceptance thresholds hold.
@@ -814,7 +814,7 @@ Derive execution TODOs from this list only after explicit PRD approval. Keep one
 - No secrets/base64/private paths appear in logs.
 - Repository source-control invariants pass after deployment.
 
-## 20. Rollback Plan
+## 20. Rollback plan
 
 ### 20.1 Feature-level rollback
 
@@ -843,14 +843,14 @@ Derive execution TODOs from this list only after explicit PRD approval. Keep one
 - migration or restore failure;
 - critical moderation bypass or secret/image leakage in logs.
 
-## 21. Open Questions Requiring Approval
+## 21. Open questions requiring approval
 
 1. **Artifact schema:** approve a generalized `artifact` table now (recommended) or an image-only table with later migration?
 2. **Lifecycle:** should artifacts survive source-chat deletion for the future Library, or follow chat deletion until Library is implemented? Recommended: retain as user-owned artifacts and tombstone chat provenance.
 3. **Feature flag:** deployment-wide flag only, or also a canary user allowlist?
 4. **Default limits:** maximum input/output bytes, pixel count, dimensions, concurrent edits per user, requests per minute/day, and total timeout.
 5. **Animated input:** reject GIF/animated WebP/AVIF for editing (recommended initially) or normalize the first frame with explicit UI warning?
-6. **HEIC/BMP:** normalize server-side if a safe decoder is available, or reject for editing while retaining vision-upload support?
+6. **HEIC/BMP:** normalize on the server if a safe decoder is available, or reject for editing while retaining vision-upload support?
 7. **Mask UX:** the reference screenshots demonstrate a useful localized-selection mode, but the current request explicitly locks multi-image target selection, not a painter. Is the first release allowed to expose masks through a second attachment role, or should a visual brush/mask mode become required? Current recommendation: keep the painter out of the first implementation unless separately approved.
 8. **Workspace presentation:** should the focused editor use an expanded in-chat surface or a route-backed full-screen overlay that returns to the same scroll position? Recommendation: route-backed responsive overlay on desktop and mobile, with the chat retained underneath and browser back closing the editor.
 9. **Prompt provenance:** store the full edit instruction in the artifact record (recommended for version history) or redact after a retention period?
@@ -862,7 +862,7 @@ Derive execution TODOs from this list only after explicit PRD approval. Keep one
 15. **Human quality review owner:** who approves backend qualification reports and model upgrades?
 16. **Route source of truth:** approve `IMAGE_MODELS_JSON`, or does the gateway have a reliable capability endpoint that should become authoritative in addition to `/models`?
 
-## 22. Decisions Locked Unless PRD Is Revised
+## 22. Decisions locked unless PRD is revised
 
 - Original images are immutable; each successful edit is a new durable artifact/version.
 - Image editing uses a dedicated tool and route, not generation fallback.
@@ -878,7 +878,7 @@ Derive execution TODOs from this list only after explicit PRD approval. Keep one
 - Failed attempts are not editable versions.
 - No implementation begins until explicit approval and derived TODO/test/eval plan.
 
-## 23. Codex/Implementation Handoff Contract
+## 23. Codex/implementation handoff contract
 
 When approved, the implementation packet must state:
 
@@ -893,6 +893,6 @@ When approved, the implementation packet must state:
 
 Implementation agents must follow the approved PRD exactly, ask/stop if ambiguity remains, avoid scope expansion, run all mapped verification, and never claim success from stubs, mocked-only flows, or health checks alone.
 
-## 24. Approval Gate
+## 24. Approval gate
 
 This is a **Draft PRD**, not implementation authorization. The next step is user review and explicit approval or requested revisions. Only after explicit approval may the backlog status become `PRD approved` and an execution TODO/test/eval plan be created from section 18.

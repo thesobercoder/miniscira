@@ -1,6 +1,6 @@
-# PRD: GitHub Repository Cloning and Analysis
+# PRD: GitHub repository cloning and analysis
 
-- **Status:** Draft — not approved for implementation
+- **Status:** Draft. Not approved for implementation.
 - **Roadmap scope:** Public repositories first; private repositories in a later phase of the same feature roadmap
 - **Source backlog:** [`docs/PRODUCT_IDEAS.md`](../docs/PRODUCT_IDEAS.md#clone-and-analyze-github-repositories)
 - **Repository:** `/opt/data/miniscira-src`
@@ -10,7 +10,7 @@
 
 MiniScira should let a signed-in user provide a GitHub repository URL and ask questions grounded in the repository's actual files, directory structure, configuration, and Git history. The system must clone the repository into an isolated per-task Sandbox, identify an immutable Git revision, index supported text content, retrieve relevant evidence, and answer with file-and-line citations pinned to that revision.
 
-The first product phase supports public GitHub repositories without credentials. A later phase supports private repositories through user-owned, narrowly scoped, revocable credentials. Both phases belong to this PRD so that the public implementation does not create data, lifecycle, authorization, citation, or Sandbox assumptions that make private support unsafe.
+The first product phase supports public GitHub repositories without credentials. A later phase supports private repositories through user-owned, revocable credentials with limited access. Both phases belong to this PRD so that the public implementation does not create data, lifecycle, authorization, citation, or Sandbox assumptions that make private support unsafe.
 
 Repository content is untrusted data. A README, source comment, issue template, generated file, Git commit message, or filename can contain instructions intended to manipulate the agent. MiniScira may read and quote such content as evidence, but repository text never becomes system or developer instructions. Cloning and read-only Git inspection are authorized by a repository-analysis request; running project code, build scripts, tests, package managers, hooks, or repository-provided commands is not authorized unless the user explicitly requests execution in a separate step and Sandbox policy permits it.
 
@@ -89,7 +89,7 @@ The following decisions are part of the proposed product contract. Implementatio
 
 ### 7.1 Entry points
 
-The minimum user-facing flow is conversational:
+The minimum flow shown to users is conversational:
 
 1. The user pastes a supported GitHub URL and asks a repository question.
 2. MiniScira recognizes the repository-analysis intent and shows a timeline step for URL validation and revision resolution.
@@ -135,7 +135,7 @@ The short SHA may link to the immutable GitHub commit URL. A branch name alone i
 
 ## 8. User stories
 
-### US-001: Recognize and validate a GitHub repository
+### US-001: recognize and validate a GitHub repository
 
 **Description:** As a signed-in user, I want MiniScira to recognize a GitHub repository URL so that I can ask questions without configuring a tool manually.
 
@@ -148,7 +148,7 @@ The short SHA may link to the immutable GitHub commit URL. A branch name alone i
 - [ ] Anonymous/app principals cannot create or access a repository analysis unless a separately approved internal use case defines ownership.
 - [ ] Unit and authorization tests pass.
 
-### US-002: Clone a bounded public repository in an isolated Sandbox
+### US-002: clone a bounded public repository in an isolated Sandbox
 
 **Description:** As a user, I want a public repository cloned safely so that MiniScira can inspect the actual source tree.
 
@@ -162,7 +162,7 @@ The short SHA may link to the immutable GitHub commit URL. A branch name alone i
 - [ ] No repository-provided executable is invoked during clone or preparation.
 - [ ] Sandbox integration and adversarial egress tests pass.
 
-### US-003: Pin an analysis to an immutable revision
+### US-003: pin an analysis to an immutable revision
 
 **Description:** As a user, I want to know exactly which commit was analyzed so that the answer remains reproducible after the repository changes.
 
@@ -176,7 +176,7 @@ The short SHA may link to the immutable GitHub commit URL. A branch name alone i
 - [ ] Follow-up questions reuse the pinned commit by default even if the remote branch advances.
 - [ ] Unit and end-to-end revision tests pass.
 
-### US-004: Inventory and index supported repository content
+### US-004: inventory and index supported repository content
 
 **Description:** As a user, I want MiniScira to find relevant code and configuration across the repository so that answers are not limited to README text.
 
@@ -192,7 +192,7 @@ The short SHA may link to the immutable GitHub commit URL. A branch name alone i
 - [ ] Indexing is idempotent for the same user, repository, commit, index schema version, and policy version.
 - [ ] Retrieval integration tests pass on representative polyglot fixtures.
 
-### US-005: Search repository files and structure
+### US-005: search repository files and structure
 
 **Description:** As a user, I want the agent to retrieve relevant files and code passages so that it can answer architecture and implementation questions accurately.
 
@@ -206,7 +206,7 @@ The short SHA may link to the immutable GitHub commit URL. A branch name alone i
 - [ ] A query that cannot be supported returns no-evidence/limited-evidence status rather than fabricated paths or lines.
 - [ ] Retrieval tests meet the thresholds in the test matrix.
 
-### US-006: Inspect bounded Git history
+### US-006: inspect bounded Git history
 
 **Description:** As a user, I want MiniScira to inspect Git history so that it can answer when and why code changed.
 
@@ -220,7 +220,7 @@ The short SHA may link to the immutable GitHub commit URL. A branch name alone i
 - [ ] Rename detection, merges, deleted files, and binary diffs have explicit bounded behavior and tests.
 - [ ] No Git alias, external diff/textconv driver, hook, pager, editor, or repository-defined command can execute.
 
-### US-007: Produce immutable file-and-line citations
+### US-007: produce immutable file-and-line citations
 
 **Description:** As a user, I want citations that open the exact code used so that I can verify each claim.
 
@@ -235,7 +235,7 @@ The short SHA may link to the immutable GitHub commit URL. A branch name alone i
 - [ ] Deleted/historical file evidence uses an immutable GitHub commit/diff or blob URL that resolves for the cited revision.
 - [ ] Citation-shape unit tests, link-resolution integration tests, and agent evals pass.
 
-### US-008: Reuse a safe checkout for follow-up questions
+### US-008: reuse a safe checkout for follow-up questions
 
 **Description:** As a user, I want follow-up questions to reuse prior repository preparation so that answers are fast and consistent.
 
@@ -249,7 +249,7 @@ The short SHA may link to the immutable GitHub commit URL. A branch name alone i
 - [ ] Cache corruption causes safe rebuild or a clear error, never fallback to an unverified worktree.
 - [ ] Reuse integration tests demonstrate fewer clone/index operations with identical citation identity.
 
-### US-009: Refresh or select another revision explicitly
+### US-009: refresh or select another revision explicitly
 
 **Description:** As a user, I want to refresh a repository or select a revision so that I can analyze updates without losing the old result's identity.
 
@@ -262,7 +262,7 @@ The short SHA may link to the immutable GitHub commit URL. A branch name alone i
 - [ ] A user can explicitly ask to return to a prior analyzed SHA if its snapshot remains available or can be recreated.
 - [ ] Refresh does not broaden credentials, fetch submodules/LFS, or bypass current limits.
 
-### US-010: Report limits and partial coverage honestly
+### US-010: report limits and partial coverage honestly
 
 **Description:** As a user, I want clear limit reporting so that I know what was and was not analyzed.
 
@@ -275,7 +275,7 @@ The short SHA may link to the immutable GitHub commit URL. A branch name alone i
 - [ ] The final answer carries a visible limitation note whenever relevant evidence could be outside analyzed coverage.
 - [ ] Limit tests cover boundaries, one-over cases, cancellation, cleanup, and concurrency.
 
-### US-011: Resist prompt injection in repository content
+### US-011: resist prompt injection in repository content
 
 **Description:** As a user, I want repository text treated as evidence rather than instructions so that malicious content cannot redirect the agent or expose data.
 
@@ -289,7 +289,7 @@ The short SHA may link to the immutable GitHub commit URL. A branch name alone i
 - [ ] No repository content can alter cache keys, filesystem roots, Git arguments, URL hosts, credentials, egress destinations, or tool schemas.
 - [ ] Security tests and agent eval pass thresholds are met.
 
-### US-012: Require explicit consent before executing repository code
+### US-012: require explicit consent before executing repository code
 
 **Description:** As a user, I want analysis to remain read-only unless I clearly ask for execution so that inspecting a repository cannot run untrusted software unexpectedly.
 
@@ -302,7 +302,7 @@ The short SHA may link to the immutable GitHub commit URL. A branch name alone i
 - [ ] If the user explicitly asks to run code/tests, the agent states the command and risk/scope, uses a separately authorized execution path, and remains subject to Sandbox and egress policy. That execution workflow is not implemented as part of this PRD unless separately approved.
 - [ ] Agent evals show zero unauthorized execution calls in all non-execution cases.
 
-### US-013: Clean up expired and failed repository resources
+### US-013: clean up expired and failed repository resources
 
 **Description:** As an operator, I want repository workspaces and indexes cleaned predictably so that storage does not grow without bounds.
 
@@ -316,7 +316,7 @@ The short SHA may link to the immutable GitHub commit URL. A branch name alone i
 - [ ] Cleanup never prunes unrelated Sandbox containers, images, networks, database volumes, uploads, or other users' repository data.
 - [ ] Cleanup is idempotent and has dry-run/metrics support for operators.
 
-### US-014: Connect a private repository credential (Phase 2)
+### US-014: connect a private repository credential (phase 2)
 
 **Description:** As a repository owner, I want to connect a revocable GitHub credential so that MiniScira can analyze repositories I am authorized to read.
 
@@ -325,26 +325,26 @@ The short SHA may link to the immutable GitHub commit URL. A branch name alone i
 - [ ] Phase 2 supports a GitHub App installation token flow or fine-grained read-only personal access token; GitHub App is preferred where deployment configuration permits it.
 - [ ] The UI states the requested permissions and recommends repository-specific read-only access.
 - [ ] The server validates the credential against GitHub before storing it and records only encrypted credential material, safe account/install metadata, masked hint, scopes/permissions, expiry, and timestamps.
-- [ ] Secret encryption uses the repository's server-side secret-box pattern or an approved replacement with rotation/migration design.
+- [ ] Secret encryption uses the repository's server-side secret-box pattern or an approved replacement with a rotation and migration design.
 - [ ] Plaintext credentials never reach browser responses after submission, the model, chat/event persistence, tool inputs/outputs, logs, analytics, exception messages, or repository files.
 - [ ] The clone broker supplies credentials only to the exact canonical GitHub HTTPS origin for the requested repository and removes transient material immediately after Git exits.
 - [ ] A user can revoke/delete a credential without deleting chats. Future private refresh/clone attempts fail closed; already cached private source follows the private-cache policy in the open questions/approval decision.
 - [ ] Cross-user credential and repository access tests pass with zero leaks.
 
-### US-015: Handle credential expiry and revocation (Phase 2)
+### US-015: handle credential expiry and revocation (phase 2)
 
 **Description:** As a private-repository user, I want clear revocation behavior so that access ends when I remove or expire a credential.
 
 **Acceptance criteria:**
 
 - [ ] Expired, revoked, missing-scope, wrong-repository, and rate-limited states have distinct safe errors.
-- [ ] Token refresh, when supported by the chosen GitHub App flow, occurs server-side and is never model-driven.
+- [ ] Token refresh, when supported by the chosen GitHub App flow, occurs on the server and is never model-driven.
 - [ ] Revocation invalidates credential cache immediately and prevents new network access.
 - [ ] Security-sensitive credential actions have an audit record containing actor, credential record ID, action, timestamp, and outcome but no secret.
 - [ ] Deleting a credential is idempotent.
 - [ ] Logs and timeline remain redacted under success and failure paths.
 
-### US-016: Observe repository-analysis health without exposing source
+### US-016: observe repository-analysis health without exposing source
 
 **Description:** As an operator, I want operational metrics and safe logs so that I can diagnose failures and capacity without reading users' private code or secrets.
 
@@ -363,7 +363,7 @@ The short SHA may link to the immutable GitHub commit URL. A branch name alone i
 - **FR-1:** The agent must route a repository-grounded question with a supported GitHub URL to repository-analysis tools rather than relying only on open-web search.
 - **FR-2:** The server must canonicalize GitHub identity as case-preserving display metadata plus a collision-safe normalized owner/repository key.
 - **FR-3:** The server must authorize every repository and snapshot operation against the current user principal.
-- **FR-4:** The system must not accept a snapshot ID, Sandbox ID, checkout path, or credential ID from the model without server-side ownership validation.
+- **FR-4:** The system must not accept a snapshot ID, Sandbox ID, checkout path, or credential ID from the model without ownership validation on the server.
 - **FR-5:** Anonymous, app, delegated, and scheduled principals must have explicitly defined behavior. The initial release permits root/delegated work only when it can resolve the owning signed-in root user; otherwise it denies access.
 - **FR-6:** Delegated subagents may receive a repository snapshot ID and retrieved evidence, but never credentials or arbitrary checkout paths.
 
@@ -400,7 +400,7 @@ The short SHA may link to the immutable GitHub commit URL. A branch name alone i
 - **FR-26:** Limit checks must occur before network retrieval where metadata permits, during transfer where enforceable, after object receipt, after checkout, and during indexing.
 - **FR-27:** Resource limits must include Sandbox CPU, memory, process/PID, and writable-storage constraints. If the current Eve/middleware path cannot enforce them, implementation must stop at a security/architecture gate rather than claim the feature is bounded.
 - **FR-28:** The system must reserve disk headroom and reject preparation before host/Sandbox storage reaches an operator-defined safety floor.
-- **FR-29:** Rate and concurrency limits must be per user and global and must return retryable status where appropriate.
+- **FR-29:** Rate and concurrency limits must be per user and global and must return retryable status when appropriate.
 - **FR-30:** Output from Git and parsers must be capped independently from process runtime.
 
 ### 9.6 Inventory, extraction, and indexing
@@ -453,7 +453,7 @@ The short SHA may link to the immutable GitHub commit URL. A branch name alone i
 - **FR-64:** No automatic language-server plugin, compiler plugin, package manager, formatter, preview renderer, notebook kernel, or repository-aware executable may run during indexing.
 - **FR-65:** Explicit execution requests must route to a separately reviewed policy that confirms user intent and reports command/network/file scope. Until that policy is approved, the system must decline execution while still offering static analysis.
 
-### 9.11 Private repositories and credentials (Phase 2)
+### 9.11 Private repositories and credentials (phase 2)
 
 - **FR-66:** Credential records must be user-owned and separate from repository/snapshot records.
 - **FR-67:** A credential may authorize only GitHub read operations and should be repository-specific through GitHub App installation or fine-grained token selection.
@@ -677,14 +677,14 @@ Agent behavior changes apply, so model evals are mandatory. Evals must use deter
 
 These are durable roadmap work packages, not active TODO state. After explicit PRD approval, convert them into smaller agent TODOs with one item in progress at a time and map each to exact files/tests.
 
-### Phase 0: Architecture and limits gate
+### Phase 0: architecture and limits gate
 
 1. **Lock defaults and storage model.** Benchmark fixtures; decide durable checkout/index storage; set all finite defaults in §12; document threat model and private-cache policy.
 2. **Prototype enforcement capability in scratch only.** Prove Sandbox CPU/RAM/PID/storage limits, cancellation, GitHub-only egress, and clone hardening without product wiring. Stop if current Eve/middleware cannot enforce the contract.
 3. **Approve data and migration design.** Define repository, snapshot, file/index, lease, credential (disabled), and audit records plus deletion behavior.
 4. **Approve tool contracts.** Finalize typed schemas for prepare/select, search, tree, file-range read, history, refresh, and cleanup; prove none accept arbitrary commands/paths.
 
-### Phase 1: Public repositories
+### Phase 1: public repositories
 
 5. **Add URL/revision domain layer and unit tests.** Canonicalization, selector resolution, immutable identity, citation builder, path safety, redaction.
 6. **Add committed database migration and repository authorization layer.** Include fresh/adopted/populated migration and restore tests.
@@ -699,7 +699,7 @@ These are durable roadmap work packages, not active TODO state. After explicit P
 15. **Complete public tests and evals.** Run the full matrices, browser journeys, migration/rollback, scratch Sandbox acceptance, and existing regression evals.
 16. **Deploy public phase behind a feature flag.** Operator opt-in, canary user, production acceptance, measured capacity, then controlled default enablement.
 
-### Phase 2: Private repositories
+### Phase 2: private repositories
 
 17. **Select and approve credential mechanism.** Prefer GitHub App; document permissions, callback/setup, token lifetime, self-hosting requirements, and fallback fine-grained PAT policy.
 18. **Implement encrypted credential records and UI.** Validation, mask, permissions, expiry, audit, revoke/delete, accessibility, and no-secret responses.
@@ -708,7 +708,7 @@ These are durable roadmap work packages, not active TODO state. After explicit P
 21. **Complete private tests/evals/security review.** Cross-user, redirect, revocation, expiry, token canaries, process/log inspection, model transcript inspection.
 22. **Deploy private phase separately behind an operator flag.** Canary on dedicated private fixture; production acceptance; rollback rehearsal; explicit enablement.
 
-### Phase 3: Optimization only after measured need
+### Phase 3: optimization only after measured need
 
 23. **Measure retrieval and cache performance.** Do not add embeddings, shared caches, incremental indexing, or GitHub API dependencies speculatively.
 24. **Propose amendments for any optimization that changes privacy, dependencies, data model, or completeness.** Re-run affected tests/evals before rollout.
@@ -801,7 +801,7 @@ After successful production deployment, commit all intended repository changes, 
 ### 19.3 Data and cache rollback
 
 - Cache artifacts are reconstructable and may be evicted by scoped snapshot IDs.
-- Never delete chat events merely because a snapshot is removed; citations and revision metadata must remain readable.
+- Never delete chat events only because a snapshot is removed; citations and revision metadata must remain readable.
 - Do not prune DB/upload volumes, all Sandbox containers, Docker images, or networks as a rollback shortcut.
 - Private credentials require a migration-aware restore/revocation procedure. If rollback could restore a credential the user deleted after backup, the private feature must remain disabled and the credential store reconciled before re-enable.
 
@@ -820,7 +820,7 @@ Production is accepted only when all applicable checks pass:
 - Failed/cancelled resources and an expired test snapshot are cleaned by exact identity.
 - Logs contain no fixture secret canaries, repository file contents, authorization headers, raw token-bearing URLs, or unexpected middleware errors.
 - Baseline user/chat/session/upload counts do not unexpectedly decrease.
-- Phase 2 additionally proves credential revocation blocks the next private fetch and leaves no token canary in browser, events, model transcript, logs, process state, Git config, or Sandbox filesystem.
+- Phase 2 also proves that credential revocation blocks the next private fetch and leaves no token canary in the browser, events, model transcript, logs, process state, Git config, or Sandbox filesystem.
 
 ## 21. Success metrics
 
@@ -857,7 +857,7 @@ Metrics are evaluated after public canary and again after private canary:
 
 ## 23. Open questions requiring resolution before approval or phase gate
 
-### Must resolve before Phase 1 implementation
+### Must resolve before phase 1 implementation
 
 1. What exact finite defaults apply to every limit in §12, based on measured Umbrel/reference-host capacity?
 2. Where should ready checkouts and indexes live: persistent application volume, retained Eve Sandbox session/container, archived object store, or a hybrid? The answer must support safe restart, eviction, backup posture, and exact revision recreation.
@@ -870,7 +870,7 @@ Metrics are evaluated after public canary and again after private canary:
 9. How is full-SHA availability guaranteed for shallow clones when a user supplies an older commit, and what maximum deepening strategy is allowed?
 10. Which supported model/gateway combinations can reliably meet the zero-tolerance security evals? Unsupported models must not be selectable for this feature if they fail.
 
-### Must resolve before Phase 2 implementation
+### Must resolve before phase 2 implementation
 
 11. Is GitHub App authentication operationally feasible for generic self-hosters, or is fine-grained PAT the initial private mechanism? If both, which is default and how are permissions explained?
 12. After credential revocation, may already cached private source remain searchable by the same user until TTL, must it be quarantined immediately, or must it be deleted immediately? This is a product/security decision, not an implementation detail.
@@ -878,7 +878,7 @@ Metrics are evaluated after public canary and again after private canary:
 14. Does deleting a private credential also delete audit metadata and repository identity, or only secret material? What retention is required?
 15. How are secret-box key rotation and database restore handled without resurrecting deleted/revoked credentials?
 16. Should private repository names be visible in operator logs by default on a single-household deployment, or hashed/redacted universally?
-17. What user-facing disclosure is required before private source passages are sent to the configured AI gateway?
+17. What disclosure must users see before private source passages are sent to the configured AI gateway?
 
 ## 24. Approval checklist
 
@@ -922,7 +922,7 @@ The full roadmap is done only when:
 - cache reuse, explicit refresh, eviction, cancellation, restart recovery, credential revocation, and cleanup are proven;
 - no repository content caused unauthorized execution or tool use, no secret/credential leaked, and no cross-user access succeeded;
 - deployment and rollback were rehearsed and production acceptance passed;
-- operator docs, user-facing copy, `.env.example`, migrations, fixtures, and eval datasets are complete;
+- operator docs, copy shown to users, `.env.example`, migrations, fixtures, and eval datasets are complete;
 - production source control is clean, committed, pushed to `origin`, and local `HEAD` equals `origin/main`.
 
 Until then, completion claims must name the specific phase and remaining gates.
