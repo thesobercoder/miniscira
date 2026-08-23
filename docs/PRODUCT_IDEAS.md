@@ -1,27 +1,25 @@
 # MiniScira Backlog
 
-This file is an index of specified product work, not a scratchpad for raw ideas.
+This file captures raw product ideas before they are selected and specified.
 
-## Mandatory PRD gate
+## Planning workflow
 
-Do not add a new backlog item until a complete PRD has first been created at
-`tasks/prd-<feature-name>.md`. Every PRD must include:
+Follow this sequence:
 
-- goals, user stories, explicit scope and non-goals;
-- ordered, atomic implementation tasks with dependencies and affected areas;
-- verifiable acceptance criteria mapped to each task;
-- a test matrix covering applicable unit, integration, browser/end-to-end,
-  authorization/security, migration/rollback, and production acceptance checks;
-- an eval plan for changes to agent behavior, prompts, tools, retrieval, memory,
-  or model routing, including cases, fixtures, expected outcomes, and pass
-  thresholds—or an explicit explanation of why model evals do not apply;
-- deployment, observability, rollback, and unresolved-question sections.
+1. **Backlog:** capture the raw idea here. It may still have open questions.
+2. **PRD:** when selected for planning, create `tasks/prd-<feature-name>.md` and
+   link it from the backlog entry. Define goals, stories, scope, non-goals,
+   requirements, acceptance criteria, testing needs, eval needs, deployment,
+   observability, rollback, and open questions.
+3. **Tasks:** after PRD approval, derive an ordered, atomic implementation plan
+   with dependencies, affected areas/files, and acceptance criteria mapped to
+   exact tests and evals.
+4. **Execution:** implement only from the approved PRD and task plan, then run the
+   specified tests, evals, deployment checks, and production acceptance.
 
-After the PRD is committed, add only a concise backlog entry linking to that PRD.
-The PRD is the source of truth; this file records priority and status. Do not
-begin implementation while material questions remain unresolved.
-
-The entries below predate this gate and require PRDs before implementation.
+Raw backlog entries do not authorize implementation. No item advances to
+execution without both a PRD and its derived task/test/eval plan. If model evals
+do not apply, the PRD must state why explicitly.
 
 ## Backlog
 

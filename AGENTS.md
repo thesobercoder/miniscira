@@ -32,22 +32,28 @@ explain *why* an invariant exists. Avoid speculative abstractions, duplicate
 state, fire-and-forget promises without an error path, and provider-specific
 behavior leaking into ordinary UI components.
 
-## Product backlog gate
+## Product planning sequence
 
-- Never add a new item to `docs/PRODUCT_IDEAS.md` from a raw idea alone.
-- First create and commit a complete PRD at `tasks/prd-<feature-name>.md`.
-- The PRD must decompose the feature into ordered, atomic implementation tasks
-  with dependencies, affected areas/files where known, and verifiable acceptance
-  criteria. It must also define the exact unit, integration, browser/end-to-end,
-  security, migration/rollback, and production acceptance tests that apply.
-- When the feature changes agent behavior, prompts, tools, retrieval, memory, or
-  model routing, the PRD must define model-level eval cases, datasets/fixtures,
-  expected outcomes, and pass thresholds. If evals do not apply, the PRD must
-  explain why explicitly rather than omitting them.
-- Only after the PRD exists may the backlog receive a short entry linking to it.
-  The PRD is the source of truth; the backlog is only an index and status view.
-- Do not start implementation until unresolved product or architecture questions
-  in the PRD have been answered and its task/test/eval plan is executable.
+Follow this order exactly: **raw backlog idea → PRD → implementation tasks →
+execution**.
+
+- Record concrete raw ideas in `docs/PRODUCT_IDEAS.md` first. A backlog entry may
+  be brief and incomplete; it exists to preserve the idea, not to authorize work.
+- Before implementation, promote the selected idea into a complete PRD at
+  `tasks/prd-<feature-name>.md`. Link the backlog entry to that PRD and record its
+  planning status.
+- After the PRD is approved and material questions are resolved, derive a
+  separate ordered task plan from it. Tasks must be atomic, name dependencies and
+  affected areas/files where known, and map every acceptance criterion to exact
+  unit, integration, browser/end-to-end, security, migration/rollback, and
+  production acceptance tests as applicable.
+- The PRD must determine the required model-level eval strategy for changes to
+  agent behavior, prompts, tools, retrieval, memory, or model routing: cases,
+  datasets/fixtures, expected outcomes, and pass thresholds. If evals do not
+  apply, say why explicitly.
+- Do not execute implementation directly from a raw backlog entry or directly
+  from an un-decomposed PRD. Execution begins only after the PRD and derived task,
+  test, and eval plan are ready.
 
 ## Toolchain
 
