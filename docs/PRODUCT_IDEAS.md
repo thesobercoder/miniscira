@@ -32,3 +32,7 @@ Remove an entry after the user explicitly approves its PRD.
 ### Nightly memory extraction from the day's chats
 
 [Draft PRD](../tasks/prd-nightly-memory-extraction.md). Awaiting approval.
+
+### Mobile layout and installable web app
+
+[Draft PRD](../tasks/prd-mobile-layout-and-installable-app.md). Awaiting approval.
