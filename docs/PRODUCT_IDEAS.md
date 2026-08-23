@@ -25,6 +25,7 @@ do not apply, the PRD must state why explicitly.
 
 ### Artifact Library across all chats
 
+- **Status:** PRD in progress — [`tasks/prd-artifact-library.md`](../tasks/prd-artifact-library.md)
 - Add a **Library** destination in the main sidebar immediately below **Lookouts** and above **MCP Servers**.
 - Show every artifact the signed-in user has created or received across all chats, including generated images, uploaded files, research exports, and future PDF, DOCX, PPTX, and XLSX outputs.
 - Provide useful type, chat, project, and date filters plus filename and content search where indexing is supported.
@@ -35,6 +36,8 @@ do not apply, the PRD must state why explicitly.
 Before implementation, create a focused PRD covering the artifact data model, existing upload/generated-file discovery, sidebar and Library UX, previews, search and filtering, source-chat provenance, retention and deletion semantics, authorization, migrations, and end-to-end tests.
 
 ### Edit uploaded images with natural-language instructions
+
+**Status:** PRD in progress — [Draft PRD](../tasks/prd-image-editing.md)
 
 - Let users upload an image and describe the desired changes conversationally.
 - Preserve the original and save every edited result as a new durable file.
@@ -48,6 +51,7 @@ Before implementation, verify the live gateway's image-editing endpoint and inpu
 
 ### Generate editable documents and presentations
 
+- **Status:** PRD in progress — [`tasks/prd-document-generation.md`](../tasks/prd-document-generation.md)
 - Generate PDF, DOCX, PPTX, and XLSX artifacts directly from a conversation.
 - Provide the completed artifact as a durable downloadable file and preserve it with the chat.
 - Prefer editable native formats for DOCX, PPTX, and XLSX rather than rendered screenshots.
@@ -59,6 +63,7 @@ Before implementation, create a focused PRD covering artifact schemas, rendering
 
 ### Clone and analyze GitHub repositories
 
+- **Status:** PRD in progress — [`tasks/prd-github-repository-analysis.md`](../tasks/prd-github-repository-analysis.md)
 - Accept a GitHub repository URL and clone it into an isolated, per-task Sandbox workspace.
 - Answer questions from the repository's actual files, structure, configuration, and Git history with file-and-line citations.
 - Support public repositories first; add private repositories later through revocable user-owned credentials that are never exposed to the model or persisted in source control.
@@ -70,6 +75,7 @@ Before implementation, create a focused PRD covering repository identity and rev
 
 ### Archive and recover chat threads
 
+- **Status:** PRD in progress — [`tasks/prd-thread-archiving.md`](../tasks/prd-thread-archiving.md)
 - Let users manually archive and unarchive threads without deleting their messages, events, documents, or generated artifacts.
 - Exclude archived threads from the normal sidebar and provide a dedicated archived-threads view with recovery actions.
 - Offer an optional per-user auto-archive policy, including a one-week inactivity setting; base inactivity on the last real chat activity rather than background maintenance timestamps.
@@ -79,6 +85,8 @@ Before implementation, create a focused PRD covering repository identity and rev
 Before implementation, create a focused PRD covering schema and migration changes, manual actions, inactivity semantics, pinning, Lookout interactions, batch scheduling, recovery UX, authorization, and end-to-end tests.
 
 ### Search and read previous threads
+
+**Status:** PRD in progress — [draft PRD](../tasks/prd-thread-search.md)
 
 - Search the signed-in user's other threads by title and message content from inside MiniScira.
 - Open matching threads directly and show enough context around each match to understand why it was returned.
@@ -90,6 +98,7 @@ Before implementation, create a focused PRD covering lexical and semantic retrie
 
 ### Nightly memory extraction from the day's chats
 
+- **Status:** PRD in progress — [`tasks/prd-nightly-memory-extraction.md`](../tasks/prd-nightly-memory-extraction.md)
 - Run an optional nightly, per-user extraction pass over chats that had user activity during that user's local calendar day.
 - Extract only durable, useful memories such as stable preferences, decisions, recurring entities, and long-lived project context; reject transient task progress, secrets, raw identifiers, and speculative conclusions.
 - Deduplicate against existing memory and keep provenance back to the source thread and message range.
