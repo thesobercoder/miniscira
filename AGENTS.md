@@ -7,7 +7,7 @@
 - Use this file as the table of contents for repository instructions.
 - Read each linked document that applies to the job before you act.
 - Put durable detailed guidance in `docs/`, not in this file.
-- Add or update a linked document when a recurring rule, invariant, or workflow appears.
+- Before adding guidance, search existing documents and update its canonical location; never duplicate instructions.
 - Keep the product experience simple. Make search, memory, tools, and routing automatic when possible.
 - Do not expose secrets in code, logs, diffs, tests, documentation, or replies.
 - Do not implement a backlog idea before its PRD has explicit user approval and its TODO, test, and eval plan exists.
