@@ -71,7 +71,7 @@ export async function sendLookoutEmail(input: {
   const html = `
     <div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:600px;margin:0 auto;color:#111;line-height:1.55;font-size:14px">
       <h1 style="font-size:18px;margin:0 0 2px">🔭 ${input.lookoutName}</h1>
-      <p style="color:#666;font-size:12px;margin:0 0 16px">Your scheduled research from MiniScira Lookout.</p>
+      <p style="color:#666;font-size:12px;margin:0 0 16px">Your scheduled research from MiniScira.</p>
       ${body}
       <p style="margin:24px 0 0">
         <a href="${input.chatUrl}" style="display:inline-block;background:#16a34a;color:#fff;padding:8px 14px;border-radius:8px;text-decoration:none;font-weight:600">Open in MiniScira →</a>
