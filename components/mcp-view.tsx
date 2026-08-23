@@ -237,9 +237,12 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
   const [name, setName] = useState("")
   const [url, setUrl] = useState("")
   const [transport, setTransport] = useState<Transport>("http")
-  const [headerKey, setHeaderKey] = useState("")
+  // This must be a real value, not only a placeholder. Otherwise a user who
+  // enters a bearer token without touching the name field sends no header.
+  const [headerKey, setHeaderKey] = useState("Authorization")
   const [headerValue, setHeaderValue] = useState("")
-  const [headerPlaceholder, setHeaderPlaceholder] = useState("Bearer …")
+  const [headerPlaceholder, setHeaderPlaceholder] =
+    useState("Bearer your-token")
 
   const addServer = async (
     payload: {
@@ -293,9 +296,9 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
     )
     setName("")
     setUrl("")
-    setHeaderKey("")
+    setHeaderKey("Authorization")
     setHeaderValue("")
-    setHeaderPlaceholder("Bearer …")
+    setHeaderPlaceholder("Bearer your-token")
   }
 
   const insecureMcpUrl = (() => {
@@ -471,7 +474,7 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                       own name — the value field holds a credential and must
                       announce as more than an unlabeled textbox. */}
                   <span className="font-medium text-sm leading-none">
-                    API key / header value (optional)
+                    Authentication header (optional)
                   </span>
                   <div className="flex gap-1.5">
                     <Input
@@ -493,6 +496,10 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                       className="font-mono text-xs"
                     />
                   </div>
+                  <p className="text-muted-foreground text-xs">
+                    For bearer authentication, keep the name as Authorization
+                    and enter the complete value: Bearer followed by your token.
+                  </p>
                 </div>
                 <Button
                   onClick={create}
