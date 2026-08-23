@@ -20,7 +20,8 @@ raw backlog idea
 - Record raw product ideas in `docs/PRODUCT_IDEAS.md`.
 - An idea can be brief, incomplete, and contain open questions.
 - A backlog entry preserves an idea. It does not authorize implementation.
-- Track its status with one of these values when useful: `Backlog`, `PRD in progress`, `PRD approved`, `In progress`, or `Done`.
+- Keep one entry per idea and use one consistent PRD link label: `Draft PRD`.
+- Once a draft PRD contains the idea's full scope, collapse the backlog entry to one line: feature name, `Draft PRD` link, and `awaiting approval` status. Do not repeat the PRD's requirements in the backlog.
 
 ## 2. PRD
 
@@ -32,7 +33,7 @@ raw backlog idea
 - If model evals do not apply, explain why.
 - A written PRD is not approved by implication. Ask the user to review it.
 - Record approval only after the user explicitly approves it.
-- After explicit approval, mark the PRD planning work done and set the backlog status to `PRD approved`. This does not mean the feature is implemented.
+- After explicit approval, mark the PRD planning work done and remove the feature from `docs/PRODUCT_IDEAS.md`; it is no longer a backlog idea. The approved PRD remains the durable specification. This does not mean the feature is implemented.
 
 ## 3. TODO tasks
 
@@ -51,7 +52,6 @@ raw backlog idea
 - Do not implement directly from a raw backlog idea.
 - Do not implement from an unapproved PRD.
 - Start only after explicit PRD approval and creation of the TODO, test, and eval plan.
-- Set the backlog status to `In progress` when implementation starts.
 - Mark a feature `Done` only after:
   - every required TODO is complete;
   - every mapped acceptance test and eval passes;
@@ -59,4 +59,5 @@ raw backlog idea
   - production deployment is verified when applicable; and
   - the repository satisfies the production source-control rules.
 - Keep the approved PRD as the durable record of intent and acceptance.
+- Do not keep completed features in `docs/PRODUCT_IDEAS.md`. Document shipped behavior in the relevant product or operations document; use Git history and the retained PRD for historical planning context.
 - Keep completion evidence in commits, test results, eval results, and relevant operations documents.
