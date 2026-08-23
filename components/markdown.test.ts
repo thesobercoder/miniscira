@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { normalizeCitations } from "@/components/markdown"
+import { copyRenderedCode, normalizeCitations } from "@/components/markdown"
 
 /**
  * Inputs are verbatim citation shapes taken from `message.completed` events in
@@ -88,5 +88,41 @@ describe("normalizeCitations", () => {
     expect(normalizeCitations("no links here at all")).toBe(
       "no links here at all"
     )
+  })
+})
+
+describe("copyRenderedCode", () => {
+  test("copies rendered code through the plain-http fallback", async () => {
+    const originalNavigator = globalThis.navigator
+    const originalDocument = globalThis.document
+    let copied = ""
+    globalThis.navigator = {} as Navigator
+    globalThis.document = {
+      createElement: () => ({
+        value: "",
+        style: {},
+        setAttribute: () => {},
+        select: () => {},
+        setSelectionRange: () => {},
+        remove: () => {},
+      }),
+      body: {
+        append: (textarea: { value: string }) => (copied = textarea.value),
+      },
+      execCommand: () => true,
+    } as unknown as Document
+    const button = {
+      closest: () => ({
+        querySelector: () => ({ textContent: "const answer = 42" }),
+      }),
+    } as unknown as Element
+
+    try {
+      expect(await copyRenderedCode(button)).toBe(true)
+      expect(copied).toBe("const answer = 42")
+    } finally {
+      globalThis.navigator = originalNavigator
+      globalThis.document = originalDocument
+    }
   })
 })

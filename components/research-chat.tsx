@@ -114,6 +114,9 @@ async function buildFileParts(docs: UploadedDoc[]) {
   )
 }
 
+/** @public Regression seam for attachment payload tests. */
+export const modelFileParts = buildFileParts
+
 /**
  * The entries of `childParts` this message actually renders: the ones keyed by
  * a tool call id in its own parts, which is exactly what
@@ -233,6 +236,9 @@ export function ResearchChat({
     chatId,
     projectId,
     initialDocuments,
+    // The first submit creates the chat, binds its uploads, and routes here with
+    // q=. Stage those files once so the automatic submit sends them to the model.
+    initialStagedDocuments: initialPrompt ? initialDocuments : [],
     currentChatId: () => chatIdRef.current,
   })
 

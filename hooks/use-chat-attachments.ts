@@ -36,6 +36,8 @@ type Options = {
   chatId?: string
   projectId?: string
   initialDocuments?: readonly UploadedDoc[]
+  /** Files uploaded before a first chat existed, ready for its routed send. */
+  initialStagedDocuments?: readonly UploadedDoc[]
   /** Read lazily: the chat row may not exist until the first message is sent. */
   currentChatId: () => string | undefined
 }
@@ -44,10 +46,13 @@ export function useChatAttachments({
   chatId,
   projectId,
   initialDocuments = [],
+  initialStagedDocuments = [],
   currentChatId,
 }: Options) {
   // Staged in the composer for the NEXT message; cleared when it's sent.
-  const [documents, setDocuments] = useState<UploadedDoc[]>([])
+  const [documents, setDocuments] = useState<UploadedDoc[]>(() =>
+    initialStagedDocuments.filter((document) => document.status === "ready")
+  )
   // Mirror for callbacks that must stay reference-stable: the composer is
   // memoized, so a handler that changed identity per staged file would
   // re-render it on every keystroke of an unrelated upload.

@@ -1,7 +1,9 @@
 import { isValidElement, useMemo } from "react"
+import { toast } from "sonner"
 import { Streamdown } from "streamdown"
 import "streamdown/styles.css"
 
+import { copyText } from "@/lib/clipboard"
 import { faviconFor, hostOf, shortHost } from "@/lib/urls"
 import { cn } from "@/lib/utils"
 
@@ -110,6 +112,13 @@ export function normalizeCitations(markdown: string) {
         )
     )
     .replace(DUPLICATE_TERMINATOR, "$1$2")
+}
+
+/** Copy a rendered Streamdown code block through MiniScira's LAN-safe helper. */
+export function copyRenderedCode(button: Element): Promise<boolean> {
+  const block = button.closest('[data-streamdown="code-block"]')
+  const code = block?.querySelector("pre code")?.textContent ?? ""
+  return copyText(code)
 }
 
 // AIcss-style table skin (aicss.dev/components/data-table), translated from its
@@ -235,45 +244,64 @@ export function Markdown({
   // mid-stream) doesn't redo the regex work.
   const source = useMemo(() => normalizeCitations(children), [children])
   return (
-    <Streamdown
-      parseIncompleteMarkdown
-      className={cn("text-sm leading-7 [&>*:first-child]:mt-0", className)}
-      shikiTheme={["github-light", "github-dark"]}
-      // Only carry the animation while actually streaming. Once static,
-      // dropping `animated`/`isAnimating` stops Streamdown from replaying the
-      // per-token fade whenever a *later* turn re-renders this settled message.
-      mode={animating ? "streaming" : "static"}
-      {...(animating
-        ? {
-            animated: {
-              animation: "slideUp",
-              // Milliseconds. Streamdown emits `--sd-duration:${duration}ms`
-              // and defaults to 150; the value this was written with (4) is
-              // below a frame, so the entrance never actually showed.
-              duration: 150,
-              easing: "ease-in",
-              // No cascade. Streamdown's default staggers each *new* word by
-              // 40ms (`--sd-delay: newIndex * stagger`), and its rule is
-              // `animation: … both`, so a word sits at the keyframe's opacity:0
-              // for the whole of its delay. A word is only exempt from being
-              // "new" while the plugin's `prevContentLength` is non-zero — and
-              // that counter is a single shared value which `getLastRenderCharCount()`
-              // zeroes on read. Any render that reads it out of step re-staggers
-              // a whole block from index 0, so a 400-word answer hands its tail
-              // ~16s of delay and renders as blank space with a few words in it.
-              //
-              // The cascade was never worth that: tokens already arrive one at a
-              // time, so the stream paces the reveal by itself. At 0 the words
-              // still fade and slide in, they just do it when they arrive
-              // instead of queueing behind an artificial timeline.
-              stagger: 0,
-            },
-            isAnimating: true,
-          }
-        : {})}
-      components={markdownComponents}
+    <div
+      onClickCapture={(event) => {
+        const target = event.target
+        if (!(target instanceof Element)) return
+        const button = target.closest<HTMLButtonElement>(
+          '[data-streamdown="code-block-copy-button"]'
+        )
+        if (!button) return
+
+        // Streamdown 2.5 calls navigator.clipboard directly. That API is absent
+        // on MiniScira's normal plain-http LAN origin, while copyText has the
+        // synchronous selection fallback required there.
+        event.stopPropagation()
+        void copyRenderedCode(button).then((copied) => {
+          if (!copied) toast.error("Couldn't copy that code")
+        })
+      }}
     >
-      {source}
-    </Streamdown>
+      <Streamdown
+        parseIncompleteMarkdown
+        className={cn("text-sm leading-7 [&>*:first-child]:mt-0", className)}
+        shikiTheme={["github-light", "github-dark"]}
+        // Only carry the animation while actually streaming. Once static,
+        // dropping `animated`/`isAnimating` stops Streamdown from replaying the
+        // per-token fade whenever a *later* turn re-renders this settled message.
+        mode={animating ? "streaming" : "static"}
+        {...(animating
+          ? {
+              animated: {
+                animation: "slideUp",
+                // Milliseconds. Streamdown emits `--sd-duration:${duration}ms`
+                // and defaults to 150; the value this was written with (4) is
+                // below a frame, so the entrance never actually showed.
+                duration: 150,
+                easing: "ease-in",
+                // No cascade. Streamdown's default staggers each *new* word by
+                // 40ms (`--sd-delay: newIndex * stagger`), and its rule is
+                // `animation: … both`, so a word sits at the keyframe's opacity:0
+                // for the whole of its delay. A word is only exempt from being
+                // "new" while the plugin's `prevContentLength` is non-zero — and
+                // that counter is a single shared value which `getLastRenderCharCount()`
+                // zeroes on read. Any render that reads it out of step re-staggers
+                // a whole block from index 0, so a 400-word answer hands its tail
+                // ~16s of delay and renders as blank space with a few words in it.
+                //
+                // The cascade was never worth that: tokens already arrive one at a
+                // time, so the stream paces the reveal by itself. At 0 the words
+                // still fade and slide in, they just do it when they arrive
+                // instead of queueing behind an artificial timeline.
+                stagger: 0,
+              },
+              isAnimating: true,
+            }
+          : {})}
+        components={markdownComponents}
+      >
+        {source}
+      </Streamdown>
+    </div>
   )
 }

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import type { EveMessage, EveMessagePart } from "eve/client"
 
-import { selectChildParts } from "@/components/research-chat"
+import { modelFileParts, selectChildParts } from "@/components/research-chat"
 
 function toolCall(toolCallId: string): EveMessagePart {
   return {
@@ -86,5 +86,44 @@ describe("selectChildParts", () => {
 
     expect(second).not.toBe(first)
     expect(Object.keys(second)).toEqual(["a"])
+  })
+})
+
+describe("modelFileParts", () => {
+  test("inlines an image as a model-safe data URL", async () => {
+    const originalFetch = globalThis.fetch
+    const originalFileReader = globalThis.FileReader
+    globalThis.fetch = (async () =>
+      new Response(new Uint8Array([1, 2, 3]), {
+        headers: { "content-type": "image/png" },
+      })) as unknown as typeof fetch
+    globalThis.FileReader = class {
+      result: string | ArrayBuffer | null = null
+      onload: null | (() => void) = null
+      onerror: null | (() => void) = null
+      readAsDataURL() {
+        this.result = "data:image/png;base64,AQID"
+        this.onload?.()
+      }
+    } as unknown as typeof FileReader
+
+    try {
+      const [part] = await modelFileParts([
+        {
+          id: "image-1",
+          filename: "image.png",
+          status: "ready",
+          kind: "image",
+          mimeType: "image/png",
+          url: "/api/files/image.png",
+        },
+      ])
+      expect(part.type).toBe("file")
+      expect(part.mediaType).toBe("image/png")
+      expect(part.data.href).toBe("data:image/png;base64,AQID")
+    } finally {
+      globalThis.fetch = originalFetch
+      globalThis.FileReader = originalFileReader
+    }
   })
 })
