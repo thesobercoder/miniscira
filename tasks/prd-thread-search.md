@@ -7,9 +7,15 @@
 
 ## 1. Introduction
 
-MiniScira persists a user's conversations as ordered Eve events, but users can currently find an old thread only by scanning the recency-sorted sidebar or a project's chat list. The research agent also has no tool for looking up relevant prior conversations. This makes earlier decisions, explanations, links, and research difficult to recover and encourages users to repeat context.
+MiniScira persists a user's conversations as ordered Eve events. However, the agent cannot search those conversations. This causes context loss between threads. The user must repeat earlier decisions, preferences, explanations, links, and research before the agent can continue the work.
 
-This feature adds authenticated search over thread titles and visible message text, direct navigation to a matching message, explicit archived-state labels, and a user-scoped/project-scoped agent retrieval tool. Prior-thread content must always retain provenance. The agent may quote or summarize retrieved excerpts only with explicit thread-and-message citations; it must never merge old-thread content into the current conversation as if the user had just said it.
+The primary purpose of this feature is agent continuity. It gives the agent tools to search and read earlier threads when the current request may depend on previous work. This includes archived threads. Archived threads remain a useful source of decisions, facts, preferences, plans, and research.
+
+User-facing search is also included, but it is the secondary purpose. Users can search thread titles and visible message text, open a matching message, and see whether a result is archived. Both agent and user retrieval must enforce the same user and project boundaries.
+
+Previous-thread retrieval complements durable memory. Memory stores selected facts that should remain available over time. Thread retrieval lets the agent recover detailed context, reasoning, decisions, sources, and work history without trying to compress all useful information into memory.
+
+Prior-thread content must retain its source. The agent may quote or summarize retrieved excerpts only with explicit thread-and-message citations. It must never present old-thread content as if the user had just said it in the current thread.
 
 This PRD defines only product behavior and an implementation plan. It does not authorize implementation. The separate archive-and-recover feature may introduce the archive field and archive UI; this PRD consumes that state when available and must not expand into a full archiving implementation.
 
@@ -49,14 +55,19 @@ These decisions are part of this draft specification. Implementation must not im
 10. **Indexing model:** add a normalized searchable message projection rather than repeatedly scanning/reducing all `chat_event.event` JSON at query time.
 11. **Pagination:** cursor-based, stable ordering. No offset pagination for production search.
 12. **Deletion and archive semantics:** deleting a chat cascades/removes its searchable messages. Archiving changes labels/filtering only and never removes index rows. Unarchiving updates result labels immediately.
-13. **No automatic retrieval:** the agent uses the prior-thread tool when the user asks about an earlier discussion or when resolving a clearly relevant continuity question. MiniScira does not automatically inject prior-thread excerpts into every turn.
+13. **Proactive agent retrieval:** the agent must search previous threads when the current request explicitly refers to earlier work or when prior context is likely to change the answer or action. The user should not need to find the old thread or ask for a search command. The agent must not search on every turn, and MiniScira must not inject old-thread excerpts into every prompt.
+14. **Archived threads remain useful context:** agent retrieval includes archived threads by default. Archive state changes organization and active-thread views. It does not remove a thread from agent retrieval.
+15. **Memory and thread retrieval are separate:** memory provides selected durable facts. Previous-thread retrieval provides detailed, cited conversation context. Neither system replaces the other.
 
 ## 4. Goals
 
+- Let the agent recover relevant context from previous threads so work can continue without asking the user to repeat it.
+- Let the agent proactively search when a request refers to earlier work or likely depends on earlier decisions, preferences, research, or plans.
+- Include archived threads in agent retrieval by default.
+- Preserve explicit thread and message citations for retrieved context.
 - Let a signed-in user find a prior thread by title or visible message text and understand each match from a concise snippet.
 - Let the user open the exact matching message with one action.
-- Make archived matches discoverable without hiding their state.
-- Let the research agent retrieve relevant prior-thread excerpts while preserving explicit thread/message provenance.
+- Show archived state without making archived threads less searchable.
 - Guarantee that neither UI search nor agent retrieval crosses user or project boundaries.
 - Keep indexes current under ordinary event appends, title changes, branching, superseding, archive changes, deletion, migration backfill, and retries.
 - Meet measurable retrieval quality, latency, authorization, citation, and no-silent-blending gates before rollout.
@@ -65,8 +76,9 @@ These decisions are part of this draft specification. Implementation must not im
 
 - Implementing manual archive/unarchive controls, auto-archive scheduling, pinning, or the archived-threads management view; those belong to the archive-and-recover PRD.
 - Searching reasoning traces, tool calls/results, system prompts, client context, MCP secrets, attachment bytes, or document contents.
-- Replacing durable memories or automatically extracting memories from prior threads.
+- Replacing durable memory or automatically extracting memory from prior threads. Memory and thread retrieval solve different problems.
 - Automatically adding old-thread content to every prompt.
+- Searching previous threads for every request when earlier context is not relevant.
 - Searching across users, teams, public/shared threads, or deployments.
 - Project membership/sharing/roles. Current projects are single-owner; this feature enforces that model.
 - Editing, deleting, or archiving messages from search results.
@@ -74,9 +86,19 @@ These decisions are part of this draft specification. Implementation must not im
 - A separate hosted search service for the initial release.
 - Making an external embedding provider mandatory for self-hosted installations.
 
-## 6. Primary user journeys
+## 6. Primary journeys
 
-### 6.1 User searches all prior threads
+### 6.1 Agent continues work from previous threads
+
+1. The user starts a new thread and refers to earlier work, a past decision, a known preference, or an ongoing project.
+2. The agent recognizes that the answer or action may depend on previous-thread context.
+3. The agent calls `search_previous_threads` without requiring the user to locate the old thread or request a search command.
+4. The search includes active and archived threads within the allowed user and project scope.
+5. The agent calls `read_previous_thread_messages` when it needs more context around a result.
+6. The agent continues the work using the retrieved context and cites the source thread at each relevant claim.
+7. If the results are missing or ambiguous, the agent says so and asks for a useful clue instead of inventing continuity.
+
+### 6.2 User searches all prior threads
 
 1. User opens the search affordance from the main sidebar or keyboard shortcut.
 2. User enters at least two non-whitespace characters.
@@ -84,14 +106,14 @@ These decisions are part of this draft specification. Implementation must not im
 4. User can filter by thread state and optionally by project.
 5. Selecting a title opens the thread; selecting a message snippet opens and highlights that exact message.
 
-### 6.2 User searches within a project
+### 6.3 User searches within a project
 
 1. User invokes search from a project surface or chooses a project filter.
 2. The server verifies the project belongs to the user.
 3. Only chats whose `projectId` equals that project are returned.
 4. Removing the filter returns to global user-owned scope.
 
-### 6.3 Agent retrieves an earlier discussion
+### 6.4 Agent retrieves an explicitly named discussion
 
 1. User asks, for example, "What did we decide about the launch checklist in our earlier thread?"
 2. The agent calls `search_previous_threads` with a concise query.
@@ -174,14 +196,17 @@ These decisions are part of this draft specification. Implementation must not im
 - [ ] If the archive feature has not landed, the search schema/API remain compatible with all chats treated as active; archived filters remain hidden rather than simulated.
 - [ ] Browser and API tests cover archived/project labels and filters.
 
-### US-006: search prior threads from the agent
+### US-006: preserve agent continuity across threads
 
-**Description:** As a user, I want the agent to find earlier discussions when I ask about them so that I do not have to locate and quote them manually.
+**Description:** As a user, I want the agent to search earlier discussions when they may contain needed context so that work can continue across threads without repetition.
 
 **Acceptance Criteria:**
 
 - [ ] `search_previous_threads` accepts query and bounded limit only; user/current-project scope is derived on the server.
 - [ ] The tool excludes the current thread by default and returns structured excerpt citations.
+- [ ] Agent instructions require retrieval for explicit references to earlier work and for continuity questions where prior context is likely to change the answer or action.
+- [ ] The agent can call retrieval without the user naming a thread or asking for search.
+- [ ] Archived threads are included in agent search by default and remain readable under the same authorization rules.
 - [ ] `read_previous_thread_messages` accepts only cited message/thread identifiers and a bounded context window.
 - [ ] Read results include only visible, non-superseded messages from the same authorized scope.
 - [ ] Tool output clearly marks excerpts as untrusted prior-thread content and never represents them as current conversation turns.
@@ -236,7 +261,7 @@ These decisions are part of this draft specification. Implementation must not im
 
 ### Agent retrieval
 
-- **FR-13:** Add `search_previous_threads` as a narrow retrieval tool, separate from uploaded-document search and web search.
+- **FR-13:** Add `search_previous_threads` as a core agent-continuity tool, separate from durable memory, uploaded-document search, and web search.
 - **FR-14:** Add a bounded read tool or equivalent second-stage operation for context around selected message IDs; search results alone must not dump whole transcripts.
 - **FR-15:** Both tools must derive the user from Eve auth and reject principals that are absent, non-user, or missing an ID.
 - **FR-16:** Both tools must derive the current root chat/project from the authenticated root session. A project chat restricts retrieval to exact same-project chats.
@@ -246,6 +271,10 @@ These decisions are part of this draft specification. Implementation must not im
 - **FR-20:** Retrieved prior-thread content must be treated as untrusted data. Embedded requests such as "ignore previous instructions" remain quoted source text and cannot alter tool scope or agent behavior.
 - **FR-21:** The agent must not state a previous decision, preference, or claim from retrieved text without a prior-thread citation on that claim.
 - **FR-22:** If retrieval is empty, ambiguous, unavailable, or below relevance threshold, the agent must state that it did not find a reliable match and ask for a narrower clue when useful.
+- **FR-22A:** Agent instructions must tell the agent to search when the user explicitly refers to earlier work or when missing previous context is likely to change the answer or action.
+- **FR-22B:** The agent must not require the user to name the old thread or issue an explicit search command.
+- **FR-22C:** Agent retrieval must include archived threads by default. Archive state may be returned as metadata but must not reduce retrieval eligibility.
+- **FR-22D:** Retrieval must remain selective. The agent must not call the tool for unrelated requests or inject previous-thread content into every prompt.
 
 ### Projection and lifecycle
 
@@ -544,6 +573,7 @@ Create a frozen fixture corpus with at least 40 cases and expected thread/messag
 | Category | Minimum cases | Expected behavior |
 |---|---:|---|
 | Explicit recall ("What did we decide in the X thread?") | 8 | Calls prior-thread search; cites correct thread/message. |
+| Implicit continuity ("Continue the deployment plan" or "Use my earlier preference") | 8 | Searches without an explicit search command; retrieves and cites the relevant earlier context. |
 | Title/keyword lookup | 6 | Retrieves exact lexical target in top 3. |
 | Paraphrase/semantic recall | 8 | Retrieves meaning-equivalent target in top 5 or honestly reports no reliable match. |
 | Ambiguous multiple matches | 4 | Presents/asks about ambiguity; does not merge threads. |
@@ -559,6 +589,7 @@ Create a frozen fixture corpus with at least 40 cases and expected thread/messag
 All thresholds are release gates, measured over at least three seeded model runs where model variance applies:
 
 - Tool routing on explicit prior-discussion prompts: **≥95%**.
+- Tool routing on implicit continuity prompts where earlier context changes the answer or action: **≥90%**.
 - Tool restraint on unrelated prompts: **≥95%** do not call prior-thread retrieval.
 - Exact/title lexical Recall@3: **≥0.90**.
 - Message keyword lexical Recall@5: **≥0.85**.
@@ -733,6 +764,7 @@ Feature flags should independently control:
 - Implement `search_previous_threads` and bounded `read_previous_thread_messages`.
 - Derive principal/current-project scope on the server and re-authorize reads.
 - Return structured citations and untrusted-content boundaries.
+- Include archived threads by default.
 - Add tool tests, including delegated/root-session cases.
 - **Depends on:** T-06, T-09.
 - **Likely files:** `agent/tools/`, shared retrieval/auth modules, tests.
@@ -740,7 +772,8 @@ Feature flags should independently control:
 
 ### T-11: update agent instructions and citation rendering contract
 
-- Teach the agent when to use prior-thread retrieval, how to cite app-relative thread/message links, and how to avoid silent blending/injection.
+- Teach the agent to retrieve prior context proactively when it is likely to change the answer or action. Cover explicit references and implicit continuity requests.
+- Teach the agent how to cite app-relative thread/message links and avoid silent blending or prompt injection.
 - Ensure app-relative citation links render and navigate safely without weakening web citation rules.
 - Add deterministic instruction/citation tests.
 - **Depends on:** T-10.
@@ -767,7 +800,8 @@ Feature flags should independently control:
 ### T-14: run full verification and real user flows
 
 - Run focused tests, authorization suite, browser tests, agent evals, performance tests, and standard repository gates.
-- Exercise user search → snippet → exact message and agent retrieval → read → cited answer against real app services.
+- Exercise agent continuity → search → read → cited continuation as the primary real flow.
+- Exercise user search → snippet → exact message as the secondary real flow.
 - Inspect logs for private content.
 - **Depends on:** T-08–T-13.
 - **Maps to:** all acceptance criteria.
@@ -787,7 +821,7 @@ Feature flags should independently control:
 | US-003 / FR-1–FR-8 | T-06, T-07, T-08 | Ranking/snippet/cursor unit tests, API integration, browser search flow. |
 | US-004 / FR-9 | T-09 | Direct-open browser tests and foreign/stale ID tests. |
 | US-005 / FR-12 | T-04, T-07, T-08 | Archived/project API and browser cases. |
-| US-006 / FR-13–FR-22 | T-10–T-12 | Tool tests plus agent eval thresholds. |
+| US-006 / FR-13–FR-22D | T-10–T-12 | Tool tests plus explicit and implicit continuity eval thresholds. |
 | US-007 / FR-26–FR-30 | T-04, T-05, T-14 | Freshness, retry, branch, supersede, move, archive, delete, repair tests. |
 | US-008 / NFR-6–NFR-10 | T-02, T-07, T-10, T-13–T-15 | Security suite, log inspection, migration/rollback, semantic policy, production acceptance. |
 | Lexical quality/latency | T-06, T-12, T-14 | Recall gates, EXPLAIN/query-plan evidence, p95/p99 load results. |
@@ -836,7 +870,7 @@ Post-launch product metrics, if collected without query/message content:
 - percentage of active users who use thread search;
 - result selection rate;
 - no-result rate bucketed globally, not by user/query;
-- agent retrieval invocation and empty-result rates;
+- agent retrieval invocation, continuity success, and empty-result rates;
 - stale-anchor fallback rate.
 
 ## 21. Open questions requiring approval or investigation
@@ -844,7 +878,7 @@ Post-launch product metrics, if collected without query/message content:
 1. **Archive dependency:** Will the archive-and-recover PRD land first, and what exact field/state owns `archived`? This PRD must consume one canonical state rather than duplicate it.
 2. **Stable message identity:** Can one searchable row map directly to one `chat_event.id` for all visible assistant segments, or does Eve/render behavior require a deterministic segment mapping table?
 3. **Supersede mapping:** What exact reducer message IDs are persisted in `client.superseded`, and can they be mapped losslessly to projected rows across multiple Eve sessions?
-4. **UI location:** Should global search be a sidebar modal/command palette, a dedicated page, or both? The default proposal is a sidebar affordance opening a responsive command-style surface.
+4. **UI location:** Should the secondary user-facing search be a sidebar modal/command palette, a dedicated page, or both? The default proposal is a sidebar affordance opening a responsive command-style surface.
 5. **Keyboard shortcut:** Approve `/`, `Ctrl/Cmd+K`, or another shortcut after checking existing composer/browser conflicts.
 6. **Search language support:** Which Postgres text-search configuration(s) are required at launch? `simple` is language-neutral but lacks stemming; language-specific configs improve English recall but can mis-handle multilingual chats.
 7. **Title fuzzy matching:** Is `pg_trgm` guaranteed in every supported Postgres deployment, or should prefix/full-text matching launch without it?
@@ -875,6 +909,7 @@ After approval, any implementation agent must receive:
 - **Source of truth:** this PRD plus `AGENTS.md`, `docs/PRODUCT_PLANNING.md`, `docs/DEVELOPMENT_PRINCIPLES.md`, and `docs/ENGINEERING_INVARIANTS.md`.
 - **Repository context:** `/opt/data/miniscira-src`, clean branch/worktree expectations, Bun at `/opt/data/bin/bun`, committed Drizzle migrations only, and no startup schema mutation.
 - **Locked decisions:** Section 3, especially visible-only indexing, exact user/project predicates, lexical-first retrieval, explicit citations, no silent blending, and semantic gating.
+- **Product priority:** agent continuity is primary. User-facing search is secondary. Archived threads remain available to agent retrieval.
 - **Ordered tasks:** T-01 through T-15. Do not skip projection-contract work and jump to UI/tool implementation.
 - **Non-goals:** Section 5. Do not implement archive management, memory extraction, public/team search, or opportunistic event/auth refactors.
 - **Verification:** exact focused commands added to the approved TODO plan, full repository gates, browser flow, authorization suite, agent evals, migration/backfill/rollback evidence, and production acceptance.
