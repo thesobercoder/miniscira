@@ -280,10 +280,10 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
 
   const create = async () => {
     if (!name.trim() || !url.trim()) return
-    const headers =
-      headerKey.trim() && headerValue.trim()
-        ? { [headerKey.trim()]: headerValue.trim() }
-        : undefined
+    const credential = headerValue.trim()
+    const headers = credential
+      ? { [headerKey.trim() || "Authorization"]: credential }
+      : undefined
     await addServer(
       {
         name,
@@ -451,7 +451,7 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                   )}
                 </div>
               </div>
-              <div className="flex flex-wrap items-end gap-3">
+              <div className="grid gap-3 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start">
                 <div className="grid gap-1.5">
                   <Label>Transport</Label>
                   <div className="flex gap-1">
@@ -469,14 +469,14 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                     ))}
                   </div>
                 </div>
-                <div className="grid flex-1 basis-52 gap-1.5">
+                <div className="grid min-w-0 gap-1.5">
                   {/* One visual label over the pair, but each input carries its
                       own name — the value field holds a credential and must
                       announce as more than an unlabeled textbox. */}
                   <span className="font-medium text-sm leading-none">
                     Authentication header (optional)
                   </span>
-                  <div className="flex gap-1.5">
+                  <div className="grid gap-1.5 sm:grid-cols-2">
                     <Input
                       id="mcp-hk"
                       aria-label="Header name"
@@ -501,13 +501,15 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                     and enter the complete value: Bearer followed by your token.
                   </p>
                 </div>
-                <Button
-                  onClick={create}
-                  disabled={creating || !name.trim() || !url.trim()}
-                  className="gap-2"
-                >
-                  <RiAddLine className="size-4" /> Add
-                </Button>
+                <div className="flex justify-end sm:col-span-2">
+                  <Button
+                    onClick={create}
+                    disabled={creating || !name.trim() || !url.trim()}
+                    className="gap-2"
+                  >
+                    <RiAddLine className="size-4" /> Add
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

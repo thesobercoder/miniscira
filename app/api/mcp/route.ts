@@ -5,17 +5,9 @@ import { authed } from "@/lib/api-auth"
 import { db } from "@/lib/db"
 import { mcpServer } from "@/lib/db/schema"
 import { publicServer } from "@/lib/mcp"
+import { sanitizeMcpHeaders } from "@/lib/mcp-headers"
 import { sealMcpHeaders, sealMcpJson } from "@/lib/mcp-secrets"
 import { validateMcpServerUrl } from "@/lib/mcp-url"
-
-function sanitizeHeaders(input: unknown): Record<string, string> | null {
-  if (!input || typeof input !== "object") return null
-  const out: Record<string, string> = {}
-  for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
-    if (k.trim() && typeof v === "string") out[k.trim()] = v
-  }
-  return Object.keys(out).length > 0 ? out : null
-}
 
 // GET /api/mcp — the signed-in user's MCP servers.
 export const GET = authed(async (_request, { userId }) => {
@@ -65,7 +57,7 @@ export const POST = authed(async (request, { userId }) => {
       url,
       transport,
       authType,
-      headers: sealMcpHeaders(sanitizeHeaders(body.headers)),
+      headers: sealMcpHeaders(sanitizeMcpHeaders(body.headers)),
       oauthClient: oauthClientId
         ? sealMcpJson({
             client_id: oauthClientId,
