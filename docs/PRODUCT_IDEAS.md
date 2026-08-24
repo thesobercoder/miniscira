@@ -17,9 +17,9 @@ Remove an entry after the user explicitly approves its PRD.
 
 [Draft PRD](../tasks/prd-document-generation.md). Awaiting approval.
 
-### Archive and recover chat threads
+### Scalable research history
 
-[Draft PRD](../tasks/prd-thread-archiving.md). Awaiting approval.
+[Draft PRD](../tasks/prd-scalable-research-history.md). Awaiting approval.
 
 ### Progressive MCP tool discovery
 
