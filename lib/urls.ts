@@ -64,6 +64,12 @@ export function safeRedirect(
   }
 }
 
+/** Signed-in visitors should never remain on the sign-in route itself. */
+export function signedInRedirect(value: string | null | undefined): string {
+  const target = safeRedirect(value)
+  return target === "/sign-in" || target.startsWith("/sign-in?") ? "/" : target
+}
+
 /** Parses a URL, or returns null instead of throwing on a malformed one. */
 export function tryParseUrl(value: string): URL | null {
   try {

@@ -4,6 +4,7 @@ import {
   initialQuery,
   MAX_QUERY_LENGTH,
   safeRedirect,
+  signedInRedirect,
   withoutInitialQuery,
 } from "@/lib/urls"
 
@@ -106,5 +107,19 @@ describe("safeRedirect", () => {
     expect(safeRedirect(undefined)).toBe("/")
     expect(safeRedirect("")).toBe("/")
     expect(safeRedirect(null, "/chat")).toBe("/chat")
+  })
+})
+
+describe("signedInRedirect", () => {
+  test("keeps a safe return target", () => {
+    expect(signedInRedirect("/chat/abc?tab=sources")).toBe(
+      "/chat/abc?tab=sources"
+    )
+  })
+
+  test("falls back to the app instead of looping through sign-in", () => {
+    expect(signedInRedirect(null)).toBe("/")
+    expect(signedInRedirect("/sign-in")).toBe("/")
+    expect(signedInRedirect("/sign-in?redirect=/settings")).toBe("/")
   })
 })
