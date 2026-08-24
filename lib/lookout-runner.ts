@@ -8,6 +8,7 @@ import { appBaseUrl } from "@/lib/base-url"
 import { db } from "@/lib/db"
 import { chat, chatEvent, lookout, project, user } from "@/lib/db/schema"
 import { sendLookoutEmail } from "@/lib/email"
+import { eveClientOrigin } from "@/lib/eve-client-origin"
 import { lookoutRecipient } from "@/lib/lookout-recipient"
 
 // Reduce the persisted stream into the final assistant answer text (for email).
@@ -71,7 +72,15 @@ export async function runLookout(
   if (instructions?.trim())
     clientContext.projectInstructions = instructions.trim()
 
-  const client = new Client({ host: appBaseUrl() })
+  const publicAppOrigin = appBaseUrl()
+  const client = new Client({
+    host: eveClientOrigin({
+      appOrigin: publicAppOrigin,
+      nodeEnv: process.env.NODE_ENV,
+      productionPort: process.env.EVE_NEXT_PRODUCTION_PORT,
+      vercel: process.env.VERCEL,
+    }),
+  })
   const session = client.session()
   const events: MessageStreamEvent[] = []
 
@@ -133,7 +142,7 @@ export async function runLookout(
       name: u.name,
       lookoutName: lk.name,
       answer: extractAnswerText(events),
-      chatUrl: `${appBaseUrl()}/chat/${row.id}`,
+      chatUrl: `${publicAppOrigin}/chat/${row.id}`,
     }).catch((err) => console.error("lookout email failed", err))
   }
 
