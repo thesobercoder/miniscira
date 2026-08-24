@@ -22,6 +22,7 @@
  *   RUN_DB_PUSH                   "true" to enable the transitional gate (default off)
  *   DB_WAIT_TIMEOUT_MS            how long to wait for the DB (default 90000)
  *   RUN_DB_PUSH_LOCK_TIMEOUT_MS   how long to wait for the advisory lock (default 60000)
+ *   EVE_NEXT_PRODUCTION_PORT       Eve server port (default 4274)
  */
 import { spawn } from "node:child_process"
 import { Pool } from "pg"
@@ -207,6 +208,19 @@ try {
 }
 process.env.NODE_ENV ??= "production"
 
+const evePort = process.env.EVE_NEXT_PRODUCTION_PORT?.trim() || "4274"
+const parsedEvePort = Number.parseInt(evePort, 10)
+if (
+  String(parsedEvePort) !== evePort ||
+  parsedEvePort < 1 ||
+  parsedEvePort > 65_535
+) {
+  console.error(
+    "[entrypoint] EVE_NEXT_PRODUCTION_PORT must be an integer between 1 and 65535."
+  )
+  process.exit(1)
+}
+
 try {
   await waitForDatabase(url)
   log("database reachable")
@@ -228,9 +242,9 @@ if (process.env.RUN_DB_PUSH === "true") {
   )
 }
 
-log("starting eve (port 4274) and next (port 3000) under supervision")
+log(`starting eve (port ${evePort}) and next (port 3000) under supervision`)
 const code = await supervise([
-  ["node", "node_modules/eve/bin/eve.js", "start", "--port", "4274"],
+  ["node", "node_modules/eve/bin/eve.js", "start", "--port", evePort],
   ["node", "node_modules/next/dist/bin/next", "start"],
 ])
 process.exit(code)

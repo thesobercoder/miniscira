@@ -56,4 +56,20 @@ describe("eveClientOrigin", () => {
       })
     ).toBe("https://eve.example.com")
   })
+
+  test("rejects invalid local Eve production ports", () => {
+    for (const productionPort of ["abc", "4274x", "0", "-1", "70000"]) {
+      expect(() =>
+        eveClientOrigin({
+          appOrigin: "http://umbrel.local:8325",
+          nodeEnv: "production",
+          productionOrigin: undefined,
+          productionPort,
+          vercel: undefined,
+        })
+      ).toThrow(
+        "EVE_NEXT_PRODUCTION_PORT must be an integer between 1 and 65535."
+      )
+    }
+  })
 })
