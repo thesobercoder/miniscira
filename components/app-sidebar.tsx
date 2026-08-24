@@ -1,5 +1,5 @@
 import { RiAddLine } from "@remixicon/react"
-import { and, desc, eq, isNull } from "drizzle-orm"
+import { desc, eq } from "drizzle-orm"
 import Link from "next/link"
 import { ChatList } from "@/components/chat-list"
 import { LookoutList } from "@/components/lookout-list"
@@ -19,7 +19,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { db } from "@/lib/db"
-import { chat, lookout } from "@/lib/db/schema"
+import { lookout } from "@/lib/db/schema"
 import { listHistoryPage } from "@/lib/history"
 
 type SidebarUserInfo = {
@@ -30,12 +30,8 @@ type SidebarUserInfo = {
 }
 
 export async function AppSidebar({ user }: { user: SidebarUserInfo }) {
-  const [chats, lookouts] = await Promise.all([
-    db
-      .select({ id: chat.id, title: chat.title, updatedAt: chat.updatedAt })
-      .from(chat)
-      .where(and(eq(chat.userId, user.id), isNull(chat.lookoutId)))
-      .orderBy(desc(chat.updatedAt)),
+  const [chatHistory, lookouts] = await Promise.all([
+    listHistoryPage({ userId: user.id, scope: { kind: "active" } }),
     db
       .select({ id: lookout.id, name: lookout.name })
       .from(lookout)
@@ -105,7 +101,16 @@ export async function AppSidebar({ user }: { user: SidebarUserInfo }) {
           <LookoutList lookouts={lookoutGroups} />
         </SidebarGroup>
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-          <ChatList chats={chats} />
+          <ChatList
+            initialPage={{
+              chats: chatHistory.rows.map((row) => ({
+                id: row.id,
+                title: row.title,
+                updatedAt: row.timestamp.toISOString(),
+              })),
+              nextCursor: chatHistory.nextCursor,
+            }}
+          />
         </SidebarGroup>
       </SidebarContent>
 

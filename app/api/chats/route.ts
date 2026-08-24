@@ -1,25 +1,32 @@
-import { desc, eq } from "drizzle-orm"
 import { NextResponse } from "next/server"
 
 import { authed, notFound } from "@/lib/api-auth"
 import { ownedProject } from "@/lib/api-ownership"
 import { db } from "@/lib/db"
 import { chat } from "@/lib/db/schema"
+import { isInvalidHistoryCursor, listHistoryPage } from "@/lib/history"
 
-// GET /api/chats — list the signed-in user's chats, most recent first.
-export const GET = authed(async (_request, { userId }) => {
-  const chats = await db
-    .select({
-      id: chat.id,
-      title: chat.title,
-      updatedAt: chat.updatedAt,
-      createdAt: chat.createdAt,
+// GET /api/chats — one bounded active-history page.
+export const GET = authed(async (request, { userId }) => {
+  const cursor = request.nextUrl.searchParams.get("cursor")
+  try {
+    const page = await listHistoryPage({
+      userId,
+      scope: { kind: "active" },
+      cursor,
     })
-    .from(chat)
-    .where(eq(chat.userId, userId))
-    .orderBy(desc(chat.updatedAt))
-
-  return NextResponse.json({ chats })
+    return NextResponse.json({
+      chats: page.rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        updatedAt: row.timestamp.toISOString(),
+      })),
+      nextCursor: page.nextCursor,
+    })
+  } catch (error) {
+    if (!isInvalidHistoryCursor(error)) throw error
+    return NextResponse.json({ error: "Invalid cursor" }, { status: 400 })
+  }
 })
 
 // POST /api/chats — create an empty chat row and return its id.

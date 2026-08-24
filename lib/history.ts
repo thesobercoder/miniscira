@@ -162,6 +162,10 @@ export function parseHistoryCursor(raw: string | null): HistoryCursor | null {
   }
 }
 
+export function isInvalidHistoryCursor(error: unknown) {
+  return error instanceof Error && error.message === "Invalid history cursor."
+}
+
 export function encodeHistoryCursor(
   cursor: Omit<HistoryCursor, "ownerBinding"> & { userId: string }
 ): string {

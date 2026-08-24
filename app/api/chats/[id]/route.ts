@@ -24,6 +24,7 @@ export const GET = authedWithParams<Params>(
       chat: {
         id: owned.chat.id,
         title: owned.chat.title,
+        updatedAt: owned.chat.lastActivityAt.toISOString(),
         eveSessionId: owned.chat.eveSessionId,
         continuationToken: owned.chat.continuationToken,
         streamIndex: owned.chat.streamIndex,
