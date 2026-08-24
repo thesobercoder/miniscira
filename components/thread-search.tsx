@@ -21,6 +21,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
+import { Kbd } from "@/components/ui/kbd"
 import { SidebarMenuButton } from "@/components/ui/sidebar"
 import { useMountEffect } from "@/hooks/use-mount-effect"
 import { chatPath } from "@/lib/chat-route"
@@ -190,9 +191,10 @@ export function ThreadSearchButton() {
     >
       <RiSearchLine />
       <span>Search chats</span>
-      <kbd className="ml-auto text-muted-foreground text-xs group-data-[collapsible=icon]:hidden">
-        ⌘K
-      </kbd>
+      <Kbd className="ml-auto min-w-8 gap-1 px-1.5 group-data-[collapsible=icon]:hidden">
+        <span aria-hidden="true">⌘</span>
+        <span>K</span>
+      </Kbd>
     </SidebarMenuButton>
   )
 }
