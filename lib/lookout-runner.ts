@@ -29,7 +29,7 @@ function extractAnswerText(events: MessageStreamEvent[]): string {
 
 /**
  * Run one lookout: create a result chat, run the agent headlessly as the owner,
- * persist the turn, then email the digest. Reused by the QStash callback and the
+ * persist the turn, then email the digest. Reused by the Eve schedule and the
  * manual "Run now" trigger.
  */
 export async function runLookout(
@@ -77,6 +77,7 @@ export async function runLookout(
     host: eveClientOrigin({
       appOrigin: publicAppOrigin,
       nodeEnv: process.env.NODE_ENV,
+      productionOrigin: process.env.EVE_NEXT_PRODUCTION_ORIGIN,
       productionPort: process.env.EVE_NEXT_PRODUCTION_PORT,
       vercel: process.env.VERCEL,
     }),

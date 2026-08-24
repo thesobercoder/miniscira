@@ -8,6 +8,7 @@ describe("eveClientOrigin", () => {
       eveClientOrigin({
         appOrigin: "https://app.example.com",
         nodeEnv: "development",
+        productionOrigin: undefined,
         productionPort: undefined,
         vercel: undefined,
       })
@@ -16,6 +17,7 @@ describe("eveClientOrigin", () => {
       eveClientOrigin({
         appOrigin: "https://app.example.com",
         nodeEnv: "production",
+        productionOrigin: undefined,
         productionPort: undefined,
         vercel: "1",
       })
@@ -27,6 +29,7 @@ describe("eveClientOrigin", () => {
       eveClientOrigin({
         appOrigin: "http://umbrel.local:8325",
         nodeEnv: "production",
+        productionOrigin: undefined,
         productionPort: undefined,
         vercel: undefined,
       })
@@ -35,9 +38,22 @@ describe("eveClientOrigin", () => {
       eveClientOrigin({
         appOrigin: "http://umbrel.local:8325",
         nodeEnv: "production",
+        productionOrigin: undefined,
         productionPort: "5000",
         vercel: undefined,
       })
     ).toBe("http://127.0.0.1:5000")
+  })
+
+  test("uses the configured remote Eve production origin", () => {
+    expect(
+      eveClientOrigin({
+        appOrigin: "https://app.example.com",
+        nodeEnv: "production",
+        productionOrigin: "https://eve.example.com/base/path",
+        productionPort: undefined,
+        vercel: undefined,
+      })
+    ).toBe("https://eve.example.com")
   })
 })
