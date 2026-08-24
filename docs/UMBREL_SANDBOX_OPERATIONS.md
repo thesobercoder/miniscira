@@ -512,6 +512,40 @@ for path in ('/api/health', '/eve/v1/health'):
 PY
 ```
 
+### Run production Eve evals
+
+Use the durable runner from the repository root:
+
+```bash
+python3 scripts/run-production-evals.py
+```
+
+It connects the three parts of the production eval harness without printing
+credentials:
+
+1. It reads Stack 30 through Portainer and copies `EVE_EVAL_AUTH_TOKEN` only
+   into the local Eve runner process.
+2. It verifies that Stack 30 maps the token to `EVE_EVAL_USER_ID=miniscira-eval-user`.
+   `agent/channels/eve.ts` turns a matching bearer token into that user principal.
+3. It prepares the durable fixture chats for that account, starts
+   `scripts/eval-forward.mjs`, and maps local `http://127.0.0.1:8325` to production
+   `http://10.21.0.1:8325`. The loopback URL satisfies Eve's remote URL check while
+   the TCP forward still exercises the deployed app and agent.
+4. It runs every discovered eval with `--strict --max-concurrency 1` when no eval
+   IDs or tags are supplied.
+
+Pass ordinary `eve eval` arguments after the script name to narrow a run. For
+example:
+
+```bash
+python3 scripts/run-production-evals.py --tag thread-search
+python3 scripts/run-production-evals.py document-generation-routing
+python3 scripts/run-production-evals.py --list
+```
+
+The runner owns the forward lifecycle and terminates it after the eval command.
+Never print, copy, commit, or persist the token outside Stack 30.
+
 ### Inspect services through Portainer
 
 Prefer `/opt/data/bin/portainerctl` for inventory, or the Portainer API using
