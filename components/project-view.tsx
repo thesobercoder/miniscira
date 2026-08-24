@@ -15,7 +15,7 @@ import {
 } from "@remixicon/react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useReducer, useRef, useState } from "react"
 import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { ResearchChat } from "@/components/research-chat"
@@ -47,8 +47,12 @@ import { useMountEffect } from "@/hooks/use-mount-effect"
 import { mutateOrToast } from "@/lib/api-client"
 import {
   type ChatListPagePayload,
-  type ChatListRow,
+  createHistoryWindow,
+  historyWindowReducer,
+  nextHistoryIntent,
   parseChatListPage,
+  reloadHistoryIntent,
+  renderedHistorySlots,
 } from "@/lib/chat-list-events"
 import { hostOf, tryParseUrl } from "@/lib/urls"
 
@@ -68,8 +72,6 @@ type ProjectDoc = {
   error?: string | null
   url?: string
 }
-type ProjectChat = ChatListRow
-
 const DOC_ACCEPT =
   "image/*,.pdf,.txt,.md,.markdown,.csv,.json,.log,.tsv,.html,.xml,.yaml,.yml,text/*,application/pdf"
 
@@ -78,10 +80,11 @@ type PanelProps = {
   setInstructions: (v: string) => void
   saveInstructions: () => void
   docs: ProjectDoc[]
-  chats: ProjectChat[]
-  chatsNextCursor: string | null
+  chatSlots: ReturnType<typeof renderedHistorySlots>
+  chatsHaveMore: boolean
   chatsLoading: boolean
   loadMoreChats: () => void
+  reloadChats: (slot: number, cursor: string | null) => void
   links: string[]
   onAddLink: (url: string) => void
   onRemoveLink: (url: string) => void
@@ -184,10 +187,11 @@ function ProjectPanelContent({
   setInstructions,
   saveInstructions,
   docs,
-  chats,
-  chatsNextCursor,
+  chatSlots,
+  chatsHaveMore,
   chatsLoading,
   loadMoreChats,
+  reloadChats,
   links,
   onAddLink,
   onRemoveLink,
@@ -289,23 +293,41 @@ function ProjectPanelContent({
         )}
       </div>
 
-      {(chats.length > 0 || chatsNextCursor) && (
+      {(chatSlots.length > 0 || chatsHaveMore) && (
         <div className="flex min-w-0 flex-col gap-2">
           <Label>Chats</Label>
           <ul className="flex flex-col gap-0.5">
-            {chats.map((c) => (
-              <li key={c.id}>
-                <Link
-                  href={`/chat/${c.id}`}
-                  className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50"
-                >
-                  <RiChat3Line className="size-4 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1 truncate">{c.title}</span>
-                </Link>
-              </li>
-            ))}
+            {chatSlots.map(({ slot, index }) =>
+              slot.kind === "loaded" ? (
+                slot.rows.map((chat) => (
+                  <li key={chat.id}>
+                    <Link
+                      href={`/chat/${chat.id}`}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50"
+                    >
+                      <RiChat3Line className="size-4 shrink-0 text-muted-foreground" />
+                      <span className="min-w-0 flex-1 truncate">
+                        {chat.title}
+                      </span>
+                    </Link>
+                  </li>
+                ))
+              ) : (
+                <li key={slot.key}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full"
+                    disabled={chatsLoading}
+                    onClick={() => reloadChats(index, slot.inputCursor)}
+                  >
+                    Load {slot.rowCount} earlier chats
+                  </Button>
+                </li>
+              )
+            )}
           </ul>
-          {chatsNextCursor && (
+          {chatsHaveMore && (
             <Button
               variant="ghost"
               size="sm"
@@ -357,9 +379,14 @@ export function ProjectView({
     useState(initialInstructions)
   const [links, setLinks] = useState<string[]>(initialLinks)
   const [docs, setDocs] = useState<ProjectDoc[]>([])
-  const [chats, setChats] = useState<ProjectChat[]>([])
-  const [chatsNextCursor, setChatsNextCursor] = useState<string | null>(null)
-  const [chatsLoading, setChatsLoading] = useState(false)
+  const [chatHistory, dispatchChatHistory] = useReducer(
+    historyWindowReducer,
+    {
+      generation: "loading",
+      page: { chats: [], nextCursor: null },
+    },
+    createHistoryWindow
+  )
   const [panelOpen, setPanelOpen] = useState(true)
   const isMobile = useIsMobile()
   // Keep the side panel out of the resizable group on mobile — it would take a
@@ -375,39 +402,69 @@ export function ProjectView({
         if (Array.isArray(d.documents)) setDocs(d.documents)
         const page = parseChatListPage(d)
         if (page) {
-          setChats(page.chats)
-          setChatsNextCursor(page.nextCursor)
+          dispatchChatHistory({
+            type: "sourceChanged",
+            generation: JSON.stringify(page),
+            page,
+          })
         }
       })
       .catch(() => {})
   }, [projectId])
 
-  const loadMoreChats = useCallback(() => {
-    if (!chatsNextCursor || chatsLoading) return
-    setChatsLoading(true)
-    fetch(
-      `/api/projects/${projectId}?cursor=${encodeURIComponent(chatsNextCursor)}`
-    )
-      .then(async (response) =>
-        response.ok ? parseChatListPage(await response.json()) : null
+  const requestChatPage = useCallback(
+    (slot: number, cursor: string | null) => {
+      dispatchChatHistory({ type: "pageRequested", slot, cursor })
+      fetch(
+        `/api/projects/${projectId}?cursor=${encodeURIComponent(cursor ?? "")}`
       )
-      .then((page: ChatListPagePayload | null) => {
-        if (!page) {
-          toast.error("Couldn't load older chats")
-          return
-        }
-        setChats((current) => {
-          const seen = new Set(current.map((chat) => chat.id))
-          return [
-            ...current,
-            ...page.chats.filter((chat) => !seen.has(chat.id)),
-          ].slice(0, 300)
+        .then(async (response) =>
+          response.ok ? parseChatListPage(await response.json()) : null
+        )
+        .then((page: ChatListPagePayload | null) => {
+          if (!page) {
+            toast.error("Couldn't load older chats")
+            dispatchChatHistory({
+              type: "pageFailed",
+              slot,
+              cursor,
+              message: "Couldn't load older chats",
+            })
+            return
+          }
+          dispatchChatHistory({
+            type: "pageLoaded",
+            slot,
+            cursor,
+            page,
+          })
         })
-        setChatsNextCursor(page.nextCursor)
-      })
-      .catch(() => toast.error("Couldn't load older chats"))
-      .finally(() => setChatsLoading(false))
-  }, [chatsLoading, chatsNextCursor, projectId])
+        .catch(() => {
+          toast.error("Couldn't load older chats")
+          dispatchChatHistory({
+            type: "pageFailed",
+            slot,
+            cursor,
+            message: "Couldn't load older chats",
+          })
+        })
+    },
+    [projectId]
+  )
+
+  const loadMoreChats = useCallback(() => {
+    const intent = nextHistoryIntent(chatHistory)
+    if (intent) requestChatPage(intent.slot, intent.cursor)
+  }, [chatHistory, requestChatPage])
+
+  const reloadChats = useCallback(
+    (slot: number, cursor: string | null) => {
+      const intent = reloadHistoryIntent(chatHistory, slot)
+      if (intent && intent.cursor === cursor)
+        requestChatPage(intent.slot, intent.cursor)
+    },
+    [chatHistory, requestChatPage]
+  )
 
   // Mount-only: a different project is a different route, so it remounts.
   useMountEffect(() => {
@@ -504,10 +561,11 @@ export function ProjectView({
     setInstructions,
     saveInstructions,
     docs,
-    chats,
-    chatsNextCursor,
-    chatsLoading,
+    chatSlots: renderedHistorySlots(chatHistory),
+    chatsHaveMore: nextHistoryIntent(chatHistory) !== null,
+    chatsLoading: chatHistory.load.kind === "loading",
     loadMoreChats,
+    reloadChats,
     links,
     onAddLink: addLink,
     onRemoveLink: removeLink,
