@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react"
 import { toast } from "sonner"
 import { useMountEffect } from "@/hooks/use-mount-effect"
 import { mutateOrToast } from "@/lib/api-client"
+import { DOCUMENT_MEDIA_TYPES } from "@/lib/document-files"
 
 /**
  * Owns the attachment lifecycle for one chat: files staged in the composer for
@@ -29,8 +30,23 @@ export type UploadedDoc = {
   file?: File
 }
 
-export const DOC_ACCEPT =
-  "image/*,.png,.jpg,.jpeg,.webp,.gif,.avif,.pdf,.txt,.md,.markdown,.csv,.json,.log,.tsv,.html,.xml,.yaml,.yml,text/*,application/pdf"
+export const OFFICE_MIME_TYPES = [
+  DOCUMENT_MEDIA_TYPES[".docx"],
+  DOCUMENT_MEDIA_TYPES[".pptx"],
+  DOCUMENT_MEDIA_TYPES[".xlsx"],
+] as const
+
+const MODEL_DOCUMENT_MIME_TYPES = new Set<string>(["application/pdf"])
+
+export const DOC_ACCEPT = `image/*,.png,.jpg,.jpeg,.webp,.gif,.avif,.pdf,.docx,.pptx,.xlsx,.txt,.md,.markdown,.csv,.json,.log,.tsv,.html,.xml,.yaml,.yml,text/*,application/pdf,${OFFICE_MIME_TYPES.join(",")}`
+
+export function isModelFileAttachment(document: UploadedDoc): boolean {
+  return (
+    document.kind === "image" ||
+    (document.mimeType != null &&
+      MODEL_DOCUMENT_MIME_TYPES.has(document.mimeType))
+  )
+}
 
 type Options = {
   chatId?: string

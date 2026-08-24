@@ -26,6 +26,7 @@ import {
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller"
 import {
+  isModelFileAttachment,
   type UploadedDoc,
   useChatAttachments,
 } from "@/hooks/use-chat-attachments"
@@ -391,14 +392,12 @@ export function ResearchChat({
     }
 
     // Attachments ride to the model natively as file parts — eve's message
-    // schema only accepts "text"/"file" (no separate "image" part type);
-    // models with vision read image-mediaType file parts directly. Documents
-    // are ALSO indexed for search_documents, so they stay searchable across chats.
+    // schema only accepts "text"/"file" (no separate "image" part type).
+    // Models with vision read image-mediaType file parts directly. PDFs keep
+    // their stored MIME type. Office files are staged by filename in run_code.
     // The model-facing part is a data: URL — buildFileParts inlines the bytes
     // because the SDK refuses http attachments from private hosts (see above).
-    const attachable = attached.filter(
-      (d) => d.url && (d.kind === "image" || d.mimeType === "application/pdf")
-    )
+    const attachable = attached.filter((d) => d.url && isModelFileAttachment(d))
     let fileParts: Awaited<ReturnType<typeof buildFileParts>> | null = null
     if (attachable.length > 0) {
       try {

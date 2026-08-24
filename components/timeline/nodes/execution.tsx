@@ -31,6 +31,7 @@ import {
   type ToolPart,
 } from "@/components/timeline/parts"
 import { Live } from "@/components/timeline/primitives"
+import type { GeneratedDocumentFile } from "@/lib/document-files"
 import { cn } from "@/lib/utils"
 
 /** Steps where the agent ran something: code, shell, and file edits. */
@@ -42,6 +43,24 @@ export function CodeBlock({ text }: { text: string }) {
     <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/60 p-2.5 font-mono text-foreground text-xs leading-relaxed">
       {clampText(text)}
     </pre>
+  )
+}
+
+export function DocumentLinks({ files }: { files: GeneratedDocumentFile[] }) {
+  if (files.length === 0) return null
+  return (
+    <div className="flex flex-col gap-1.5">
+      {files.map((file) => (
+        <a
+          key={file.url}
+          href={file.url}
+          download={file.name}
+          className="w-fit text-sm underline underline-offset-4"
+        >
+          Download {file.name}
+        </a>
+      ))}
+    </div>
   )
 }
 
@@ -60,6 +79,7 @@ export function RunCodeNode({ group, last, active }: ToolNodeProps) {
         stderr?: string
         ok?: boolean
         images?: { name: string; url: string }[]
+        files?: GeneratedDocumentFile[]
         loadedFiles?: string[]
         missingFiles?: string[]
       }
@@ -72,6 +92,7 @@ export function RunCodeNode({ group, last, active }: ToolNodeProps) {
   )
   const stdout = out?.stdout?.trim() ? out.stdout : ""
   const stderr = out?.stderr?.trim() ? out.stderr : ""
+  const files = arrayField<GeneratedDocumentFile>(outputOf(part), "files")
 
   return (
     <ChainOfThoughtStep
@@ -117,6 +138,7 @@ export function RunCodeNode({ group, last, active }: ToolNodeProps) {
             ))}
           </div>
         )}
+        <DocumentLinks files={files} />
         {out?.missingFiles?.length ? (
           <div className="text-muted-foreground text-xs">
             Couldn't find: {out.missingFiles.join(", ")}

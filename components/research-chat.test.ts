@@ -126,4 +126,43 @@ describe("modelFileParts", () => {
       globalThis.FileReader = originalFileReader
     }
   })
+
+  test("preserves a supplied document MIME type in the model part builder", async () => {
+    const originalFetch = globalThis.fetch
+    const originalFileReader = globalThis.FileReader
+    const mimeType =
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    globalThis.fetch = (async () =>
+      new Response(new Uint8Array([80, 75]), {
+        headers: { "content-type": "application/octet-stream" },
+      })) as unknown as typeof fetch
+    globalThis.FileReader = class {
+      result: string | ArrayBuffer | null = null
+      onload: null | (() => void) = null
+      onerror: null | (() => void) = null
+      readAsDataURL() {
+        this.result = "data:application/octet-stream;base64,UEs="
+        this.onload?.()
+      }
+    } as unknown as typeof FileReader
+
+    try {
+      const [part] = await modelFileParts([
+        {
+          id: "docx-1",
+          filename: "brief.docx",
+          status: "ready",
+          kind: "document",
+          mimeType,
+          url: "/api/files/brief.docx",
+        },
+      ])
+      expect(part.mediaType).toBe(mimeType)
+      expect(part.data.href).toBe(`data:${mimeType};base64,UEs=`)
+      expect(part.filename).toBe("brief.docx")
+    } finally {
+      globalThis.fetch = originalFetch
+      globalThis.FileReader = originalFileReader
+    }
+  })
 })

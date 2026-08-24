@@ -100,7 +100,15 @@ RUN apt-get update \
     | tar -xz --strip-components=1 -C /usr/local/bin docker/docker \
  && mv /usr/local/bin/docker /usr/local/bin/docker-real \
  && rm -rf /var/lib/apt/lists/* \
- && python3 -m pip install --no-cache-dir --break-system-packages pandas numpy matplotlib
+ && python3 -m pip install --no-cache-dir --break-system-packages \
+    pandas \
+    numpy \
+    matplotlib \
+    reportlab==5.0.1 \
+    pypdf==6.16.2 \
+    python-docx==1.2.0 \
+    python-pptx==1.0.2 \
+    openpyxl==3.1.5
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next

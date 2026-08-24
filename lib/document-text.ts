@@ -1,5 +1,6 @@
 import { classifyPdf, processPdf } from "@firecrawl/pdf-inspector"
 import { extractText, getDocumentProxy } from "unpdf"
+import { storedDocumentMimeType } from "@/lib/document-files"
 
 /**
  * Turning an uploaded file into indexable text.
@@ -12,7 +13,15 @@ import { extractText, getDocumentProxy } from "unpdf"
  * reranker, so extraction lives here and never enters its module graph.
  */
 
-type SupportedKind = "pdf" | "text"
+type SupportedKind = "office" | "pdf" | "text"
+
+export function storedMimeType(mimeType: string, filename: string): string {
+  return (
+    storedDocumentMimeType(mimeType, filename) ||
+    mimeType ||
+    "application/octet-stream"
+  )
+}
 
 /** Classify an upload: "image" → vision input, "document" → parsed & embedded, null → unsupported. */
 export function attachmentKind(
@@ -31,6 +40,8 @@ export function attachmentKind(
 
 function kindForFile(mimeType: string, filename: string): SupportedKind | null {
   const name = filename.toLowerCase()
+  const documentType = storedDocumentMimeType(mimeType, filename)
+  if (documentType && documentType !== "application/pdf") return "office"
   if (mimeType === "application/pdf" || name.endsWith(".pdf")) return "pdf"
   if (
     mimeType.startsWith("text/") ||
@@ -89,8 +100,9 @@ export async function extractDocumentText(
   buffer: ArrayBuffer,
   mimeType: string,
   filename: string
-): Promise<string> {
+): Promise<string | null> {
   const kind = kindForFile(mimeType, filename)
+  if (kind === "office") return null
   if (kind !== "pdf") return new TextDecoder().decode(buffer)
 
   try {

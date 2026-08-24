@@ -1,6 +1,6 @@
 # PRD: sandbox document files
 
-- **Status:** Draft — revised for review
+- **Status:** Approved by Soham on 2026-08-24.
 - **Backlog source:** [`docs/PRODUCT_IDEAS.md` — Generate editable documents and presentations](../docs/PRODUCT_IDEAS.md#generate-editable-documents-and-presentations)
 - **Scope:** PDF, DOCX, PPTX, and XLSX creation and editing
 
@@ -8,7 +8,7 @@
 
 The agent can already write document files in its Sandbox. The current `run_code` result only publishes generated images, so an office document created successfully can remain trapped in the Sandbox. MiniScira also does not accept every supported office format as an input for editing.
 
-MiniScira does not need a separate document platform. The agent needs the four document skills Soham supplied, the tools those skills expect in the Sandbox image, and a small extension to the existing file path so supported documents can be uploaded and downloaded.
+MiniScira does not need a separate document platform. The agent needs four original MiniScira document skills, the tools those skills expect in the Sandbox image, and a small extension to the existing file path so supported documents can be uploaded and downloaded.
 
 ## Goal
 
@@ -29,18 +29,18 @@ A user can ask the agent to create or edit a PDF, DOCX, PPTX, or XLSX file. The 
 
 ### Skills
 
-Make the four user-supplied Anthropic document skills available to Eve as load-on-demand skills:
+Make four clean-room MiniScira document skills available to Eve as load-on-demand skills:
 
 - PDF
 - DOCX
 - PPTX
 - XLSX
 
-Preserve their supporting scripts and references when the skill depends on them. Keep their provenance and license files with the installed copy. Do not rewrite the skills into a second MiniScira-specific instruction system.
+Write these skills from MiniScira's requirements and the public APIs of the installed libraries. Do not copy Anthropic skill text, scripts, references, or assets. Keep the skills small and use `run_code` directly.
 
 ### Sandbox image
 
-Install the runtimes, libraries, and command-line tools required by those four skills. The exact package list comes from the skills themselves and must be pinned in the image. The image must contain everything needed at runtime. The agent must not install packages during a chat.
+Install and pin `reportlab`, `pypdf`, `python-docx`, `python-pptx`, and `openpyxl` in the image. The image must contain everything needed at runtime. The agent must not install packages during a chat.
 
 Keep the current Sandbox isolation and network policy unchanged.
 
@@ -69,7 +69,7 @@ Extend the existing `run_code` timeline node with a small file-download list. Do
 
 ## Acceptance criteria
 
-- [ ] The four supplied skills are discoverable and load on demand.
+- [ ] The four clean-room MiniScira skills are discoverable and load on demand.
 - [ ] The production Sandbox contains the tools required by each skill.
 - [ ] The agent creates one valid PDF, DOCX, PPTX, and XLSX fixture through the real chat flow.
 - [ ] Each file appears in the originating `run_code` result and downloads with the correct filename and MIME type.
@@ -115,7 +115,7 @@ Create and download one small file per format through the real browser. Open eac
 
 ## Implementation order after approval
 
-1. Add the four supplied skills and their required Sandbox packages.
+1. Add the four clean-room skills and their required Sandbox packages.
 2. Add office upload and MIME support.
 3. Extend `run_code` to publish supported document outputs.
 4. Add document links to the existing execution timeline.
@@ -125,6 +125,6 @@ Create and download one small file per format through the real browser. Open eac
 
 ## Approval gate
 
-Implementation begins only after Soham explicitly approves this revised PRD. After approval, create a short TODO mapped to the seven steps above. If a supplied skill requires a tool that cannot run in the current Sandbox image, resolve that package gap without adding a new product architecture.
+Implementation begins only after Soham explicitly approves this revised PRD. After approval, create a short TODO mapped to the seven steps above. If a skill requires a tool that cannot run in the current Sandbox image, resolve that package gap without adding a new product architecture.
 
 > **Review request:** Approve this revised PRD or request another reduction.

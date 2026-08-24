@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
 
-import type { UploadedDoc } from "@/hooks/use-chat-attachments"
+import {
+  DOC_ACCEPT,
+  isModelFileAttachment,
+  OFFICE_MIME_TYPES,
+  type UploadedDoc,
+} from "@/hooks/use-chat-attachments"
 
 /**
  * The rule `attachToTurn` applies when a message is sent. Extracted here as the
@@ -49,5 +54,43 @@ describe("attachToTurn partitioning", () => {
       ...staged.filter(ridesAlong),
       ...staged.filter(staysStaged),
     ]).toHaveLength(staged.length)
+  })
+})
+
+describe("office attachments", () => {
+  test("the file picker accepts office extensions and exact MIME types", () => {
+    const accepted = DOC_ACCEPT.split(",")
+    for (const extension of [".docx", ".pptx", ".xlsx"]) {
+      expect(accepted).toContain(extension)
+    }
+    for (const mimeType of OFFICE_MIME_TYPES) {
+      expect(accepted).toContain(mimeType)
+    }
+  })
+
+  test("office documents are staged for run_code instead of sent to the model", () => {
+    for (const [index, mimeType] of OFFICE_MIME_TYPES.entries()) {
+      expect(
+        isModelFileAttachment({
+          id: `office-${index}`,
+          filename: `office-${index}`,
+          status: "ready",
+          kind: "document",
+          mimeType,
+        })
+      ).toBe(false)
+    }
+  })
+
+  test("ordinary indexed text documents are not sent as file parts", () => {
+    expect(
+      isModelFileAttachment({
+        id: "text-1",
+        filename: "notes.txt",
+        status: "ready",
+        kind: "document",
+        mimeType: "text/plain",
+      })
+    ).toBe(false)
   })
 })

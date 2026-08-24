@@ -4,7 +4,11 @@ import { authed, notFound } from "@/lib/api-auth"
 import { ownedChat, ownedProject } from "@/lib/api-ownership"
 import { db } from "@/lib/db"
 import { document } from "@/lib/db/schema"
-import { attachmentKind, extractDocumentText } from "@/lib/document-text"
+import {
+  attachmentKind,
+  extractDocumentText,
+  storedMimeType,
+} from "@/lib/document-text"
 import { put } from "@/lib/local-blob"
 import { chunkText } from "@/lib/rag"
 import { MAX_UPLOAD_BYTES, uploadPathname } from "@/lib/upload-limits"
@@ -68,8 +72,8 @@ export const PATCH = authed(async (request, { userId }) => {
   return NextResponse.json({ ok: true })
 })
 
-// POST /api/documents — upload a file, store it, then extract and cache its
-// text. No embedding step: `search_documents` chunks and ranks on demand.
+// POST /api/documents — upload and store a file. Searchable formats also cache
+// extracted text; office packages stay as original bytes for model and Sandbox use.
 export const POST = authed(async (request, { userId }) => {
   const form = await request.formData().catch(() => null)
   const file = form?.get("file")
@@ -81,7 +85,7 @@ export const POST = authed(async (request, { userId }) => {
     return NextResponse.json(
       {
         error:
-          "Unsupported file type. Upload an image, a PDF, or a text file (txt, md, csv, json…).",
+          "Unsupported file type. Upload an image, PDF, DOCX, PPTX, XLSX, or text file.",
       },
       { status: 415 }
     )
@@ -101,6 +105,7 @@ export const POST = authed(async (request, { userId }) => {
   }
   const chatId = field("chatId")
   const projectId = field("projectId")
+  const mimeType = storedMimeType(file.type, file.name)
 
   // Validate the parent ids before the upload: rejecting after `put` would
   // leave an orphan blob behind for a request we are about to refuse.
@@ -126,7 +131,7 @@ export const POST = authed(async (request, { userId }) => {
     // lib/upload-limits so the trust boundary is defined in one place).
     const blob = await put(uploadPathname(userId, file.name), buffer, {
       addRandomSuffix: true,
-      contentType: file.type || "application/octet-stream",
+      contentType: mimeType,
     })
     blobUrl = blob.url
   } catch (err) {
@@ -137,7 +142,6 @@ export const POST = authed(async (request, { userId }) => {
     )
   }
 
-  const mimeType = file.type || "application/octet-stream"
   const [doc] = await db
     .insert(document)
     .values({
@@ -165,12 +169,30 @@ export const POST = authed(async (request, { userId }) => {
     )
   }
 
-  // Documents: parse and cache the text. Inline, so the client learns straight
-  // away whether the file is searchable — and so a scanned PDF is reported here
-  // rather than as a mystery empty result three questions later. No embedding
-  // step: `search_documents` chunks this text and ranks it on demand.
+  // Searchable documents parse and cache text inline. Office packages become
+  // ready without extraction so their original bytes can reach editing tools.
   try {
     const text = await extractDocumentText(buffer, file.type, file.name)
+    if (text === null) {
+      await db
+        .update(document)
+        .set({ status: "ready", chunkCount: 0 })
+        .where(eq(document.id, doc.id))
+
+      return NextResponse.json(
+        {
+          document: {
+            ...doc,
+            status: "ready",
+            kind,
+            url: blobUrl,
+            mimeType,
+            chunkCount: 0,
+          },
+        },
+        { status: 201 }
+      )
+    }
     const chunks = chunkText(text).slice(0, MAX_CHUNKS)
     if (chunks.length === 0)
       throw new Error("No extractable text found in this file.")

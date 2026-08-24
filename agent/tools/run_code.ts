@@ -3,21 +3,24 @@ import { defineTool } from "eve/tools"
 import { z } from "zod"
 import { db } from "@/lib/db"
 import { document } from "@/lib/db/schema"
+import {
+  changedDocumentFiles,
+  DOCUMENT_MEDIA_TYPES,
+  type DocumentFileState,
+  documentMediaType,
+  type GeneratedDocumentFile,
+  MAX_GENERATED_DOCUMENT_BYTES,
+  type SupportedDocumentMediaType,
+} from "@/lib/document-files"
 import { put } from "@/lib/local-blob"
 
 // The model sees this tool as `run_code`. It runs a Python script in the
-// agent's sandbox — a sibling Docker container with allowlisted package/source
-// egress on this deployment (see agent/sandbox.ts) — for data analysis over the
-// user's uploaded files — and returns stdout/stderr plus any charts it saved.
-// The sandbox image has pandas / numpy / matplotlib preinstalled. Paths resolve
-// from /workspace, so a bare
-// filename addresses the working directory. Renders in the timeline as a code
-// cell with its output and any generated plots.
+// deployment's sibling Docker sandbox and publishes supported generated files.
 const IMAGE_RE = /\.(png|jpe?g|svg|gif|webp)$/i
 
 export default defineTool({
   description:
-    "Run a Python script in a secure, offline sandbox for calculations, statistics, and data analysis. pandas, numpy, and matplotlib are preinstalled; there is NO internet access. To analyze the user's uploaded files, pass their exact filenames in `files` — each is placed in the working directory to open by name (e.g. pd.read_csv('sales.csv')). print() the results you want back. Save any chart with plt.savefig('chart.png') and it is returned as a viewable image. Use this for math and data work — not for prose (write Markdown) or web research (use the search tools).",
+    "Run a Python script in a secure, offline sandbox for calculations, statistics, data analysis, and document creation. pandas, numpy, and matplotlib are preinstalled; there is NO internet access. To analyze or edit the user's uploaded files, pass their exact filenames in `files` — each is placed in the working directory to open by name (e.g. pd.read_csv('sales.csv')). print() the results you want back. Save charts as PNG, JPEG, SVG, GIF, or WebP for inline display. Newly created PDF, DOCX, PPTX, and XLSX files are returned as downloads. Use this for code-driven work, not prose or web research.",
   inputSchema: z.object({
     code: z
       .string()
@@ -36,11 +39,35 @@ export default defineTool({
         "Exact filenames of the user's uploaded documents to load into the working directory before running (e.g. ['sales.csv'])."
       ),
   }),
+  outputSchema: z.object({
+    title: z.string().optional(),
+    code: z.string(),
+    stdout: z.string(),
+    stderr: z.string(),
+    exitCode: z.number(),
+    ok: z.boolean(),
+    images: z.array(z.object({ name: z.string(), url: z.string() })),
+    files: z.array(
+      z.object({
+        name: z.string(),
+        url: z.string(),
+        mediaType: z.enum(
+          Object.values(DOCUMENT_MEDIA_TYPES) as [
+            SupportedDocumentMediaType,
+            ...SupportedDocumentMediaType[],
+          ]
+        ),
+        size: z.number().int().nonnegative(),
+      })
+    ),
+    loadedFiles: z.array(z.string()).optional(),
+    missingFiles: z.array(z.string()).optional(),
+  }),
   async execute({ code, title, files }, ctx) {
     const auth = ctx.session.auth.current
     const sandbox = await ctx.getSandbox()
 
-    const listImages = async (): Promise<string[]> => {
+    const listWorkspaceFiles = async (): Promise<string[]> => {
       try {
         const res = await sandbox.run({
           command: "ls -1 /workspace 2>/dev/null",
@@ -48,7 +75,23 @@ export default defineTool({
         return res.stdout
           .split("\n")
           .map((s) => s.trim())
-          .filter((n) => IMAGE_RE.test(n))
+          .filter(Boolean)
+      } catch {
+        return []
+      }
+    }
+
+    const listImages = async (): Promise<string[]> =>
+      (await listWorkspaceFiles()).filter((name) => IMAGE_RE.test(name))
+
+    const listDocuments = async (): Promise<DocumentFileState[]> => {
+      try {
+        const result = await sandbox.run({
+          command:
+            'python3 -c \'import json,os; print(json.dumps([{"name":n,"size":(s:=os.stat(n)).st_size,"modifiedNanoseconds":s.st_mtime_ns} for n in os.listdir("/workspace") if os.path.isfile(n)]))\'',
+        })
+        const files = JSON.parse(result.stdout) as DocumentFileState[]
+        return files.filter((file) => documentMediaType(file.name))
       } catch {
         return []
       }
@@ -97,8 +140,9 @@ export default defineTool({
       }
     }
 
-    // Snapshot existing charts so we only return ones this run creates.
+    // Snapshot existing outputs so we only return ones this run creates.
     const before = new Set(await listImages())
+    const documentsBefore = await listDocuments()
 
     await sandbox.writeTextFile({ path: "main.py", content: code })
     const run = await sandbox.run({ command: "python3 main.py" })
@@ -123,6 +167,44 @@ export default defineTool({
       }
     }
 
+    const generatedFiles: GeneratedDocumentFile[] = []
+    let generatedBytes = 0
+    for (const file of changedDocumentFiles(
+      documentsBefore,
+      await listDocuments()
+    ).slice(0, 20)) {
+      const { name, size } = file
+      const mediaType = documentMediaType(name)
+      if (!mediaType) continue
+      if (
+        size > MAX_GENERATED_DOCUMENT_BYTES ||
+        generatedBytes + size > MAX_GENERATED_DOCUMENT_BYTES
+      ) {
+        continue
+      }
+      try {
+        const bytes = await sandbox.readBinaryFile({ path: name })
+        if (!bytes) continue
+        const blob = await put(
+          `runcode/${Date.now()}-${name}`,
+          Buffer.from(bytes),
+          {
+            addRandomSuffix: true,
+            contentType: mediaType,
+          }
+        )
+        generatedBytes += size
+        generatedFiles.push({
+          name,
+          url: `${blob.url}?filename=${encodeURIComponent(name)}`,
+          mediaType,
+          size,
+        })
+      } catch {
+        // A generated file that fails to upload is omitted; the run result stays usable.
+      }
+    }
+
     return {
       title,
       code,
@@ -131,6 +213,7 @@ export default defineTool({
       exitCode: run.exitCode,
       ok: run.exitCode === 0,
       images,
+      files: generatedFiles,
       ...(loadedFiles.length ? { loadedFiles } : {}),
       ...(missingFiles.length ? { missingFiles } : {}),
     }
