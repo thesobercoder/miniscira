@@ -100,7 +100,7 @@ export async function AppSidebar({ user }: { user: SidebarUserInfo }) {
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
           <LookoutList lookouts={lookoutGroups} />
         </SidebarGroup>
-        <SidebarGroup className="min-h-0 flex-1 group-data-[collapsible=icon]:hidden">
+        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
           <ChatList
             initialPage={{
               chats: chatHistory.rows.map((row) => ({

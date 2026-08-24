@@ -52,6 +52,10 @@ import { chatPath } from "@/lib/chat-route"
 
 type ChatRow = ChatListRow
 
+function sidebarScrollRoot(node: HTMLElement | null) {
+  return node?.closest<HTMLElement>('[data-sidebar="content"]') ?? null
+}
+
 function bucket(date: Date) {
   if (isToday(date)) return "Today"
   if (isYesterday(date)) return "Yesterday"
@@ -216,7 +220,7 @@ export function ChatList({
     async (slot: number, cursor: string | null) => {
       const key = `${slot}:${cursor ?? "first"}`
       if (requestRef.current === key) return
-      const root = rootRef.current
+      const root = sidebarScrollRoot(rootRef.current)
       const node = slotRefs.current.get(slot)
       if (root && node) {
         anchorRef.current = {
@@ -292,7 +296,7 @@ export function ChatList({
   }, [decodedCurrentChatId, currentChatIsLoaded, generation])
 
   useEffect(() => {
-    const root = rootRef.current
+    const root = sidebarScrollRoot(rootRef.current)
     if (!root) return
     const observer = new IntersectionObserver(
       (entries) => {
@@ -329,7 +333,7 @@ export function ChatList({
   }, [history.slots.length])
 
   useEffect(() => {
-    const root = rootRef.current
+    const root = sidebarScrollRoot(rootRef.current)
     const end = endRef.current
     if (!root || !end) return
     const observer = new IntersectionObserver(
@@ -348,7 +352,7 @@ export function ChatList({
     if (history.load.kind !== "idle") return
     const anchor = anchorRef.current
     if (!anchor) return
-    const root = rootRef.current
+    const root = sidebarScrollRoot(rootRef.current)
     const node = slotRefs.current.get(anchor.slot)
     anchorRef.current = null
     if (!root || !node) return
@@ -374,7 +378,7 @@ export function ChatList({
   }
 
   return (
-    <div ref={rootRef} className="min-h-0 flex-1 overflow-y-auto">
+    <div ref={rootRef}>
       {currentRows.length > 0 && (
         <ChatRows
           rows={currentRows}
