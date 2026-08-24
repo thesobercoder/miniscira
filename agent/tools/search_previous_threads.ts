@@ -48,7 +48,11 @@ export default defineTool({
 
     const rootSessionId = ctx.session.parent?.rootSessionId ?? ctx.session.id
     const grantKey = threadSearchGrantKey(auth.principalId, rootSessionId)
-    const scope = await activeThreadScope(rootSessionId, auth.principalId)
+    const scope = await activeThreadScope(
+      rootSessionId,
+      auth.principalId,
+      auth.authenticator === "eval-run"
+    )
     if (!scope) {
       clearThreadSearchGrant(grantKey)
       return {

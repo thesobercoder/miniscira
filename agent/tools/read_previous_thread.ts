@@ -26,7 +26,11 @@ export default defineTool({
       return { error: "No authenticated user — cannot read threads." }
 
     const rootSessionId = ctx.session.parent?.rootSessionId ?? ctx.session.id
-    const scope = await activeThreadScope(rootSessionId, auth.principalId)
+    const scope = await activeThreadScope(
+      rootSessionId,
+      auth.principalId,
+      auth.authenticator === "eval-run"
+    )
     if (!scope)
       return {
         error: "Previous-thread retrieval is unavailable for this session.",

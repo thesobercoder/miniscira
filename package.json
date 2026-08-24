@@ -20,6 +20,7 @@
     "check": "biome check --write agent app components evals hooks lib scripts *.ts *.mjs",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
+    "eval:thread-search": "eve eval --url http://127.0.0.1:8325 --tag thread-search --strict --max-concurrency 1",
     "knip": "bunx knip@5 --include exports",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

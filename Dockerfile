@@ -121,6 +121,7 @@ COPY --from=builder /app/source.config.ts ./source.config.ts
 COPY --from=builder /app/content ./content
 # eve resolves the application root from these when it starts.
 COPY --from=builder /app/agent ./agent
+COPY --from=builder /app/evals ./evals
 COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 # Manual schema tooling and the transitional RUN_DB_PUSH gate read

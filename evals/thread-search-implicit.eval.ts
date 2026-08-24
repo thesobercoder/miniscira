@@ -8,7 +8,7 @@ export default defineEval({
   tags: ["thread-search", "routing", "release-gate"],
   async test(t) {
     const turn = await t.send(
-      "Continue the MiniScira search design using the database choice and first-release scope we agreed on before. What should I implement next?"
+      "Continue the MiniScira thread-search design using the database choice and first-release scope we agreed on before. What should I implement next?"
     )
 
     t.succeeded()

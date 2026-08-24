@@ -60,12 +60,40 @@ function internalRun(): AuthFn<Request> {
   }
 }
 
+// Headless production evals need the same stable user principal as a signed-in
+// browser, but Eve's remote runner can only send a bearer token. Keep that token
+// independent from Better Auth credentials and map it to one dedicated account.
+// Both values live only in the deployment environment.
+function evalRun(): AuthFn<Request> {
+  return async (request) => {
+    const expected = process.env.EVE_EVAL_AUTH_TOKEN
+    const userId = process.env.EVE_EVAL_USER_ID
+    const authorization = request.headers.get("authorization")
+    const prefix = "Bearer "
+    if (
+      !expected ||
+      !userId ||
+      !authorization?.startsWith(prefix) ||
+      !secretsMatch(authorization.slice(prefix.length), expected)
+    )
+      return null
+
+    return {
+      authenticator: "eval-run",
+      principalType: "user",
+      principalId: userId,
+      attributes: { purpose: "model-eval" },
+    }
+  }
+}
+
 export default eveChannel({
   // Ordered walk: our app session first, then the internal-run secret (lookouts),
   // then Vercel-to-Vercel runtime callers, then a local-dev loopback fallback.
   auth: [
     appSession(),
     internalRun(),
+    evalRun(),
     vercelOidc(),
     // DEVELOPMENT ONLY. `localDev()` authenticates any request whose URL
     // hostname is loopback (127.*, localhost, [::1], *.localhost) — verified in

@@ -183,7 +183,11 @@ export async function searchPreviousThreads({
   }))
 }
 
-export async function activeThreadScope(rootSessionId: string, userId: string) {
+export async function activeThreadScope(
+  rootSessionId: string,
+  userId: string,
+  allowUnmapped = false
+) {
   const result = await db.execute(sql`
     select id, project_id
     from chat
@@ -194,9 +198,11 @@ export async function activeThreadScope(rootSessionId: string, userId: string) {
     id: string
     project_id: string | null
   }[]
-  return rows.length === 1
-    ? { currentChatId: rows[0].id, projectId: rows[0].project_id }
-    : null
+  if (rows.length === 1)
+    return { currentChatId: rows[0].id, projectId: rows[0].project_id }
+  if (rows.length === 0 && allowUnmapped)
+    return { currentChatId: null, projectId: null }
+  return null
 }
 
 export async function ownedThreadScope(chatId: string | null, userId: string) {

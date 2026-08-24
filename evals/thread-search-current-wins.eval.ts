@@ -6,7 +6,7 @@ import { searchedThenReadPreviousThread } from "./thread-search-tools"
 const followsCurrentConstraint = satisfies<string>((reply) => {
   const normalized = reply.toLowerCase()
   const recommendsStaleApproach =
-    /(?:recommend|should|must|use|implement)[^.!?\n]{0,60}(?:embeddings?|external search service)/i.test(
+    /(?:recommend|should|must|implement)[^.!?\n]{0,60}(?:embeddings?|external search service)|\buse[^.!?\n]{0,60}(?:embeddings?|external search service)(?![^.!?\n]*(?:excluded|conflicts|do not|don't|no\b|not\b|never))/i.test(
       reply
     )
   return (

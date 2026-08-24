@@ -74,3 +74,20 @@ PostgreSQL must filter `chat.user_id` before ranking or limiting results. A read
 5. Run the focused tests, full repository gates, and the PostgreSQL query-plan check.
 6. Exercise “What did we talk about yesterday?” in the real signed-in production browser. Verify the visible search/read timeline and final linked answer.
 7. Back up production, deploy the verified image, confirm existing data and health, then commit and push with a clean tree matching `origin/main`.
+
+## Durable model eval environment
+
+The production release gate uses one dedicated local account and deterministic
+owned fixtures. The account is not ephemeral. Its bearer credential and user ID
+live only in Stack 30 environment variables. `scripts/prepare-thread-search-evals.py`
+creates or repairs the account and fixtures idempotently, while a second user
+owns a collision fixture used to prove isolation. Run the thread-search eval tag
+against the real production Eve endpoint with concurrency `1`; this keeps the
+fixture state stable and exercises the deployed model, tools, authorization, and
+PostgreSQL reads together.
+
+Prepare fixtures with `python3 scripts/prepare-thread-search-evals.py`. Then set
+`EVE_EVAL_AUTH_TOKEN` in the runner process, start
+`node scripts/eval-forward.mjs`, and run `/opt/data/bin/bun run
+eval:thread-search`. The loopback forward is required because Eve deliberately
+rejects plain HTTP remote targets. Never print or commit the token.
