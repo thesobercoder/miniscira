@@ -10,7 +10,7 @@ const createRequests = [
     prompt: "Create a DOCX meeting agenda for a 30-minute product review.",
   },
   {
-    skill: "powerpoint",
+    skill: "pptx",
     prompt: "Create a three-slide PPTX pitch deck for a neighborhood bakery.",
   },
   {
