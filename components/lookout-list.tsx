@@ -23,9 +23,17 @@ export type LookoutListGroup = {
   name: string
   reports: {
     id: string
-    title: string
     timestamp: string
   }[]
+}
+
+const MAX_SIDEBAR_REPORTS = 10
+
+function datedReportLabel(timestamp: string) {
+  return new Date(timestamp).toLocaleString([], {
+    dateStyle: "medium",
+    timeStyle: "short",
+  })
 }
 
 export function LookoutList({ lookouts }: { lookouts: LookoutListGroup[] }) {
@@ -61,18 +69,26 @@ export function LookoutList({ lookouts }: { lookouts: LookoutListGroup[] }) {
                         </span>
                       </SidebarMenuSubItem>
                     ) : (
-                      lookout.reports.map((report) => (
-                        <SidebarMenuSubItem key={report.id}>
-                          <SidebarMenuSubButton
-                            render={<Link href={`/chat/${report.id}`} />}
-                            isActive={pathname === `/chat/${report.id}`}
-                            title={`${report.title} · ${new Date(report.timestamp).toLocaleString()}`}
-                          >
-                            <RiFileTextLine className="size-3.5 shrink-0" />
-                            <span className="truncate">{report.title}</span>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                      ))
+                      lookout.reports
+                        .slice(0, MAX_SIDEBAR_REPORTS)
+                        .map((report, index) => {
+                          const label =
+                            index === 0
+                              ? "Current"
+                              : datedReportLabel(report.timestamp)
+                          return (
+                            <SidebarMenuSubItem key={report.id}>
+                              <SidebarMenuSubButton
+                                render={<Link href={`/chat/${report.id}`} />}
+                                isActive={pathname === `/chat/${report.id}`}
+                                title={label}
+                              >
+                                <RiFileTextLine className="size-3.5 shrink-0" />
+                                <span className="truncate">{label}</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          )
+                        })
                     )}
                   </SidebarMenuSub>
                 </CollapsibleContent>

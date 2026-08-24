@@ -54,9 +54,9 @@ export async function AppSidebar({ user }: { user: SidebarUserInfo }) {
         name: item.name,
         reports: history.rows
           .filter((report) => report.reportChatId !== null)
+          .slice(0, 10)
           .map((report) => ({
             id: report.reportChatId as string,
-            title: report.title,
             timestamp: report.timestamp.toISOString(),
           })),
       }

@@ -88,6 +88,8 @@ Permanent deletion is not a history class. Deletion removes the chat and its dep
 - Lookout reports do not appear in the active research sidebar, project chat lists, or archived-research list.
 - Each Lookout row exposes its latest successful report when one exists.
 - Each Lookout exposes a paged run history ordered newest first.
+- The sidebar shows at most 10 report chats inside each Lookout group. The newest report is labelled **Current**. Up to nine older reports use their run date and time as the row label. Report rows do not repeat the Lookout name.
+- The 10-row sidebar limit does not delete or hide reports from search or the full paged Lookout history.
 - A report row shows its run date, trigger source, and outcome state. Trigger source is `scheduled`, `manual`, or `retry`.
 - Email links continue to open the exact report that generated the email.
 - Manual **Run now** opens the exact completed report as it does today.
@@ -499,6 +501,8 @@ The stable IDs in this section map to implementation units and named checks in `
 - [ ] **AC-LR-07:** The most recent run outcome remains visible when the latest successful report is older.
 - [ ] **AC-LR-08:** Deleting the parent Lookout preserves past reports and readable provenance.
 - [ ] **AC-LR-09:** The real scheduled and manual Lookout flows each render the correct timeline and final answer.
+- [ ] **AC-LR-10:** Each sidebar Lookout group shows **Current** for the newest report, at most nine older date-and-time labels, and no repeated Lookout-name report labels.
+- [ ] **AC-LR-11:** Reports beyond the 10-row sidebar limit remain available through search and paged Lookout history.
 
 ### Archive and recovery
 

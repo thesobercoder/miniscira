@@ -73,12 +73,13 @@ Checks:
 - Show each Lookout with its latest succeeded report, latest-run outcome, and paginated report history.
 - Show running and failed runs that have no report chat.
 - Label a safely persisted partial transcript from a failed run as `Incomplete`. Do not add `incomplete` as a run status.
+- In the sidebar, show **Current** for the newest report and up to nine older reports labelled by run date and time. Do not repeat the Lookout name in report rows. Keep older reports available outside this bounded sidebar list.
 - Open the exact report from its email link.
 
 Checks:
 
 - API tests cover report pagination, deleted parent Lookouts, incomplete runs, and run status visibility.
-- Browser tests cover grouped reports, exact report links, parent deletion, and the latest-run failure message.
+- Browser tests cover grouped reports, the 10-row sidebar limit, Current and dated labels, exact report links, parent deletion, and the latest-run failure message.
 - A production-safe Lookout run proves the real rendered report and email link.
 
 ## Unit 6. Add archive, recovery, and automatic archival
