@@ -180,7 +180,8 @@ describe("chat list events", () => {
     }
 
     const evicted = history.slots.findIndex((slot) => slot.kind === "evicted")
-    expect(evicted).toBeGreaterThanOrEqual(0)
+    expect(evicted).toBeGreaterThan(0)
+    expect(history.slots[0].kind).toBe("loaded")
     expect(reloadHistoryIntent(history, evicted)).toEqual({
       slot: evicted,
       cursor: history.slots[evicted].inputCursor,

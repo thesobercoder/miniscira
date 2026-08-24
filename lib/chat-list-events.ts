@@ -161,7 +161,8 @@ function capPayloads(slots: HistorySlot[], visibleSlot: number) {
     let distance = -1
     for (let index = 0; index < next.length; index += 1) {
       const slot = next[index]
-      if (slot.kind !== "loaded" || index === visibleSlot) continue
+      if (slot.kind !== "loaded" || index === 0 || index === visibleSlot)
+        continue
       const currentDistance = Math.abs(index - visibleSlot)
       if (currentDistance > distance) {
         candidate = index
