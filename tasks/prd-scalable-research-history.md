@@ -1,7 +1,7 @@
 # PRD: scalable research history
 
-- **Status:** Draft. Needs explicit user approval before implementation.
-- **Backlog source:** `docs/PRODUCT_IDEAS.md` entry `Scalable research history`
+- **Status:** Approved by Soham on 2026-08-24. Implementation in progress.
+- **Promoted from:** `docs/PRODUCT_IDEAS.md` entry `Scalable research history`
 - **Supersedes:** `tasks/prd-thread-archiving.md`
 - **Repository:** `/opt/data/miniscira-src`
 - **Primary surfaces:** sidebar, thread search, chat lifecycle, archived threads, Lookout reports, projects, database queries, and Eve schedules
@@ -72,7 +72,7 @@ Permanent deletion is not a history class. Deletion removes the chat and its dep
 - Search results identify archived research and Lookout reports with quiet labels.
 - Search can open an owned result directly.
 - Agent thread retrieval continues to include active and archived research under the approved thread-search rules.
-- Whether agent retrieval includes Lookout reports by default is an approval question in Section 19.
+- Agent retrieval includes Lookout reports by default with a `Lookout report` label.
 
 ### 4.3 Current thread outside loaded pages
 
@@ -463,60 +463,62 @@ The server returns `409` with a stable code such as `CHAT_ARCHIVED`, `CHAT_PINNE
 
 ## 14. Acceptance criteria
 
+The stable IDs in this section map to implementation units and named checks in `tasks/todo-scalable-research-history.md`.
+
 ### Sidebar pagination
 
-- [ ] The initial sidebar contains at most 30 active research rows.
-- [ ] Scrolling loads the next page and shows a skeleton while waiting.
-- [ ] Pages join in the correct stable order without gaps or duplicates when the ordered data does not change between requests.
-- [ ] A concurrent insert or activity update does not create duplicate rows. A first-page reload reconciles rows that moved ahead of the active cursor.
-- [ ] A failed page can be retried without clearing existing rows.
-- [ ] The sidebar stops requesting when `nextCursor` is null.
-- [ ] Lookout reports and archived research never appear in active sidebar pages.
-- [ ] The browser retains at most 300 list rows and renders at most 120 rows after a long scroll.
-- [ ] Scrolling into an evicted range fetches its page again without losing the user's position.
-- [ ] Project chat lists load in bounded pages and exclude archived research and Lookout reports.
-- [ ] The real authenticated sidebar works with a large seeded history on desktop and narrow screens.
+- [ ] **AC-SB-01:** The initial sidebar contains at most 30 active research rows.
+- [ ] **AC-SB-02:** Scrolling loads the next page and shows a skeleton while waiting.
+- [ ] **AC-SB-03:** Pages join in the correct stable order without gaps or duplicates when the ordered data does not change between requests.
+- [ ] **AC-SB-04:** A concurrent insert or activity update does not create duplicate rows. A first-page reload reconciles rows that moved ahead of the active cursor.
+- [ ] **AC-SB-05:** A failed page can be retried without clearing existing rows.
+- [ ] **AC-SB-06:** The sidebar stops requesting when `nextCursor` is null.
+- [ ] **AC-SB-07:** Lookout reports and archived research never appear in active sidebar pages.
+- [ ] **AC-SB-08:** The browser retains at most 300 list rows and renders at most 120 rows after a long scroll.
+- [ ] **AC-SB-09:** Scrolling into an evicted range fetches its page again without losing the user's position.
+- [ ] **AC-SB-10:** Project chat lists load in bounded pages and exclude archived research and Lookout reports.
+- [ ] **AC-SB-11:** The real authenticated sidebar works with a large seeded history on desktop and narrow screens.
 
 ### Current chat and search
 
-- [ ] Search finds an owned result outside loaded sidebar pages.
-- [ ] Opening an old active result shows it under **Current chat**.
-- [ ] The temporary row disappears when normal pagination loads the same ID.
-- [ ] Archived and Lookout results show clear quiet labels in search.
-- [ ] Search remains bounded and independent of sidebar state.
-- [ ] Navigation uses the Next.js App Router without a document reload.
+- [ ] **AC-CS-01:** Search finds an owned result outside loaded sidebar pages.
+- [ ] **AC-CS-02:** Opening an old active result shows it under **Current chat**.
+- [ ] **AC-CS-03:** The temporary row disappears when normal pagination loads the same ID.
+- [ ] **AC-CS-04:** Archived and Lookout results show clear quiet labels in search.
+- [ ] **AC-CS-05:** Search remains bounded and independent of sidebar state.
+- [ ] **AC-CS-06:** Navigation uses the Next.js App Router without a document reload.
 
 ### Lookout reports
 
-- [ ] A scheduled Lookout run creates one separate report snapshot.
-- [ ] The report does not appear in active or archived research lists.
-- [ ] The parent Lookout shows its latest successful report.
-- [ ] Report history loads in bounded pages and orders runs newest first.
-- [ ] An email opens the exact report that produced it.
-- [ ] Failed and incomplete runs are not labelled as successful reports.
-- [ ] The most recent run outcome remains visible when the latest successful report is older.
-- [ ] Deleting the parent Lookout preserves past reports and readable provenance.
-- [ ] The real scheduled and manual Lookout flows render the correct timeline and final answer.
+- [ ] **AC-LR-01:** A scheduled Lookout run creates one separate report snapshot.
+- [ ] **AC-LR-02:** The report does not appear in active or archived research lists.
+- [ ] **AC-LR-03:** The parent Lookout shows its latest successful report.
+- [ ] **AC-LR-04:** Report history loads in bounded pages and orders runs newest first.
+- [ ] **AC-LR-05:** An email opens the exact report that produced it.
+- [ ] **AC-LR-06:** Failed runs and failed runs with an `Incomplete` transcript label are not labelled as successful reports.
+- [ ] **AC-LR-07:** The most recent run outcome remains visible when the latest successful report is older.
+- [ ] **AC-LR-08:** Deleting the parent Lookout preserves past reports and readable provenance.
+- [ ] **AC-LR-09:** The real scheduled and manual Lookout flows each render the correct timeline and final answer.
 
 ### Archive and recovery
 
-- [ ] Manual archive preserves events, documents, artifacts, project links, and Eve session fields.
-- [ ] Archived research leaves all active list pages and appears in the archived view.
-- [ ] Archived research opens read-only and requires recovery before a new turn.
-- [ ] Recovery returns the row to active history without changing its original activity time.
-- [ ] Pin and active-run rules prevent unsafe archival.
-- [ ] One-week automatic archival is off by default and excludes Lookout reports.
-- [ ] Archive and deletion remain separate in UI, API, scheduler code, and tests.
+- [ ] **AC-AR-01:** Manual archive preserves events, documents, artifacts, project links, and Eve session fields.
+- [ ] **AC-AR-02:** Archived research leaves all active list pages and appears in the archived view.
+- [ ] **AC-AR-03:** Archived research opens read-only and requires recovery before a new turn.
+- [ ] **AC-AR-04:** Recovery returns the row to active history without changing its original activity time.
+- [ ] **AC-AR-05:** Pin and active-run rules prevent unsafe archival.
+- [ ] **AC-AR-06:** One-week automatic archival is off by default and excludes Lookout reports.
+- [ ] **AC-AR-07:** Archive and deletion remain separate in UI, API, scheduler code, and tests.
 
 ### Security, migration, and production
 
-- [ ] Cross-user list, pagination, search, report, archive, recover, and direct-link cases disclose no private metadata.
-- [ ] Existing chats and Lookout reports retain their content and relationships after migration.
-- [ ] Migration checks compare representative event sequences, Eve session fields, continuation tokens, documents and upload references, project links, report provenance, and artifact-bearing events before and after migration.
-- [ ] Query-plan checks pass on representative large data.
-- [ ] Unit, integration, browser, migration, and rollback checks pass.
-- [ ] Production acceptance verifies the real sidebar, search, archive, and Lookout report flows.
-- [ ] Production source control is clean and local `HEAD` equals `origin/main` after deployment.
+- [ ] **AC-SP-01:** Cross-user list, pagination, search, report, archive, recover, and direct-link cases disclose no private metadata.
+- [ ] **AC-SP-02:** Existing chats and Lookout reports retain their content and relationships after migration.
+- [ ] **AC-SP-03:** Migration checks compare representative event sequences, Eve session fields, continuation tokens, documents and upload references, project links, report provenance, and artifact-bearing events before and after migration.
+- [ ] **AC-SP-04:** Query-plan checks pass on representative large data.
+- [ ] **AC-SP-05:** Unit, integration, browser, migration, and rollback checks pass.
+- [ ] **AC-SP-06:** Production acceptance verifies the real sidebar, search, archive, and Lookout report flows.
+- [ ] **AC-SP-07:** Production source control is clean and local `HEAD` equals `origin/main` after deployment.
 
 ## 15. Test plan
 
@@ -555,7 +557,7 @@ Cover:
 
 ### Browser checks
 
-Use the real authenticated application. Verify:
+Use the existing Browser Use CLI through the Hermes `browser_exec` flow against the real authenticated application. Use Bun component and API tests for deterministic UI state, request, and route coverage. Browser acceptance remains the required proof for user-visible flows. Verify:
 
 - initial bounded sidebar rendering;
 - scrolling, skeleton, page arrival, retry, and end state;
@@ -574,23 +576,21 @@ Seed at least 10,000 chats for one test user with a mix of active, archived, pro
 
 Model evals do not apply to sidebar pagination, report grouping, or archival by themselves. These changes do not alter prompts, tool selection, model routing, or expected generated answers.
 
-If the approved design changes agent retrieval rules for Lookout reports, update the thread-search eval plan before implementation. Add cases for report inclusion, source labels, ownership, and prompt injection in old report content.
+Update the thread-search eval suite before the retrieval change lands. Add cases for report inclusion, source labels, ownership, and prompt injection in old report content.
 
 ## 16. Deployment and observability
 
 ### Deployment
 
-1. Obtain explicit PRD approval.
-2. Create the implementation TODO, test, and eval plan.
-3. Back up the production database.
-4. Capture existing chat, event, document, Lookout, and Lookout-report counts.
-5. Capture representative relationship checks for event ordering, documents and uploads, projects, Eve session state, and existing Lookout reports.
-6. Apply the committed additive migration through the explicit migration workflow. New non-null fields must have safe database defaults while old processes can still write.
-7. Deploy archive-aware Next.js and Eve processes before enabling archive mutations or the automatic archive schedule.
-8. Verify indexes and query plans before large-history acceptance.
-9. Exercise the real authenticated flows with safe fixtures.
-10. Monitor pagination, archive, and Lookout scheduler behavior.
-11. Commit and push all production-backed repository changes.
+1. Back up the production database.
+2. Capture existing chat, event, document, Lookout, and Lookout-report counts.
+3. Capture representative relationship checks for event ordering, documents and uploads, projects, Eve session state, and existing Lookout reports.
+4. Apply the committed additive migration through the explicit migration workflow. New non-null fields must have safe database defaults while old processes can still write.
+5. Deploy archive-aware Next.js and Eve processes before enabling archive mutations or the automatic archive schedule.
+6. Verify indexes and query plans before large-history acceptance.
+7. Exercise the real authenticated flows with safe fixtures.
+8. Monitor pagination, archive, and Lookout scheduler behavior.
+9. Commit and push all production-backed repository changes.
 
 ### Observability
 
@@ -632,21 +632,18 @@ Do not add a hosted analytics dependency for this feature.
 12. Run authorization, performance, migration, browser, and production acceptance.
 13. Complete deployment documentation and production source-control verification.
 
-Implementation must not start from this list until the PRD is approved and the temporary TODO plan is created.
+The temporary implementation TODO list maps these units to the acceptance checks in Sections 14 and 15.
 
-## 19. Open questions for approval
+## 19. Approved recommendations
 
-1. **Agent retrieval of Lookout reports:** Include Lookout reports in normal agent thread search by default, or require an explicit report search? Recommendation: include them with a `Lookout report` label because they can contain useful prior research.
-2. **Browser harness:** Add a small repository Playwright setup or use repeatable external browser automation? Recommendation: decide during the post-approval TODO plan after checking current repository test needs.
-3. **Client history cache:** Accept the 10-page, 300-row metadata cache and 120-row render limit? Recommendation: yes. Older pages reload when the user scrolls back to them.
+1. Agent retrieval includes Lookout reports by default with a `Lookout report` label.
+2. Real browser acceptance uses the existing Browser Use CLI through Hermes `browser_exec`. Bun component and API tests cover deterministic UI state and route behavior where they apply.
+3. The client keeps at most 10 pages or 300 history rows. It renders at most 120 rows. Older pages reload when the user scrolls back to them.
 
 ## 20. Approval gate
 
 This PRD supersedes the archive-only draft because pagination, search, archive state, and Lookout report organization share the same history boundaries and queries.
 
-Implementation must not begin until Soham explicitly approves this PRD and resolves or accepts the recommendations in Section 19. After approval:
+Soham approved this PRD by asking MiniScira to start the scalable research history work. The implementation must follow the approved requirements and the mapped TODO, test, and eval plan.
 
-1. remove the backlog entry;
-2. keep this approved PRD as the durable specification;
-3. create the implementation TODO, test, and eval plan; and
-4. start execution in the documented order.
+Keep this approved PRD as the durable specification. Do not use this file for temporary progress tracking.

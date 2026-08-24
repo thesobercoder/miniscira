@@ -1,13 +1,16 @@
 import { relations, sql } from "drizzle-orm"
 import {
   boolean,
+  check,
   customType,
+  foreignKey,
   index,
   integer,
   jsonb,
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
   vector,
@@ -109,7 +112,10 @@ export const project = pgTable(
       .$defaultFn(() => new Date())
       .notNull(),
   },
-  (table) => [index("project_user_id_idx").on(table.userId, table.updatedAt)]
+  (table) => [
+    index("project_user_id_idx").on(table.userId, table.updatedAt),
+    unique("project_id_user_id_unique").on(table.id, table.userId),
+  ]
 )
 
 export const chat = pgTable(
@@ -136,6 +142,14 @@ export const chat = pgTable(
     eveSessionId: text("eve_session_id"),
     continuationToken: text("continuation_token"),
     streamIndex: integer("stream_index").notNull().default(0),
+    lastActivityAt: timestamp("last_activity_at").defaultNow().notNull(),
+    archivedAt: timestamp("archived_at"),
+    archiveReason: text("archive_reason"),
+    archiveStateChangedAt: timestamp("archive_state_changed_at")
+      .defaultNow()
+      .notNull(),
+    pinnedAt: timestamp("pinned_at"),
+    activeRunUntil: timestamp("active_run_until"),
     createdAt: timestamp("created_at")
       .$defaultFn(() => new Date())
       .notNull(),
@@ -150,6 +164,32 @@ export const chat = pgTable(
       "gin",
       sql`lower(${table.title}) gin_trgm_ops`
     ),
+    index("chat_active_history_idx")
+      .on(table.userId, table.lastActivityAt.desc(), table.id.asc())
+      .where(sql`${table.archivedAt} is null and ${table.lookoutId} is null`),
+    index("chat_archived_history_idx")
+      .on(table.userId, table.archivedAt.desc(), table.id.asc())
+      .where(
+        sql`${table.archivedAt} is not null and ${table.lookoutId} is null`
+      ),
+    index("chat_active_project_history_idx")
+      .on(
+        table.userId,
+        table.projectId,
+        table.lastActivityAt.desc(),
+        table.id.asc()
+      )
+      .where(sql`${table.archivedAt} is null and ${table.lookoutId} is null`),
+    index("chat_auto_archive_idx")
+      .on(table.userId, table.lastActivityAt)
+      .where(
+        sql`${table.archivedAt} is null and ${table.lookoutId} is null and ${table.pinnedAt} is null and ${table.activeRunUntil} is null`
+      ),
+    check(
+      "chat_archive_reason_check",
+      sql`${table.archiveReason} is null or ${table.archiveReason} in ('manual', 'inactivity')`
+    ),
+    unique("chat_id_user_id_unique").on(table.id, table.userId),
   ]
 )
 
@@ -334,7 +374,117 @@ export const lookout = pgTable(
       .$defaultFn(() => new Date())
       .notNull(),
   },
-  (table) => [index("lookout_user_id_idx").on(table.userId, table.createdAt)]
+  (table) => [
+    index("lookout_user_id_idx").on(table.userId, table.createdAt),
+    unique("lookout_id_user_id_unique").on(table.id, table.userId),
+  ]
+)
+
+export const lookoutRun = pgTable(
+  "lookout_run",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    lookoutId: uuid("lookout_id"),
+    lookoutUserId: text("lookout_user_id"),
+    projectId: uuid("project_id"),
+    projectUserId: text("project_user_id"),
+    retryOfRunId: uuid("retry_of_run_id"),
+    retryOfUserId: text("retry_of_user_id"),
+    reportChatId: uuid("report_chat_id").unique(),
+    reportChatUserId: text("report_chat_user_id"),
+    lookoutName: text("lookout_name").notNull(),
+    prompt: text("prompt").notNull(),
+    schedule: text("schedule").notNull(),
+    timezone: text("timezone").notNull(),
+    frequency: text("frequency").notNull(),
+    trigger: text("trigger").notNull(),
+    status: text("status").notNull(),
+    startedAt: timestamp("started_at").notNull(),
+    finishedAt: timestamp("finished_at"),
+    leasedUntil: timestamp("leased_until"),
+    leaseOwner: text("lease_owner"),
+    failureCode: text("failure_code"),
+    emailSentAt: timestamp("email_sent_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("lookout_run_history_idx").on(
+      table.userId,
+      table.lookoutId,
+      table.startedAt.desc(),
+      table.id.asc()
+    ),
+    index("lookout_run_latest_idx").on(
+      table.lookoutId,
+      table.startedAt.desc(),
+      table.id.asc()
+    ),
+    unique("lookout_run_id_user_id_unique").on(table.id, table.userId),
+    foreignKey({
+      columns: [table.lookoutId, table.lookoutUserId],
+      foreignColumns: [lookout.id, lookout.userId],
+      name: "lookout_run_lookout_owner_fk",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.projectId, table.projectUserId],
+      foreignColumns: [project.id, project.userId],
+      name: "lookout_run_project_owner_fk",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.retryOfRunId, table.retryOfUserId],
+      foreignColumns: [table.id, table.userId],
+      name: "lookout_run_retry_owner_fk",
+    }).onDelete("set null"),
+    foreignKey({
+      columns: [table.reportChatId, table.reportChatUserId],
+      foreignColumns: [chat.id, chat.userId],
+      name: "lookout_run_report_chat_owner_fk",
+    }).onDelete("set null"),
+    check(
+      "lookout_run_trigger_check",
+      sql`${table.trigger} in ('scheduled', 'manual', 'retry')`
+    ),
+    check(
+      "lookout_run_status_check",
+      sql`${table.status} in ('claimed', 'running', 'succeeded', 'failed', 'cancelled')`
+    ),
+    check(
+      "lookout_run_retry_check",
+      sql`${table.retryOfRunId} is null or ${table.retryOfRunId} <> ${table.id}`
+    ),
+    check(
+      "lookout_run_owner_provenance_check",
+      sql`(${table.lookoutId} is null and ${table.lookoutUserId} is null or ${table.lookoutId} is not null and ${table.lookoutUserId} = ${table.userId}) and (${table.projectId} is null and ${table.projectUserId} is null or ${table.projectId} is not null and ${table.projectUserId} = ${table.userId}) and (${table.retryOfRunId} is null and ${table.retryOfUserId} is null or ${table.retryOfRunId} is not null and ${table.retryOfUserId} = ${table.userId}) and (${table.reportChatId} is null and ${table.reportChatUserId} is null or ${table.reportChatId} is not null and ${table.reportChatUserId} = ${table.userId})`
+    ),
+    check(
+      "lookout_run_retry_trigger_check",
+      sql`(${table.trigger} = 'retry') = (${table.retryOfRunId} is not null)`
+    ),
+    check(
+      "lookout_run_finished_check",
+      sql`(${table.status} in ('claimed', 'running') and ${table.finishedAt} is null) or (${table.status} in ('succeeded', 'failed', 'cancelled') and ${table.finishedAt} is not null)`
+    ),
+    check(
+      "lookout_run_failure_code_check",
+      sql`${table.status} = 'failed' or ${table.failureCode} is null`
+    ),
+    check(
+      "lookout_run_report_state_check",
+      sql`(${table.status} = 'succeeded' and ${table.reportChatId} is not null) or (${table.status} = 'failed') or (${table.status} in ('claimed', 'running', 'cancelled') and ${table.reportChatId} is null)`
+    ),
+    check(
+      "lookout_run_lease_check",
+      sql`(${table.leasedUntil} is null) = (${table.leaseOwner} is null) and (${table.status} in ('claimed', 'running') or ${table.leasedUntil} is null)`
+    ),
+    check(
+      "lookout_run_email_check",
+      sql`${table.emailSentAt} is null or (${table.status} = 'succeeded' and ${table.reportChatId} is not null)`
+    ),
+  ]
 )
 
 /* -------------------------------------------------------------------------- */
@@ -382,6 +532,7 @@ export const userRelations = relations(user, ({ many }) => ({
   documents: many(document),
   projects: many(project),
   lookouts: many(lookout),
+  lookoutRuns: many(lookoutRun),
   mcpServers: many(mcpServer),
 }))
 
@@ -394,13 +545,37 @@ export const projectRelations = relations(project, ({ one, many }) => ({
   chats: many(chat),
   documents: many(document),
   lookouts: many(lookout),
+  lookoutRuns: many(lookoutRun),
 }))
 
-export const lookoutRelations = relations(lookout, ({ one }) => ({
+export const lookoutRelations = relations(lookout, ({ one, many }) => ({
   user: one(user, { fields: [lookout.userId], references: [user.id] }),
   project: one(project, {
     fields: [lookout.projectId],
     references: [project.id],
+  }),
+  runs: many(lookoutRun),
+}))
+
+export const lookoutRunRelations = relations(lookoutRun, ({ one, many }) => ({
+  user: one(user, { fields: [lookoutRun.userId], references: [user.id] }),
+  lookout: one(lookout, {
+    fields: [lookoutRun.lookoutId],
+    references: [lookout.id],
+  }),
+  project: one(project, {
+    fields: [lookoutRun.projectId],
+    references: [project.id],
+  }),
+  retryOf: one(lookoutRun, {
+    fields: [lookoutRun.retryOfRunId],
+    references: [lookoutRun.id],
+    relationName: "lookoutRunRetries",
+  }),
+  retries: many(lookoutRun, { relationName: "lookoutRunRetries" }),
+  reportChat: one(chat, {
+    fields: [lookoutRun.reportChatId],
+    references: [chat.id],
   }),
 }))
 
@@ -421,6 +596,7 @@ export const chatRelations = relations(chat, ({ one, many }) => ({
   project: one(project, { fields: [chat.projectId], references: [project.id] }),
   lookout: one(lookout, { fields: [chat.lookoutId], references: [lookout.id] }),
   events: many(chatEvent),
+  lookoutRuns: many(lookoutRun),
 }))
 
 export const chatEventRelations = relations(chatEvent, ({ one }) => ({
@@ -433,4 +609,5 @@ export type Document = typeof document.$inferSelect
 export type DocumentChunk = typeof documentChunk.$inferSelect
 export type Project = typeof project.$inferSelect
 export type Lookout = typeof lookout.$inferSelect
+export type LookoutRun = typeof lookoutRun.$inferSelect
 export type McpServer = typeof mcpServer.$inferSelect
