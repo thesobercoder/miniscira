@@ -36,5 +36,6 @@ describe("LookoutList", () => {
     expect(html).toContain("Lookouts")
     expect(html.match(/Umbrel Update/g)?.length).toBeGreaterThanOrEqual(2)
     expect(html).toContain('href="/chat/66666666-6666-4666-8666-666666666666"')
+    expect(html).toContain('data-panel-open=""')
   })
 })

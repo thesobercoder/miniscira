@@ -38,13 +38,10 @@ export function LookoutList({ lookouts }: { lookouts: LookoutListGroup[] }) {
       <SidebarGroupLabel>Lookouts</SidebarGroupLabel>
       <SidebarMenu>
         {lookouts.map((lookout) => {
-          const hasActiveReport = lookout.reports.some(
-            (report) => pathname === `/chat/${report.id}`
-          )
           return (
             <Collapsible
               key={lookout.id}
-              defaultOpen={hasActiveReport}
+              defaultOpen={lookout.reports.length > 0}
               className="group/lookout"
             >
               <SidebarMenuItem>
