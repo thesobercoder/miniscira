@@ -18,6 +18,20 @@ const createRequests = [
     prompt:
       "Create an XLSX monthly budget with rent, groceries, and transport rows.",
   },
+  {
+    skill: "docx",
+    prompt: "Create a Word document meeting agenda for a 30-minute product review.",
+  },
+  {
+    skill: "pptx",
+    prompt:
+      "Create a three-slide PowerPoint presentation for a neighborhood bakery.",
+  },
+  {
+    skill: "xlsx",
+    prompt:
+      "Create an Excel file with a monthly budget for rent, groceries, and transport.",
+  },
 ] as const
 
 export default defineEval({
