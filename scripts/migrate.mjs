@@ -9,9 +9,8 @@
  *     ensures the pgvector extension exists, then applies every migration.
  *
  *   EXISTING database (tables already present, e.g. a stack adopted from the
- *     pre-migration era): stamps the current migration set as applied in
- *     drizzle.__drizzle_migrations ("baseline adoption") and exits without
- *     re-running DDL. Future migrations (0001, …) then apply normally.
+ *     pre-migration era): stamps only the historical 0000-0002 baseline, then
+ *     applies every newer committed migration normally.
  *
  * Used as a one-shot Compose service:
  *   docker compose --profile migrate run --rm migrate
@@ -52,6 +51,7 @@ const entries = journal.entries.map((entry) => {
     "utf8"
   )
   return {
+    idx: entry.idx,
     tag: entry.tag,
     when: entry.when,
     hash: createHash("sha256").update(sql).digest("hex"),
@@ -90,7 +90,7 @@ async function stampBaseline() {
        created_at bigint
      )`
   )
-  for (const entry of entries) {
+  for (const entry of entries.filter((entry) => entry.idx <= 2)) {
     await pool.query(
       "INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ($1, $2) ON CONFLICT DO NOTHING",
       [entry.hash, entry.when]
@@ -102,37 +102,35 @@ try {
   const hasTables = (await publicTableCount()) > 0
   const tracking = await trackingState()
 
-  // The vector extension is required by the schema but is not part of the
-  // committed SQL (extensions are cluster-level, not schema objects). The DB
-  // owner can create it on pgvector images; managed Postgres may not allow
-  // it — log the outcome either way and let the migration surface a clear
-  // error if it is actually missing.
-  try {
-    await pool.query("CREATE EXTENSION IF NOT EXISTS vector")
-    log("pgvector extension present (or created)")
-  } catch (err) {
-    log(
-      `WARNING: could not ensure pgvector extension (${err.message}) — ` +
-        "migration may fail if vector columns are needed"
-    )
+  // Extensions are cluster-level, not schema objects, so committed table/index
+  // migrations cannot reliably own them. The DB owner can create these on the
+  // bundled image; managed Postgres may require an administrator.
+  for (const extension of ["vector", "pg_trgm"]) {
+    try {
+      await pool.query(`CREATE EXTENSION IF NOT EXISTS ${extension}`)
+      log(`${extension} extension present (or created)`)
+    } catch (err) {
+      log(
+        `WARNING: could not ensure ${extension} extension (${err.message}) — ` +
+          "migration may fail if dependent schema objects are needed"
+      )
+    }
   }
 
   if (hasTables && (!tracking.exists || tracking.rows === 0)) {
     await stampBaseline()
     log(
       `existing schema detected (${await publicTableCount()} public tables); ` +
-        `stamped ${entries.length} migration(s) as applied — no DDL executed`
+        "stamped historical baseline"
     )
-    process.exitCode = 0
-  } else {
-    const db = drizzle(pool)
-    await migrate(db, { migrationsFolder: MIGRATIONS_DIR })
-    const { rows } = await pool.query(
-      "SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations"
-    )
-    log(`migrations applied; tracking table has ${rows[0].n} row(s)`)
-    process.exitCode = 0
   }
+  const db = drizzle(pool)
+  await migrate(db, { migrationsFolder: MIGRATIONS_DIR })
+  const { rows } = await pool.query(
+    "SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations"
+  )
+  log(`migrations applied; tracking table has ${rows[0].n} row(s)`)
+  process.exitCode = 0
 } catch (err) {
   console.error(`[migrate] FAILED: ${err.message}`)
   process.exitCode = 1

@@ -1,5 +1,5 @@
-// Enables the pgvector extension before `drizzle-kit push` creates the vector
-// columns. Run once: `bun run db:setup`, then `bun run db:push`.
+// Enables required extensions before `drizzle-kit push` creates dependent
+// columns and indexes. Run once: `bun run db:setup`, then `bun run db:push`.
 import pg from "pg"
 
 const url = process.env.DATABASE_URL
@@ -10,6 +10,16 @@ if (!url) {
 
 const client = new pg.Client({ connectionString: url })
 await client.connect()
-await client.query("CREATE EXTENSION IF NOT EXISTS vector")
+try {
+  await client.query("CREATE EXTENSION IF NOT EXISTS vector")
+  await client.query("CREATE EXTENSION IF NOT EXISTS pg_trgm")
+} catch (error) {
+  console.error(
+    "Could not enable required Postgres extensions (vector, pg_trgm). The database role must be allowed to run CREATE EXTENSION.",
+    error instanceof Error ? error.message : error
+  )
+  await client.end()
+  process.exit(1)
+}
 await client.end()
-console.log("✓ pgvector extension enabled")
+console.log("✓ Postgres extensions enabled: vector, pg_trgm")

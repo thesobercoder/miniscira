@@ -67,7 +67,7 @@ The app validates `REQUIRED` variables at startup in `lib/env-check.ts`. If one 
   The `migrate` profile keeps the service out of `docker compose up` — normal
   startup never runs `db:push` and never mutates the schema.
 - **Fresh installs** get the full schema from the committed SQL (the service
-  also creates the pgvector extension if missing).
+  also creates the vector and `pg_trgm` extensions if missing).
 - **Adopted databases** (an existing schema from the pre-migration era) are
   detected: the migrations are **stamped as applied without executing DDL**.
   The stamping is recorded in `drizzle.__drizzle_migrations`; your data,
@@ -84,10 +84,10 @@ The app validates `REQUIRED` variables at startup in `lib/env-check.ts`. If one 
   docker compose -f docker-compose.yml -f docker-compose.external-db.yml up -d app
   ```
   It removes the bundled `db` service and requires `DATABASE_URL` to point at
-  your own pgvector-capable database (Neon, Supabase, RDS, vanilla + vector
-  extension). First-time setup on a fresh external database:
-  `bun run db:setup` (creates the vector extension once), then the migrate
-  service.
+  Postgres with the vector and `pg_trgm` extensions available. First-time setup
+  on a fresh external database: run `bun run db:setup`, then the migrate
+  service. The database role needs `CREATE EXTENSION` permission; setup fails
+  clearly when the provider requires an administrator to enable an extension.
 
 ## Model configuration
 
@@ -191,9 +191,8 @@ docker run --rm -v miniscira_uploads:/data -v "$PWD":/backup \
   alpine tar xzf /backup/uploads-YYYY-MM-DD.tar.gz -C /data
 ```
 
-A restore into a fresh database requires the pgvector extension: either use
-the bundled `db` service (it includes pgvector) or run
-`CREATE EXTENSION IF NOT EXISTS vector;` first.
+A restore into a fresh database requires the vector and `pg_trgm` extensions:
+either use the bundled `db` service or enable both extensions first.
 
 ## Upgrades and rollback
 

@@ -1,6 +1,6 @@
-# Draft PRD: search and read previous threads
+# PRD: search and read previous threads
 
-**Status:** Draft. Requires explicit user approval before implementation.
+**Status:** Approved by Soham on 2026-08-23. Phase 1 implementation is authorized. Phase 2 keeps its separate release gate.
 **Backlog source:** [Search and read previous threads](../docs/PRODUCT_IDEAS.md#search-and-read-previous-threads)
 **Repository:** `/opt/data/miniscira-src`
 **Last updated:** 2026-08-23
@@ -27,7 +27,7 @@ Thread retrieval complements durable memory:
 
 Neither replaces the other.
 
-This PRD does not authorize implementation.
+This approved PRD authorizes the ordered Phase 1 work and its verification plan. It does not authorize releasing Phase 2 before its separate gate passes.
 
 ## 2. Product priority
 
@@ -510,26 +510,24 @@ Create TODOs only after explicit PRD approval.
 
 Do not start with embeddings, vector search, raw-event search, an external service, or a custom routing mechanism. PostgreSQL title search and its measured index are the initial search infrastructure.
 
-## 16. Open questions
+## 16. Locked Phase 1 defaults
 
-1. What canonical archive field will the archive PRD add?
-2. What exact `pg_trgm` threshold and ranking weights perform best on representative MiniScira titles? Lock them from measured fixtures before implementation.
-3. Should the agent read the whole bounded thread from the start, the most recent messages, or a requested range? Proposed default: return the most recent visible messages within the limit, with a continuation option.
-4. Which PostgreSQL text-search configuration should titles use? Proposed default: `simple`, verified with multilingual and punctuation-heavy fixtures.
-5. Which text-search configurations should Phase 2 message projections support? Test `simple` and `english` before locking the first configuration.
-6. What exact title score counts as strong enough to skip Phase 2 message search?
-7. What is the canonical stable visible-message identifier after retries, superseded turns, and multiple Eve sessions?
-8. Should the projection update after each persisted flush or only at durable user-message and completed-assistant boundaries?
-9. What event-count ceiling is safe for interim reads before the Phase 2 backfill is complete?
-10. Does production scale require concurrent GIN index creation?
+1. The archive PRD defines `archivedAt`. Until that schema ships, all existing owned threads are active. Thread search must not invent a second archive field. After archive ships, active and archived threads use the same search path.
+2. Title search uses PostgreSQL's `simple` text-search configuration. Fixtures must cover Unicode, multilingual, short, and punctuation-heavy titles.
+3. Exact and prefix tiers use explicit SQL predicates. Full-text ranking handles tokens and multi-word queries. `pg_trgm` handles typo tolerance. Measured fixtures lock the similarity threshold before release.
+4. A title-selected read returns the most recent visible messages first. A continuation cursor retrieves older visible messages.
+5. Phase 1 limits are 8 agent search results, 20 picker results, 100 visible messages, 30,000 returned characters, and a measured maximum of 10,000 persisted events per interim read. Exceeding the event ceiling returns a safe bounded error instead of reducing an unbounded log.
+6. Standard committed GIN index creation is the default for the current self-hosted scale. Query-plan and migration timing tests must prove it is acceptable before production. If not, revise the migration plan to use a reviewed maintenance step.
+
+Phase 2 engineering decisions stay behind its release gate. The implementation work must lock the stable message identifier, projection update boundary, message text-search configuration, title-to-message fallback threshold, and backfill limits from transcript-equivalence fixtures and measured production-like data.
 
 ## 17. Approval gate
 
 Before implementation:
 
-- [ ] The user approves this revised PRD.
-- [ ] Every open question that changes observable behavior, architecture, or tests is resolved.
-- [ ] The approved TODO plan records exact test files, eval commands, browser-test commands, performance commands, and acceptance-fixture mapping.
+- [x] The user approved this revised PRD on 2026-08-23.
+- [x] Phase 1 decisions that change observable behavior, architecture, or tests are resolved.
+- [x] The implementation plan below records exact test files, eval commands, browser checks, performance checks, and acceptance mapping.
 - [ ] Only one TODO is in progress at a time.
 - [ ] Implementation follows the simplest canonical repository and framework patterns.
 
@@ -548,3 +546,22 @@ The implementation agent must receive:
 - The ordered tasks. The approved TODO plan must add the exact verification commands and fixture mapping before implementation starts.
 
 If a simple existing repository or framework pattern can solve a requirement, use it. Do not invent a new system.
+
+## 19. Approved Phase 1 implementation and verification plan
+
+Implement in this order:
+
+1. Add the committed `pg_trgm` extension, title search vector, and title indexes through Drizzle migrations. Update `scripts/db-setup.mjs` and external-database documentation so missing extension privileges fail clearly.
+2. Add one server-only PostgreSQL title-search helper. Test it in `lib/thread-search.test.ts` with exact, prefix, token, multi-word, typo, short, empty, Unicode, punctuation, deterministic ties, owner isolation, project isolation, current-thread exclusion, and result limits.
+3. Add migration and query-plan checks in `lib/thread-search.integration.test.ts`. Use representative multi-user fixtures and `EXPLAIN (ANALYZE, BUFFERS)` without logging user content.
+4. Add a shared server-side visible-message projection helper in `lib/thread-transcript.ts`, covered by `lib/thread-transcript.test.ts`. It must reuse canonical session scoping and Eve reduction, remove superseded messages, include visible user and assistant text only, and enforce event, message, and character limits.
+5. Add `agent/tools/search_previous_threads.ts` and `agent/tools/read_previous_thread.ts`. Their tests must cover missing auth, delegated root-session mapping, project scope, foreign and missing threads, current search authorization, archived compatibility, bounded reads, prompt injection, and safe errors.
+6. Update the agent instructions so explicit continuity references require search, likely continuity triggers selective search, unrelated prompts avoid it, retrieved content stays untrusted, and relied-on threads are linked.
+7. Add `evals/thread-search.eval.ts`. Run it with the repository eval command used by neighboring evals. Require Section 12.4 thresholds for routing, restraint, ranking, links, isolation, injection resistance, and no-match honesty.
+8. Add one authenticated `/api/chats/search` route backed by the same title-search helper. Add route tests for auth, isolation, empty/recent results, limits, malformed queries, and safe errors.
+9. Add the `Ctrl/Cmd+K` picker with current `CommandDialog`, App Router navigation, and one sidebar search button. Verify expanded, collapsed, loading, empty, error, long title, keyboard, pointer, touch, narrow viewport, Back, Forward, and no document reload states in the real browser.
+10. Run focused tests, `bun run typecheck`, `bun run lint`, `bun test`, `bun run check`, `bun run build`, `git diff --check`, migration apply/rollback checks, query-plan/performance fixtures, agent evals, and browser acceptance.
+11. Back up production, apply the migration through the documented one-shot path, deploy, and exercise the real signed-in agent continuity and picker flows. Health checks alone do not count.
+12. Commit and push the verified production-backed work. Finish with a clean tree and local `HEAD` equal to `origin/main`.
+
+Phase 2 starts only after Phase 1 production verification and a separate review of its projection schema, backfill, equivalence fixtures, and release gate.

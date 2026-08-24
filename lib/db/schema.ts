@@ -1,6 +1,7 @@
-import { relations } from "drizzle-orm"
+import { relations, sql } from "drizzle-orm"
 import {
   boolean,
+  customType,
   index,
   integer,
   jsonb,
@@ -11,6 +12,12 @@ import {
   uuid,
   vector,
 } from "drizzle-orm/pg-core"
+
+const tsvector = customType<{ data: string }>({
+  dataType() {
+    return "tsvector"
+  },
+})
 
 /* -------------------------------------------------------------------------- */
 /*  better-auth core tables                                                   */
@@ -120,6 +127,9 @@ export const chat = pgTable(
       onDelete: "set null",
     }),
     title: text("title").notNull().default("New research"),
+    titleSearch: tsvector("title_search")
+      .generatedAlwaysAs(sql`to_tsvector('simple', coalesce(title, ''))`)
+      .notNull(),
     visibility: text("visibility").notNull().default("private"),
     // eve durable-session cursor, captured from the stream so the conversation
     // can be resumed and rehydrated after a reload.
@@ -133,7 +143,14 @@ export const chat = pgTable(
       .$defaultFn(() => new Date())
       .notNull(),
   },
-  (table) => [index("chat_user_id_idx").on(table.userId, table.updatedAt)]
+  (table) => [
+    index("chat_user_id_idx").on(table.userId, table.updatedAt),
+    index("chat_title_search_idx").using("gin", table.titleSearch),
+    index("chat_title_trgm_idx").using(
+      "gin",
+      sql`lower(${table.title}) gin_trgm_ops`
+    ),
+  ]
 )
 
 export const chatEvent = pgTable(

@@ -21,10 +21,6 @@ Remove an entry after the user explicitly approves its PRD.
 
 [Draft PRD](../tasks/prd-thread-archiving.md). Awaiting approval.
 
-### Search and read previous threads
-
-[Draft PRD](../tasks/prd-thread-search.md). Awaiting approval.
-
 ### Progressive MCP tool discovery
 
 Keep MCP tools out of the model's default tool set. Expose a small discovery and invocation interface, then disclose only the relevant server and tool schemas when the task requires them. Define discovery, selection, approvals, caching, and per-turn tool limits before implementation.

@@ -4,6 +4,7 @@ import Link from "next/link"
 import { ChatList } from "@/components/chat-list"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { SidebarUser } from "@/components/sidebar-user"
+import { ThreadSearchButton } from "@/components/thread-search"
 import { Button } from "@/components/ui/button"
 import {
   Sidebar,
@@ -11,6 +12,8 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarHeader,
+  SidebarMenu,
+  SidebarMenuItem,
   SidebarRail,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
@@ -64,6 +67,11 @@ export async function AppSidebar({ user }: { user: SidebarUserInfo }) {
 
       <SidebarContent>
         <SidebarNav />
+        <SidebarMenu className="px-2">
+          <SidebarMenuItem>
+            <ThreadSearchButton />
+          </SidebarMenuItem>
+        </SidebarMenu>
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
           <ChatList chats={chats} />
         </SidebarGroup>
