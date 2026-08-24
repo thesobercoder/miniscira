@@ -1,7 +1,8 @@
 import { RiAddLine } from "@remixicon/react"
-import { desc, eq } from "drizzle-orm"
+import { and, desc, eq, isNull } from "drizzle-orm"
 import Link from "next/link"
 import { ChatList } from "@/components/chat-list"
+import { LookoutList } from "@/components/lookout-list"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { SidebarUser } from "@/components/sidebar-user"
 import { ThreadSearchButton } from "@/components/thread-search"
@@ -18,7 +19,8 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { db } from "@/lib/db"
-import { chat } from "@/lib/db/schema"
+import { chat, lookout } from "@/lib/db/schema"
+import { listHistoryPage } from "@/lib/history"
 
 type SidebarUserInfo = {
   id: string
@@ -28,11 +30,38 @@ type SidebarUserInfo = {
 }
 
 export async function AppSidebar({ user }: { user: SidebarUserInfo }) {
-  const chats = await db
-    .select({ id: chat.id, title: chat.title, updatedAt: chat.updatedAt })
-    .from(chat)
-    .where(eq(chat.userId, user.id))
-    .orderBy(desc(chat.updatedAt))
+  const [chats, lookouts] = await Promise.all([
+    db
+      .select({ id: chat.id, title: chat.title, updatedAt: chat.updatedAt })
+      .from(chat)
+      .where(and(eq(chat.userId, user.id), isNull(chat.lookoutId)))
+      .orderBy(desc(chat.updatedAt)),
+    db
+      .select({ id: lookout.id, name: lookout.name })
+      .from(lookout)
+      .where(eq(lookout.userId, user.id))
+      .orderBy(desc(lookout.createdAt)),
+  ])
+
+  const lookoutGroups = await Promise.all(
+    lookouts.map(async (item) => {
+      const history = await listHistoryPage({
+        userId: user.id,
+        scope: { kind: "lookout-reports", lookoutId: item.id },
+      })
+      return {
+        id: item.id,
+        name: item.name,
+        reports: history.rows
+          .filter((report) => report.reportChatId !== null)
+          .map((report) => ({
+            id: report.reportChatId as string,
+            title: report.title,
+            timestamp: report.timestamp.toISOString(),
+          })),
+      }
+    })
+  )
 
   return (
     <Sidebar collapsible="icon">
@@ -72,6 +101,9 @@ export async function AppSidebar({ user }: { user: SidebarUserInfo }) {
             <ThreadSearchButton />
           </SidebarMenuItem>
         </SidebarMenu>
+        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+          <LookoutList lookouts={lookoutGroups} />
+        </SidebarGroup>
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
           <ChatList chats={chats} />
         </SidebarGroup>
