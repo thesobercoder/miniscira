@@ -6,6 +6,17 @@ export const AGENT_THREAD_SEARCH_LIMIT = 8
 export const PICKER_THREAD_SEARCH_LIMIT = 20
 
 const MAX_QUERY_LENGTH = 200
+const MAX_DATE_RANGE_MS = 366 * 24 * 60 * 60 * 1000
+
+export type ThreadSearchDateRange = {
+  from: string
+  to: string
+}
+
+type ValidatedThreadSearchDateRange = {
+  from: Date
+  to: Date
+}
 
 export type ThreadSearchResult = {
   id: string
@@ -28,6 +39,7 @@ type Row = {
 export type ThreadSearchInput = {
   userId: string
   query?: string
+  dateRange?: ThreadSearchDateRange
   currentChatId?: string | null
   projectId?: string | null
   limit?: number
@@ -49,15 +61,35 @@ export function clampThreadSearchLimit(
   return Math.max(1, Math.min(maximum, Math.trunc(limit ?? maximum)))
 }
 
+export function validateThreadSearchDateRange(
+  range: ThreadSearchDateRange | undefined
+): ValidatedThreadSearchDateRange | null {
+  if (!range) return null
+  const from = new Date(range.from)
+  const to = new Date(range.to)
+  if (
+    !/^\d{4}-\d{2}-\d{2}T/.test(range.from) ||
+    !/^\d{4}-\d{2}-\d{2}T/.test(range.to) ||
+    !Number.isFinite(from.getTime()) ||
+    !Number.isFinite(to.getTime()) ||
+    from >= to ||
+    to.getTime() - from.getTime() > MAX_DATE_RANGE_MS
+  )
+    throw new Error("Invalid thread search date range.")
+  return { from, to }
+}
+
 export function threadSearchQuery({
   userId,
   query,
+  dateRange,
   currentChatId,
   projectId,
   limit,
 }: {
   userId: string
   query?: string
+  dateRange: ValidatedThreadSearchDateRange | null
   currentChatId: string | null
   projectId: string | null
   limit: number
@@ -65,6 +97,8 @@ export function threadSearchQuery({
   const normalized = normalizeThreadQuery(query)
   const lower = normalized.toLocaleLowerCase()
   const useTrigram = normalized.length >= 3
+  const from = dateRange?.from ?? null
+  const to = dateRange?.to ?? null
 
   if (!normalized) {
     return sql`
@@ -74,6 +108,8 @@ export function threadSearchQuery({
       where user_id = ${userId}
         and (${currentChatId}::uuid is null or id <> ${currentChatId}::uuid)
         and (${projectId}::uuid is null or project_id = ${projectId}::uuid)
+        and (${from}::timestamptz is null or updated_at >= ${from}::timestamptz)
+        and (${to}::timestamptz is null or updated_at < ${to}::timestamptz)
       order by updated_at desc, id asc
       limit ${limit}
     `
@@ -99,6 +135,8 @@ export function threadSearchQuery({
       where user_id = ${userId}
         and (${currentChatId}::uuid is null or id <> ${currentChatId}::uuid)
         and (${projectId}::uuid is null or project_id = ${projectId}::uuid)
+        and (${from}::timestamptz is null or updated_at >= ${from}::timestamptz)
+        and (${to}::timestamptz is null or updated_at < ${to}::timestamptz)
         and (
           lower(title) = ${lower}
           or lower(title) like ${`${lower}%`}
@@ -116,12 +154,20 @@ export function threadSearchQuery({
 export async function searchPreviousThreads({
   userId,
   query,
+  dateRange,
   currentChatId = null,
   projectId = null,
   limit = AGENT_THREAD_SEARCH_LIMIT,
 }: ThreadSearchInput): Promise<ThreadSearchResult[]> {
   const result = await db.execute(
-    threadSearchQuery({ userId, query, currentChatId, projectId, limit })
+    threadSearchQuery({
+      userId,
+      query,
+      dateRange: validateThreadSearchDateRange(dateRange),
+      currentChatId,
+      projectId,
+      limit,
+    })
   )
   const rows = (Array.isArray(result) ? result : result.rows) as Row[]
   return rows.map((row) => ({
