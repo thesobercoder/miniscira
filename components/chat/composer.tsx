@@ -486,6 +486,7 @@ export const Composer = memo(function Composer({
             </InputGroupAddon>
           )}
           <InputGroupTextarea
+            autoFocus
             value={input}
             onChange={(e) => onInputChange(e.target.value)}
             onPaste={(e) => {
