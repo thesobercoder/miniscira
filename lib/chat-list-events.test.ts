@@ -9,6 +9,7 @@ import {
   historyRows,
   historyWindowReducer,
   nextHistoryIntent,
+  parseCurrentChat,
   reloadHistoryIntent,
   renderedHistorySlots,
   scrollAnchorDelta,
@@ -98,6 +99,51 @@ describe("chat list events", () => {
       slot: 1,
       cursor: "after-server-29",
     })
+  })
+
+  test("keeps optimistic creation within the retained row limit", () => {
+    let history = createHistoryWindow({
+      generation: "one",
+      page: page(
+        Array.from({ length: 30 }, (_, index) => row(`0-${index}`)),
+        "1"
+      ),
+    })
+    for (let slot = 1; slot < 10; slot += 1) {
+      const cursor = String(slot)
+      history = historyWindowReducer(history, {
+        type: "pageRequested",
+        slot,
+        cursor,
+      })
+      history = historyWindowReducer(history, {
+        type: "pageLoaded",
+        slot,
+        cursor,
+        page: page(
+          Array.from({ length: 30 }, (_, index) => row(`${slot}-${index}`)),
+          slot === 9 ? null : String(slot + 1)
+        ),
+      })
+    }
+
+    history = historyWindowReducer(history, {
+      type: "chatCreated",
+      row: row("new"),
+    })
+
+    expect(historyRows(history).length).toBeLessThanOrEqual(300)
+  })
+
+  test("accepts current-chat metadata only for active ordinary research", () => {
+    expect(
+      parseCurrentChat({ chat: { ...row("active"), activeOrdinary: true } })
+    ).toEqual(row("active"))
+    expect(
+      parseCurrentChat({
+        chat: { ...row("archived"), activeOrdinary: false },
+      })
+    ).toBeNull()
   })
 
   test("keeps an unloaded current chat until a page contains it", () => {

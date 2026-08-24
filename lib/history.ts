@@ -163,7 +163,11 @@ export function parseHistoryCursor(raw: string | null): HistoryCursor | null {
 }
 
 export function isInvalidHistoryCursor(error: unknown) {
-  return error instanceof Error && error.message === "Invalid history cursor."
+  return (
+    error instanceof Error &&
+    (error.message === "Invalid history cursor." ||
+      error.message === "History cursor does not match this request.")
+  )
 }
 
 export function encodeHistoryCursor(

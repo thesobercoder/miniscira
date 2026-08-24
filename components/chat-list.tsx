@@ -185,7 +185,7 @@ export function ChatList({
     () => ({ chats, nextCursor }),
     [chats, nextCursor]
   )
-  const generation = `${chats[0]?.id ?? "empty"}:${nextCursor ?? "end"}`
+  const generation = JSON.stringify(page)
   const [history, dispatch] = useReducer(
     historyWindowReducer,
     { generation, page },
@@ -374,7 +374,7 @@ export function ChatList({
   }
 
   return (
-    <div ref={rootRef} className="max-h-full overflow-y-auto">
+    <div ref={rootRef} className="min-h-0 flex-1 overflow-y-auto">
       {currentRows.length > 0 && (
         <ChatRows
           rows={currentRows}

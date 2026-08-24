@@ -112,6 +112,7 @@ export function parseChatListPage(value: unknown): ChatListPagePayload | null {
 
 export function parseCurrentChat(value: unknown): ChatListRow | null {
   if (!isRecord(value)) return null
+  if (!isRecord(value.chat) || value.chat.activeOrdinary !== true) return null
   return parseRow(value.chat)
 }
 
@@ -370,10 +371,11 @@ export function historyWindowReducer(
           rows: slot.rows.filter((row) => row.id !== action.row.id),
         }
       })
+      const capped = capPayloads(slots, state.visibleSlot)
       return {
         ...state,
-        slots,
-        currentChat: reconcileCurrent(state.currentChat, slots),
+        slots: capped,
+        currentChat: reconcileCurrent(state.currentChat, capped),
       }
     }
     case "chatTitled":
