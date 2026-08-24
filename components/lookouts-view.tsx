@@ -4,10 +4,12 @@ import {
   RiAddLine,
   RiCheckLine,
   RiDeleteBinLine,
+  RiFileTextLine,
   RiPauseLine,
   RiPlayLine,
   RiRadarLine,
 } from "@remixicon/react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useRef, useState } from "react"
 import { toast } from "sonner"
@@ -21,7 +23,16 @@ import { Textarea } from "@/components/ui/textarea"
 import { useMountEffect } from "@/hooks/use-mount-effect"
 import { cn } from "@/lib/utils"
 
-type Lookout = {
+export type LookoutReport = {
+  id: string
+  title: string
+  timestamp: string
+  reportChatId: string | null
+  status: "claimed" | "running" | "succeeded" | "failed" | "cancelled" | null
+  incomplete: boolean
+}
+
+export type Lookout = {
   id: string
   name: string
   prompt: string
@@ -32,6 +43,7 @@ type Lookout = {
   status: string
   nextRunAt: string | null
   lastRunAt: string | null
+  reports: LookoutReport[]
 }
 
 type Frequency = "daily" | "weekly" | "once"
@@ -118,7 +130,7 @@ export function LookoutsView({ initial }: { initial: Lookout[] }) {
         toast.error(json.error ?? "Couldn't create lookout")
         return
       }
-      setItems((prev) => [created, ...prev])
+      setItems((prev) => [{ ...created, reports: [] }, ...prev])
       setPrompt("")
       setName("")
       if (!json.scheduled) {
@@ -288,85 +300,139 @@ export function LookoutsView({ initial }: { initial: Lookout[] }) {
       ) : (
         <ul className="flex flex-col gap-2">
           {items.map((l) => (
-            <li
-              key={l.id}
-              className="flex items-start gap-3 rounded-xl border bg-card/40 p-3.5"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="truncate font-medium text-sm">{l.name}</span>
-                  <span
-                    className={cn(
-                      "flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium text-[10px] transition-colors",
-                      l.status === "active"
-                        ? "bg-primary/15 text-primary-strong"
-                        : "bg-muted text-muted-foreground",
-                      // Confirms the change actually persisted, so an
-                      // optimistic flip isn't the only feedback.
-                      justSettled === l.id &&
-                        "zoom-in-95 animate-in ring-1 ring-primary/40 motion-reduce:animate-none"
-                    )}
-                  >
-                    {justSettled === l.id && (
-                      <RiCheckLine className="size-2.5 shrink-0" />
-                    )}
-                    {l.status}
-                  </span>
+            <li key={l.id} className="rounded-xl border bg-card/40 p-3.5">
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate font-medium text-sm">
+                      {l.name}
+                    </span>
+                    <span
+                      className={cn(
+                        "flex items-center gap-1 rounded-full px-1.5 py-0.5 font-medium text-[10px] transition-colors",
+                        l.status === "active"
+                          ? "bg-primary/15 text-primary-strong"
+                          : "bg-muted text-muted-foreground",
+                        // Confirms the change actually persisted, so an
+                        // optimistic flip isn't the only feedback.
+                        justSettled === l.id &&
+                          "zoom-in-95 animate-in ring-1 ring-primary/40 motion-reduce:animate-none"
+                      )}
+                    >
+                      {justSettled === l.id && (
+                        <RiCheckLine className="size-2.5 shrink-0" />
+                      )}
+                      {l.status}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 line-clamp-2 text-muted-foreground text-xs">
+                    {l.prompt}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {describe(l)}
+                    {l.lastRunAt &&
+                      ` · last run ${new Date(l.lastRunAt).toLocaleString()}`}
+                    {l.nextRunAt &&
+                      l.status === "active" &&
+                      ` · next run ${new Date(l.nextRunAt).toLocaleString()}`}
+                    {!l.nextRunAt &&
+                      l.status === "active" &&
+                      " · not scheduled"}
+                  </p>
                 </div>
-                <p className="mt-0.5 line-clamp-2 text-muted-foreground text-xs">
-                  {l.prompt}
-                </p>
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  {describe(l)}
-                  {l.lastRunAt &&
-                    ` · last run ${new Date(l.lastRunAt).toLocaleString()}`}
-                  {l.nextRunAt &&
-                    l.status === "active" &&
-                    ` · next run ${new Date(l.nextRunAt).toLocaleString()}`}
-                  {!l.nextRunAt && l.status === "active" && " · not scheduled"}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 gap-1.5"
-                  disabled={busy === l.id}
-                  onClick={() => runNow(l)}
-                >
-                  {busy === l.id ? "Running…" : "Run now"}
-                </Button>
-                {l.status !== "completed" && (
+                <div className="flex shrink-0 items-center gap-1">
                   <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-8"
-                    aria-label={l.status === "active" ? "Pause" : "Resume"}
-                    onClick={() => toggle(l)}
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1.5"
+                    disabled={busy === l.id}
+                    onClick={() => runNow(l)}
                   >
-                    {l.status === "active" ? (
-                      <RiPauseLine className="size-4" />
-                    ) : (
-                      <RiPlayLine className="size-4" />
-                    )}
+                    {busy === l.id ? "Running…" : "Run now"}
                   </Button>
-                )}
-                <ConfirmDialog
-                  title="Delete this lookout?"
-                  description={`“${l.name}” and its schedule will be removed. Past result chats are kept.`}
-                  onConfirm={() => remove(l)}
-                  trigger={
+                  {l.status !== "completed" && (
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="size-8 text-muted-foreground hover:text-destructive"
-                      aria-label="Delete"
+                      className="size-8"
+                      aria-label={l.status === "active" ? "Pause" : "Resume"}
+                      onClick={() => toggle(l)}
                     >
-                      <RiDeleteBinLine className="size-4" />
+                      {l.status === "active" ? (
+                        <RiPauseLine className="size-4" />
+                      ) : (
+                        <RiPlayLine className="size-4" />
+                      )}
                     </Button>
-                  }
-                />
+                  )}
+                  <ConfirmDialog
+                    title="Delete this lookout?"
+                    description={`“${l.name}” and its schedule will be removed. Past result chats are kept.`}
+                    onConfirm={() => remove(l)}
+                    trigger={
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="size-8 text-muted-foreground hover:text-destructive"
+                        aria-label="Delete"
+                      >
+                        <RiDeleteBinLine className="size-4" />
+                      </Button>
+                    }
+                  />
+                </div>
               </div>
+              {l.reports.length > 0 && (
+                <div className="mt-3 border-t pt-3">
+                  <p className="mb-1.5 font-medium text-[11px] text-muted-foreground uppercase tracking-wide">
+                    Reports
+                  </p>
+                  <ul className="space-y-1">
+                    {l.reports.map((report) => {
+                      const content = (
+                        <>
+                          <RiFileTextLine className="size-3.5 shrink-0 text-muted-foreground" />
+                          <span className="min-w-0 flex-1 truncate">
+                            {report.title}
+                          </span>
+                          {report.incomplete && (
+                            <span className="text-[10px] text-amber-600 dark:text-amber-400">
+                              Incomplete
+                            </span>
+                          )}
+                          {!report.reportChatId && report.status && (
+                            <span className="text-[10px] text-muted-foreground capitalize">
+                              {report.status}
+                            </span>
+                          )}
+                          <time className="shrink-0 text-[10px] text-muted-foreground">
+                            {new Date(report.timestamp).toLocaleString([], {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            })}
+                          </time>
+                        </>
+                      )
+                      return (
+                        <li key={report.id}>
+                          {report.reportChatId ? (
+                            <Link
+                              href={`/chat/${report.reportChatId}`}
+                              className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-muted/60"
+                            >
+                              {content}
+                            </Link>
+                          ) : (
+                            <div className="flex items-center gap-2 px-2 py-1.5 text-xs">
+                              {content}
+                            </div>
+                          )}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              )}
             </li>
           ))}
         </ul>
