@@ -25,6 +25,10 @@ Allow independent default models for interactive chat, production evals, Lookout
 
 [Draft PRD](../tasks/prd-image-generation-aspect-ratio.md). Awaiting approval.
 
+### Remove the Lookout report list from the sidebar
+
+[Draft PRD](../tasks/prd-remove-lookout-sidebar-list.md). Awaiting approval.
+
 ### Nightly memory extraction from the day's chats
 
 [Draft PRD](../tasks/prd-nightly-memory-extraction.md). Awaiting approval.
