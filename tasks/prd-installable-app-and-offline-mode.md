@@ -114,6 +114,9 @@ Users must be able to:
 - Version cache names and remove only obsolete caches owned by MiniScira.
 - Keep the service-worker scope within the MiniScira application scope.
 - Define a tested path that disables or unregisters a faulty worker.
+- Deploy manifest, icons, metadata, service-worker script, and referenced shell assets atomically or in a backward-compatible sequence.
+- Serve the service-worker script with headers that permit timely update checks and prevent an indefinitely stale worker.
+- Ensure manifest, icon, and worker paths function through the production proxy/base path.
 
 ## Security and privacy requirements
 
@@ -122,15 +125,6 @@ Users must be able to:
 - Keep sign-out effective while a service worker is registered.
 - Prove that an offline shell cannot display private content from another account.
 - Inspect Cache Storage and require that it contains only approved public shell assets.
-
-## Deployment and rollback requirements
-
-- Deploy manifest, icons, metadata, service-worker script, and referenced shell assets atomically or in a backward-compatible sequence.
-- Serve the service-worker script with headers that permit timely update checks and prevent an indefinitely stale worker.
-- Ensure manifest, icon, and worker paths function through the production proxy/base path.
-- Define a rollback procedure that can unregister or neutralize a faulty worker, invalidate its caches, and restore a compatible shell.
-- Rollback must not require users to manually clear all browser data.
-- Monitor registration failures, installability diagnostics, offline-shell errors, and update-loop symptoms after release.
 
 ## UX notes
 
@@ -217,13 +211,14 @@ Users must be able to:
 - Review service-worker install, activation, fetch, and update failures in browser developer tools.
 - Review Cache Storage during online, offline, sign-out, update, and rollback checks.
 - Review Next.js and proxy logs for failed manifest, icon, and worker requests.
+- Monitor registration failures, installability diagnostics, offline-shell errors, and update-loop symptoms after release.
 - Treat private cache entries, stale-worker loops, failed reconnects, and incorrect install identity as release blockers.
 
 ## Rollback
 
 - Disable or unregister the service worker if it traps clients on stale assets.
 - Deploy the previous application image.
-- Remove obsolete worker registration and caches through the tested cleanup path.
+- Remove obsolete worker registration and caches through the tested cleanup path, without requiring users to clear all browser data manually.
 - Verify online launch, offline behavior, sign-out, Cache Storage, and installation after rollback.
 - No database rollback is required.
 

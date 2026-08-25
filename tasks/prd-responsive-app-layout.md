@@ -139,10 +139,11 @@ The layout must remain navigable and structurally stable for:
 
 ### Browser and end-to-end checks
 
-- Exercise every primary route at 320, 375, 390, 430, 768, 1024, and 1440 CSS pixels.
-- Test pointer, touch, keyboard, browser Back and Forward, portrait, landscape, safe areas, browser-chrome resizing, and the software keyboard.
-- Test signed-out and signed-in states, the composer and Lookout forms with the software keyboard, and streaming responses with long timelines.
-- Test loading, empty, error, long-content, and streaming states in every supported theme and with reduced motion enabled.
+- Exercise every primary route at representative mobile, tablet, and desktop widths.
+- Cover 320, 375, 390, 430, 768, 1024, and 1440 CSS pixels across the route matrix, with targeted cases at the widths relevant to each known risk.
+- Test pointer, touch, keyboard, browser Back and Forward, portrait, landscape, safe areas, browser-chrome resizing, and the software keyboard on representative routes.
+- Test signed-out and signed-in states, the composer and Lookout forms with the software keyboard, and streaming responses with long timelines at their relevant widths.
+- Cover loading, empty, error, long-content, streaming, supported themes, and reduced motion without requiring every state at every route-width combination.
 - Confirm that the document has no unintended horizontal overflow and that overlays do not hide essential controls.
 
 ### Authorization and security checks
