@@ -368,17 +368,78 @@ function SidebarSeparator({
   )
 }
 
-function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
+function SidebarContent({
+  className,
+  children,
+  ref,
+  ...props
+}: React.ComponentProps<"div">) {
+  const localRef = React.useRef<HTMLDivElement | null>(null)
+  const contentRef = React.useRef<HTMLDivElement | null>(null)
+  const [edges, setEdges] = React.useState({ top: false, bottom: false })
+
+  const updateEdges = React.useCallback(() => {
+    const node = localRef.current
+    if (!node) return
+    const maxScroll = node.scrollHeight - node.clientHeight
+    setEdges({
+      top: node.scrollTop > 1,
+      bottom: maxScroll - node.scrollTop > 1,
+    })
+  }, [])
+
+  React.useEffect(() => {
+    const node = localRef.current
+    const content = contentRef.current
+    if (!node || !content) return
+    updateEdges()
+    node.addEventListener("scroll", updateEdges, { passive: true })
+    const observer = new ResizeObserver(updateEdges)
+    observer.observe(node)
+    observer.observe(content)
+    return () => {
+      node.removeEventListener("scroll", updateEdges)
+      observer.disconnect()
+    }
+  }, [updateEdges])
+
   return (
-    <div
-      data-slot="sidebar-content"
-      data-sidebar="content"
-      className={cn(
-        "no-scrollbar flex min-h-0 flex-1 flex-col gap-0 overflow-auto group-data-[collapsible=icon]:overflow-hidden",
-        className
-      )}
-      {...props}
-    />
+    <div className="relative flex min-h-0 flex-1">
+      <div
+        ref={(node) => {
+          localRef.current = node
+          if (typeof ref === "function") ref(node)
+          else if (ref) ref.current = node
+        }}
+        data-slot="sidebar-content"
+        data-sidebar="content"
+        className={cn(
+          "no-scrollbar flex min-h-0 flex-1 flex-col gap-0 overflow-auto group-data-[collapsible=icon]:overflow-hidden",
+          className
+        )}
+        {...props}
+      >
+        <div ref={contentRef} className="flex flex-col gap-0">
+          {children}
+        </div>
+      </div>
+      <div
+        aria-hidden
+        data-sidebar-scroll-edge="top"
+        className={cn(
+          "ease pointer-events-none absolute inset-x-0 top-0 z-10 h-8 bg-linear-to-b from-sidebar via-sidebar/80 to-transparent opacity-0 transition-opacity duration-150 group-data-[collapsible=icon]:hidden",
+          edges.top && "opacity-100"
+        )}
+      />
+      <div
+        aria-hidden
+        data-sidebar-scroll-edge="bottom"
+        className={cn(
+          "ease pointer-events-none absolute inset-x-0 bottom-0 z-10 h-10 bg-linear-to-t from-sidebar via-sidebar/80 to-transparent opacity-0 transition-opacity duration-150 group-data-[collapsible=icon]:hidden",
+          edges.bottom && "opacity-100"
+        )}
+      />
+    </div>
   )
 }
 
