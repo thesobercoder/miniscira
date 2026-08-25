@@ -34,6 +34,7 @@ The application does not yet define a complete installable web-app contract acro
 - Authenticated desktop/mobile layout, sidebar behavior, route overflow, touch layout, safe areas, or software-keyboard behavior. Those belong to [Responsive App Layout](./prd-responsive-app-layout.md).
 - Full offline access to authenticated data or offline mutation queues.
 - Background synchronization, push notifications, or native-app distribution.
+- Custom install marketing banners and onboarding tours in the first release.
 - Persistently caching private API responses, conversations, attachments, credentials, or personalized route documents.
 
 ## Users and use cases
@@ -51,7 +52,7 @@ Users must be able to:
 ### Web app manifest
 
 - Provide a valid, discoverable web app manifest from production pages.
-- Define product-approved `name`, `short_name`, `description`, `start_url`, `scope`, `display`, `theme_color`, and `background_color` values.
+- Set the manifest product name to `MiniScira`. Define product-approved `short_name`, `description`, `start_url`, `scope`, `display`, `theme_color`, and `background_color` values.
 - Use a stable `id` so installations are not duplicated when URLs or tracking parameters vary.
 - Ensure `start_url` and `scope` work behind the supported production deployment path and proxy configuration.
 - Define standalone display behavior without changing authentication or authorization semantics.
@@ -61,7 +62,7 @@ Users must be able to:
 - Provide standard 192×192 and 512×512 PNG icons.
 - Provide purpose-built maskable 192×192 and 512×512 PNG icons with artwork inside the required safe zone; do not merely relabel standard icons as maskable.
 - Include correct manifest `sizes`, MIME `type`, and `purpose` declarations.
-- Provide an Apple touch icon and the required Apple web-app metadata for supported iOS home-screen behavior.
+- Keep and verify the existing `apple-icon.png`. Provide the required Apple web-app metadata for supported iOS home-screen behavior.
 - Validate that icons are not cropped, padded incorrectly, transparent where a solid background is required, or illegible at launcher size.
 
 ### Installation and standalone launch
@@ -71,6 +72,7 @@ Users must be able to:
 - Document the standard iOS add-to-home-screen flow rather than implying support for a browser install prompt where the platform does not provide one.
 - Installed launches must open within scope, preserve normal authentication redirects, and avoid unexpected browser chrome where standalone mode is supported.
 - External or out-of-scope destinations must open according to platform conventions.
+- The installable app must work in MiniScira's self-hosted deployment and must not depend on Vercel-only features.
 
 ### Secure delivery
 
@@ -84,7 +86,7 @@ Users must be able to:
 - Precache only the static assets required to render a minimal branded offline shell and reconnect affordance.
 - Do not cache private authenticated HTML, API responses, conversations, search or memory results, attachments, credentials, authorization headers, or user-specific data.
 - Network requests for authenticated or private resources must remain network-only and fail closed when offline.
-- The offline shell must clearly state that the application is offline and that private content is unavailable rather than displaying stale or misleading data.
+- The offline shell must clearly state that MiniScira is offline. It must name chat, research, sign-in, Lookouts, uploads, and account data as unavailable.
 - The service worker must not interfere with streaming responses, authenticated navigation, uploads, downloads, or application API error semantics.
 
 ### Offline and reconnect behavior
@@ -139,6 +141,7 @@ Users must be able to:
 ## Acceptance criteria
 
 - The production manifest passes browser validation and contains complete identity, scope, display, color, and icon metadata.
+- The manifest uses `MiniScira` as the product name, and the deployed metadata keeps and verifies `apple-icon.png`.
 - Standard and maskable 192×192 and 512×512 icons render correctly; Apple metadata and touch icon are recognized on supported iOS devices.
 - The app can be installed through standard supported desktop and Android browser flows and added to the home screen on physical iOS.
 - Installed launches use standalone mode where supported, remain in scope, and preserve normal authentication behavior.
@@ -148,6 +151,7 @@ Users must be able to:
 - A new deployment updates cache versions without loops or uncontrolled mid-task reloads.
 - A faulty worker can be rolled back or neutralized without asking users to manually clear browser storage.
 - Installation, standalone launch, offline, reconnect, update, and rollback are checked on physical iOS and Android devices.
+- The deployed feature works without a Vercel-only dependency.
 
 ## Validation plan
 
@@ -206,6 +210,7 @@ Users must be able to:
 6. Add the minimal service worker, offline shell, cache policy, and update policy.
 7. Deploy through the normal self-hosted process.
 8. Run physical-device installation, offline, update, reconnect, privacy, and rollback acceptance.
+9. Commit and push the verified change, then confirm a clean working tree and local `HEAD` equal to `origin/main`.
 
 ## Observability
 

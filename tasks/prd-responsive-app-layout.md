@@ -39,7 +39,7 @@ Below the `md` breakpoint, the sidebar becomes a `Sheet`, but only `SidebarTrigg
 Authenticated users must be able to:
 
 - Open and close navigation on small screens.
-- Move among New research, chats, Projects, Lookouts, MCP Servers, settings, and account actions on desktop, tablet, and phone layouts.
+- Move among New research, chats, Projects, Lookouts, MCP Servers, settings, account actions, and sign-in on desktop, tablet, and phone layouts.
 - Identify the current route and return to primary content.
 - Complete route-specific work without horizontal page overflow or controls hidden behind browser chrome, safe areas, or the software keyboard.
 - Continue reading and interacting while content loads or streams.
@@ -51,6 +51,8 @@ Authenticated users must be able to:
 - Reuse `SidebarProvider`, `SidebarTrigger`, and `Sheet` rather than introducing a parallel navigation system.
 - At and above `md`, retain the desktop sidebar behavior and expose its existing collapse/expand control.
 - Below `md`, render navigation in a `Sheet` and place a persistent, visible `SidebarTrigger` outside the hidden sidebar so it is available when the sheet is closed.
+- Use the standard menu or sidebar icon and the accessible name `Open navigation` for the mobile trigger.
+- Give the mobile trigger a touch target of at least 44 by 44 CSS pixels.
 - The trigger must remain visible and operable at a 390 px production viewport and other supported mobile widths.
 - Opening navigation must present all primary/core route links; selecting a route must navigate and close the mobile sheet.
 - The active route must be identifiable in both desktop and mobile navigation.
@@ -64,7 +66,7 @@ Authenticated users must be able to:
 
 ### Touch and keyboard interaction
 
-- Navigation controls and route actions must have practical touch targets and adequate spacing.
+- Interactive controls used by touch on mobile must have touch targets of at least 44 by 44 CSS pixels and adequate spacing.
 - The mobile sheet must support keyboard opening, focus placement, focus containment, Escape-to-close, focus restoration, and an accessible name.
 - All navigation destinations and controls must be reachable and operable without a pointer.
 - Visible focus indicators must remain clear in every supported theme.
@@ -102,6 +104,7 @@ The layout must remain navigable and structurally stable for:
 
 ## UX notes
 
+- Reuse MiniScira's existing design tokens, controls, icon style, spacing, motion, and established sheet patterns.
 - Mobile navigation access should live in a stable authenticated header or equivalent persistent shell region, not inside content that may be absent, loading, or scrolled away before navigation is needed.
 - The mobile trigger must not overlap route-level primary actions.
 - Closing the sheet should return focus to the control that opened it.
@@ -109,6 +112,7 @@ The layout must remain navigable and structurally stable for:
 ## Acceptance criteria
 
 - At a production viewport of 390 px, an authenticated user can see and activate the navigation trigger without first opening or revealing another control.
+- The trigger uses the standard menu or sidebar icon, has the accessible name `Open navigation`, and measures at least 44 by 44 CSS pixels.
 - The mobile sheet exposes every primary/core route, identifies the current route, closes after route selection, and restores focus after dismissal.
 - At and above `md`, the existing desktop sidebar remains available through `SidebarProvider` and its trigger behavior.
 - Every core authenticated route is usable at supported desktop and mobile widths with no document-level horizontal overflow.
@@ -129,7 +133,7 @@ The layout must remain navigable and structurally stable for:
 
 ### Integration checks
 
-- Exercise the authenticated app shell across New research, chats, Projects, Lookouts, MCP Servers, settings, and account actions.
+- Exercise the authenticated app shell across New research, chats, Projects, Lookouts, MCP Servers, settings, account actions, and sign-in.
 - Confirm that route transitions preserve the correct desktop or mobile navigation state.
 
 ### Browser and end-to-end checks
@@ -176,6 +180,7 @@ The layout must remain navigable and structurally stable for:
 5. Run the required checks against the production build.
 6. Deploy through the normal self-hosted process.
 7. Exercise the real deployed routes on desktop and mobile browsers.
+8. Commit and push the verified change, then confirm a clean working tree and local `HEAD` equal to `origin/main`.
 
 ## Observability
 
