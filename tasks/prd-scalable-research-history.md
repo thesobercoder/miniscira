@@ -1,6 +1,6 @@
 # PRD: paged research history
 
-- **Status:** Approved by Soham on 2026-08-24. Implementation complete. Large-history production acceptance pending.
+- **Status:** Done. Approved by Soham on 2026-08-24. Production acceptance passed on 2026-08-25.
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-scalable-research-history)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 
@@ -94,4 +94,4 @@ None. The page size and loading behavior are fixed by the approved request.
 - Pagination hardening shipped in `e545d7e`.
 - Unified sidebar scrolling shipped in `40695fc`.
 - Focused automated checks cover the page limit, page joining, failure, retry, and cursor exhaustion.
-- Production currently proves the bounded API and rendered sidebar with four research threads. Large-history production acceptance still needs an account with more than 30 research threads before this PRD and its Product Ideas row change to `Done`.
+- Production acceptance used Soham's account with 37 eligible research threads. The initial rendered sidebar contained 30 threads and the next-page control. Activating it loaded the remaining seven threads. The rendered total matched the database count, and the next-page control disappeared after the final page.

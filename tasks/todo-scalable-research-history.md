@@ -1,6 +1,6 @@
 # Paged research history implementation record
 
-- **Status:** Implementation complete. Large-history production acceptance pending.
+- **Status:** Done. Production acceptance passed on 2026-08-25.
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-scalable-research-history)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 
@@ -27,12 +27,11 @@ This record maps the approved pagination scope in `tasks/prd-scalable-research-h
 | `AC-05` | Failed page loads keep rows and permit retry. | `lib/chat-list-events.test.ts`: failure and retry case. |
 | `AC-06` | The production sidebar loads older rows after the first 30. | Authenticated production browser acceptance. |
 
-## Remaining check
+## Production acceptance
 
-- Exercise the rendered production sidebar with more than 30 research threads.
-- Confirm that the initial page is bounded and scrolling loads older threads.
-- Record the result, then mark the PRD and Product Ideas row `Done`.
-
-The current production account returns four research threads and `nextCursor: null`. This proves the bounded response and rendered list, but it cannot prove later-page loading.
+- Soham's account had 37 eligible research threads.
+- The initial rendered sidebar contained 30 threads and showed the next-page control.
+- Activating the control loaded the remaining seven threads.
+- The final rendered total matched the database count, with no next-page control after the final page.
 
 Model evals do not apply because this work does not change agent behavior.

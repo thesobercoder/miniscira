@@ -26,5 +26,4 @@ The migration preserves existing chats and related data. The pagination path use
 
 - `lib/history.test.ts` covers cursor validation, ownership, stable order, the 30-row limit, and first, middle, and final pages.
 - `lib/chat-list-events.test.ts` covers page joining, duplicate removal, retry, cursor exhaustion, and bounded client state.
-- Production browser acceptance must prove that the rendered sidebar loads the first 30 threads and then loads older threads on scroll.
-- The current production account has only four research threads, so the later-page production check remains pending.
+- Production browser acceptance used an account with 37 eligible research threads. The first render contained 30 threads. Activating the next-page control loaded the remaining seven, and the control disappeared after the final page.

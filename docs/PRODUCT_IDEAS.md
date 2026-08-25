@@ -14,7 +14,7 @@ This table keeps every product idea visible through its full lifecycle. Follow [
 | <a id="idea-nightly-memory-extraction"></a>Nightly memory extraction from the day's chats | Draft | [PRD](../tasks/prd-nightly-memory-extraction.md) | Extract durable memory from the day's conversations. |
 | <a id="idea-progressive-mcp-tool-discovery"></a>Progressive MCP tool discovery | Idea | Not drafted | Show the model only the MCP servers and tool schemas relevant to the current task. |
 | <a id="idea-remove-lookout-sidebar-list"></a>Remove the Lookout report list from the sidebar | Approved | [PRD](../tasks/prd-remove-lookout-sidebar-list.md) | Keep Lookout creation in the sidebar and move report history to Lookout pages. |
-| <a id="idea-scalable-research-history"></a>Paged research history | In progress | [PRD](../tasks/prd-scalable-research-history.md) | Load 30 research threads first, then load older threads as the user scrolls. |
+| <a id="idea-scalable-research-history"></a>Paged research history | Done | [PRD](../tasks/prd-scalable-research-history.md) | Load 30 research threads first, then load older threads as the user scrolls. |
 | <a id="idea-separate-model-defaults"></a>Separate model defaults by workload | Idea | Not drafted | Configure independent defaults for chat, evals, Lookouts, subagents, and headless work. |
 | <a id="idea-thread-search"></a>Search and read previous threads | Approved | [PRD](../tasks/prd-thread-search.md) | Search past threads and read the relevant conversation context. Phase 2 keeps a separate release gate. |
 | <a id="idea-thread-search-by-date"></a>Search previous threads by date | Approved | [PRD](../tasks/prd-thread-search-by-date.md) | Restrict previous-thread search to a requested date range. |
