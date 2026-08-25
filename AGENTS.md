@@ -19,7 +19,7 @@
 |---|---|
 | [Development principles](docs/DEVELOPMENT_PRINCIPLES.md) | Before you change code, tests, repository structure, framework code, or source-control state. |
 | [Product planning and execution](docs/PRODUCT_PLANNING.md) | Before you add a backlog idea, write or approve a PRD, create TODOs, or implement planned product work. |
-| [Product backlog](docs/PRODUCT_IDEAS.md) | When you capture, review, prioritize, or promote product ideas. |
+| [Product ideas](docs/PRODUCT_IDEAS.md) | When you capture, review, prioritize, or promote product ideas. |
 | [Engineering invariants](docs/ENGINEERING_INVARIANTS.md) | Before you change auth, Eve events, Lookouts, models, streams, attachments, global styles, or motion. |
 | [Deployment guide](docs/DEPLOYMENT.md) | Before generic self-hosting, configuration, migration, backup, restore, health, or proxy work. |
 | [Umbrel Sandbox operations](docs/UMBREL_SANDBOX_OPERATIONS.md) | Before any Soham-specific Umbrel, Portainer, Docker Sandbox, middleware, network, egress, image, or production deployment work. |

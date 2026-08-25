@@ -32,8 +32,15 @@ def main() -> int:
         )
 
     required_table_header = "| Idea | Status | Planning document | Summary |"
-    if required_table_header not in product_ideas:
-        errors.append("docs/PRODUCT_IDEAS.md: missing the product-ideas table header")
+    required_table_separator = "|---|---|---|---|"
+    if product_ideas.count(required_table_header) != 1:
+        errors.append(
+            "docs/PRODUCT_IDEAS.md: expected exactly one product-ideas table header"
+        )
+    if product_ideas.count(required_table_separator) != 1:
+        errors.append(
+            "docs/PRODUCT_IDEAS.md: expected exactly one product-ideas table separator"
+        )
 
     idea_anchors = re.findall(r'<a id="(idea-[a-z0-9-]+)"></a>', product_ideas)
     duplicate_anchors = sorted(
@@ -41,6 +48,12 @@ def main() -> int:
     )
     for anchor in duplicate_anchors:
         errors.append(f"docs/PRODUCT_IDEAS.md: duplicate idea anchor: {anchor}")
+
+    idea_rows: dict[str, str] = {}
+    for line in product_ideas.splitlines():
+        anchor_match = re.search(r'<a id="(idea-[a-z0-9-]+)"></a>', line)
+        if anchor_match:
+            idea_rows[anchor_match.group(1)] = line
 
     prd_files = {task_file.name for task_file in task_files if task_file.name.startswith("prd-")}
     linked_prd_files = set(
@@ -50,6 +63,21 @@ def main() -> int:
         errors.append(f"docs/PRODUCT_IDEAS.md: linked PRD does not exist: {task_name}")
     for task_name in sorted(prd_files - linked_prd_files):
         errors.append(f"docs/PRODUCT_IDEAS.md: PRD has no product-idea row: {task_name}")
+    for task_name in sorted(prd_files):
+        link_count = product_ideas.count(f"../tasks/{task_name}")
+        if link_count != 1:
+            errors.append(
+                f"docs/PRODUCT_IDEAS.md: expected one link to {task_name}, found {link_count}"
+            )
+        matching_rows = [
+            anchor
+            for anchor, row in idea_rows.items()
+            if f"../tasks/{task_name}" in row
+        ]
+        if len(matching_rows) > 1:
+            errors.append(
+                f"docs/PRODUCT_IDEAS.md: PRD appears in multiple rows: {task_name}"
+            )
 
     for task_file in task_files:
         lines = task_file.read_text().splitlines()
@@ -73,6 +101,14 @@ def main() -> int:
             if product_ideas.count(f'<a id="{anchor}"></a>') != 1:
                 errors.append(
                     f"{task_name}: product-idea anchor must exist exactly once: {anchor}"
+                )
+            if (
+                task_name.startswith("prd-")
+                and anchor in idea_rows
+                and f"../tasks/{task_name}" not in idea_rows[anchor]
+            ):
+                errors.append(
+                    f"{task_name}: backlink does not match its Product Ideas row: {anchor}"
                 )
 
         if lines[4] != PLANNING_LINK:
