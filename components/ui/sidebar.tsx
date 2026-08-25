@@ -2,7 +2,7 @@
 
 import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
-import { RiSideBarLine } from "@remixicon/react"
+import { RiArrowDownSLine, RiSideBarLine } from "@remixicon/react"
 import { cva, type VariantProps } from "class-variance-authority"
 import * as React from "react"
 import { Button } from "@/components/ui/button"
@@ -388,6 +388,15 @@ function SidebarContent({
     })
   }, [])
 
+  const scrollByPage = React.useCallback((direction: -1 | 1) => {
+    const node = localRef.current
+    if (!node) return
+    node.scrollBy({
+      top: direction * node.clientHeight * 0.75,
+      behavior: "smooth",
+    })
+  }, [])
+
   React.useEffect(() => {
     const node = localRef.current
     const content = contentRef.current
@@ -424,21 +433,39 @@ function SidebarContent({
         </div>
       </div>
       <div
-        aria-hidden
         data-sidebar-scroll-edge="top"
         className={cn(
-          "ease pointer-events-none absolute inset-x-0 top-0 z-10 h-8 bg-linear-to-b from-sidebar via-sidebar/80 to-transparent opacity-0 transition-opacity duration-150 group-data-[collapsible=icon]:hidden",
-          edges.top && "opacity-100"
+          "ease pointer-events-none absolute inset-x-0 top-0 z-10 flex h-8 justify-center bg-linear-to-b from-sidebar via-sidebar/80 to-transparent opacity-0 transition-opacity duration-150 group-data-[collapsible=icon]:hidden",
+          edges.top && "pointer-events-auto opacity-100"
         )}
-      />
+      >
+        <button
+          type="button"
+          onClick={() => scrollByPage(-1)}
+          className="ease mt-0.5 flex size-6 items-center justify-center rounded-full text-sidebar-foreground/40 transition-colors duration-150 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground/70 focus-visible:outline-2 focus-visible:outline-sidebar-ring motion-reduce:[&>span>svg]:animate-none"
+          aria-label="Scroll sidebar up"
+        >
+          <span className="rotate-180">
+            <RiArrowDownSLine className="size-4 animate-sidebar-scroll-cue" />
+          </span>
+        </button>
+      </div>
       <div
-        aria-hidden
         data-sidebar-scroll-edge="bottom"
         className={cn(
-          "ease pointer-events-none absolute inset-x-0 bottom-0 z-10 h-10 bg-linear-to-t from-sidebar via-sidebar/80 to-transparent opacity-0 transition-opacity duration-150 group-data-[collapsible=icon]:hidden",
-          edges.bottom && "opacity-100"
+          "ease pointer-events-none absolute inset-x-0 bottom-0 z-10 flex h-10 items-end justify-center bg-linear-to-t from-sidebar via-sidebar/80 to-transparent opacity-0 transition-opacity duration-150 group-data-[collapsible=icon]:hidden",
+          edges.bottom && "pointer-events-auto opacity-100"
         )}
-      />
+      >
+        <button
+          type="button"
+          onClick={() => scrollByPage(1)}
+          className="ease mb-0.5 flex size-6 items-center justify-center rounded-full text-sidebar-foreground/40 transition-colors duration-150 hover:bg-sidebar-accent/70 hover:text-sidebar-foreground/70 focus-visible:outline-2 focus-visible:outline-sidebar-ring motion-reduce:[&>svg]:animate-none"
+          aria-label="Scroll sidebar down"
+        >
+          <RiArrowDownSLine className="size-4 animate-sidebar-scroll-cue" />
+        </button>
+      </div>
     </div>
   )
 }
