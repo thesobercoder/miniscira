@@ -94,4 +94,4 @@ None. The page size and loading behavior are fixed by the approved request.
 - Pagination hardening shipped in `e545d7e`.
 - Unified sidebar scrolling shipped in `40695fc`.
 - Focused automated checks cover the page limit, page joining, failure, retry, and cursor exhaustion.
-- Production acceptance used Soham's account with 37 eligible research threads. The initial rendered sidebar contained 30 threads and the next-page control. Activating it loaded the remaining seven threads. The rendered total matched the database count, and the next-page control disappeared after the final page.
+- Production acceptance used an authenticated account with 37 eligible research threads. The initial rendered sidebar contained 30 threads and the next-page control. Activating it loaded the remaining seven threads. The rendered total matched the database count, and the next-page control disappeared after the final page.

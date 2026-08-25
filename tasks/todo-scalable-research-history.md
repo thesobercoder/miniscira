@@ -29,7 +29,7 @@ This record maps the approved pagination scope in `tasks/prd-scalable-research-h
 
 ## Production acceptance
 
-- Soham's account had 37 eligible research threads.
+- An authenticated production account had 37 eligible research threads.
 - The initial rendered sidebar contained 30 threads and showed the next-page control.
 - Activating the control loaded the remaining seven threads.
 - The final rendered total matched the database count, with no next-page control after the final page.
