@@ -1,9 +1,10 @@
 # PRD: search and read previous threads
 
-**Status:** Approved by Soham on 2026-08-23. Phase 1 implementation is authorized. Phase 2 keeps its separate release gate.
-**Backlog source:** [Search and read previous threads](../docs/PRODUCT_IDEAS.md#search-and-read-previous-threads)
-**Repository:** `/opt/data/miniscira-src`
-**Last updated:** 2026-08-23
+- **Status:** Approved by Soham on 2026-08-23. Phase 1 implementation is authorized. Phase 2 keeps its separate release gate.
+- **Product ideas:** [Task index entry](../docs/PRODUCT_IDEAS.md#task-prd-thread-search)
+- **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
+- **Repository:** `/opt/data/miniscira-src`
+- **Last updated:** 2026-08-23
 
 ## 1. Purpose
 

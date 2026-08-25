@@ -1,8 +1,9 @@
 # PRD: search previous threads by date
 
-**Status:** Approved by Soham on 2026-08-24.
-**Backlog source:** [Search previous threads by date](../docs/PRODUCT_IDEAS.md#search-previous-threads-by-date)
-**Last updated:** 2026-08-24
+- **Status:** Approved by Soham on 2026-08-24.
+- **Product ideas:** [Task index entry](../docs/PRODUCT_IDEAS.md#task-prd-thread-search-by-date)
+- **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
+- **Last updated:** 2026-08-24
 
 ## Purpose
 

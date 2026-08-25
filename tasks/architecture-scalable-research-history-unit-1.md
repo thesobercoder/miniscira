@@ -1,5 +1,9 @@
 # Scalable research history Unit 1 contract
 
+- **Status:** Approved implementation record.
+- **Product ideas:** [Task index entry](../docs/PRODUCT_IDEAS.md#task-architecture-scalable-research-history-unit-1)
+- **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
+
 ## Caller usage
 
 Server routes request a typed history page with an authenticated user ID, one fixed history scope, an optional project ID, and an optional opaque cursor. The history module validates the cursor once, builds the exact keyset predicate, reads only list metadata, and returns rows plus the next opaque cursor.

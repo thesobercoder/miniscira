@@ -1,7 +1,8 @@
 # PRD: sandbox document files
 
 - **Status:** Approved by Soham on 2026-08-24.
-- **Backlog source:** [`docs/PRODUCT_IDEAS.md` — Generate editable documents and presentations](../docs/PRODUCT_IDEAS.md#generate-editable-documents-and-presentations)
+- **Product ideas:** [Task index entry](../docs/PRODUCT_IDEAS.md#task-prd-document-generation)
+- **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Scope:** PDF, DOCX, PPTX, and XLSX creation and editing
 
 ## Problem

@@ -1,6 +1,10 @@
 # Scalable research history implementation plan
 
-This temporary plan maps the approved requirements in `tasks/prd-scalable-research-history.md` to implementation units and checks. Delete this file after the verified feature is complete.
+- **Status:** Approved implementation plan.
+- **Product ideas:** [Task index entry](../docs/PRODUCT_IDEAS.md#task-todo-scalable-research-history)
+- **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
+
+This implementation plan maps the approved requirements in `tasks/prd-scalable-research-history.md` to implementation units and checks. Keep it as the durable execution record after the verified feature is complete.
 
 ## Verification tools
 

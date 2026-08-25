@@ -1,10 +1,11 @@
-# Draft PRD: natural-language image editing
+# PRD: natural-language image editing
 
-**Status:** Draft. Requires explicit user approval before implementation.
-**Backlog:** [MiniScira Backlog](../docs/PRODUCT_IDEAS.md)
-**Repository:** `/opt/data/miniscira-src`
-**Drafted:** 2026-08-23
-**Scope:** Full backlog scope. This document does not authorize implementation.
+- **Status:** Draft, awaiting approval.
+- **Product ideas:** [Task index entry](../docs/PRODUCT_IDEAS.md#task-prd-image-editing)
+- **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
+- **Repository:** `/opt/data/miniscira-src`
+- **Drafted:** 2026-08-23
+- **Scope:** Full backlog scope. This document does not authorize implementation.
 
 ## 1. Overview
 
