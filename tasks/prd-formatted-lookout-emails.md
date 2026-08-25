@@ -8,14 +8,13 @@
 
 Lookout reports are generated as Markdown. `lib/lookout-runner.ts` extracts the final assistant text and passes it to `lib/email.ts`. The email code uses a small regular-expression converter and sends an HTML-only message through the existing Nodemailer and Fastmail path.
 
-Replace the hand-built email HTML with a React Email template. Render the report as readable email content, add a plain-text alternative, and keep the message usable in light and dark email readers.
+Replace the hand-built email HTML with a React Email template. Render the report as readable HTML email and keep the message usable in light and dark email readers.
 
 ## Goals
 
 - Make Lookout reports easy to scan in an email reader.
 - Preserve useful report structure such as headings, paragraphs, lists, emphasis, and links.
 - Render email-compatible HTML through React Email.
-- Provide a complete plain-text MIME alternative.
 - Keep text, links, controls, and backgrounds readable in light mode, supported dark mode, and clients that force color inversion.
 - Prove the production path by delivering and inspecting a real Lookout email.
 
@@ -24,7 +23,6 @@ Replace the hand-built email HTML with a React Email template. Render the report
 - As a Lookout recipient, I can read the report without seeing raw Markdown syntax.
 - As a recipient using a light email reader, I see clear text hierarchy, spacing, links, and an obvious action to open the report in MiniScira.
 - As a recipient using a dark email reader, I can read every part of the message without low-contrast text, invisible links, or broken backgrounds.
-- As a recipient who disables HTML email, I receive the full report and report link as plain text.
 - As a MiniScira operator, I can keep the existing Fastmail SMTP configuration and sender identity.
 
 ## Product decisions
@@ -33,7 +31,7 @@ Replace the hand-built email HTML with a React Email template. Render the report
 - Keep Nodemailer and the current Fastmail SMTP transport.
 - Keep the recipient as the Lookout owner's signup email. Do not add a global recipient override.
 - Keep the sender name `MiniScira` through the existing deployment-managed sender configuration.
-- Send a multipart message with both `html` and `text` parts.
+- Send the Lookout report as HTML email. Do not add a plain-text alternative.
 - Keep the full report in the email. The link to MiniScira is an additional action, not a replacement for the content.
 - Use a simple, single-column layout with a maximum readable width. Do not reproduce the web application shell in email.
 - Do not depend on an email client's dark-mode behavior being consistent. Supply explicit dark-mode hints and styles, then use colors that remain legible when a client ignores or overrides them.
@@ -45,7 +43,6 @@ Replace the hand-built email HTML with a React Email template. Render the report
 - Safe conversion of report Markdown into email content.
 - Subject, preheader, report title, report body, empty-report state, and the `Open in MiniScira` action.
 - Light and dark email-reader styling.
-- Plain-text rendering.
 - Tests for rendering, content safety, SMTP payloads, and the existing recipient rules.
 - Production delivery and inspection of a real Lookout email.
 
@@ -68,7 +65,7 @@ Replace the hand-built email HTML with a React Email template. Render the report
 7. Long URLs, long words, code, headings, and list items do not force horizontal scrolling in common mobile email readers.
 8. An empty report shows `No notable updates this run.`
 9. The `Open in MiniScira` link uses the existing production application origin and report chat ID.
-10. The sent message contains equivalent `html` and `text` MIME parts. The plain-text part includes the full report and the MiniScira report URL.
+10. The sent message contains the rendered HTML report and does not add a plain-text alternative.
 11. Email rendering failure follows the current email-failure path. It must not send malformed fallback HTML, expose report contents in logs, erase the persisted report, or turn a successful research run into a failed run.
 12. Missing SMTP configuration keeps the current no-send behavior.
 
@@ -87,13 +84,13 @@ Replace the hand-built email HTML with a React Email template. Render the report
 
 ## Technical requirements
 
-- Add the smallest supported React Email dependency set needed for components, HTML rendering, and plain-text rendering.
+- Add the smallest supported React Email dependency set needed for components and HTML rendering.
 - Keep the template in a server-only module near the email delivery code. It must not enter the browser bundle.
 - Keep SMTP credentials and transport construction in the existing server-side email boundary.
 - Separate these responsibilities:
   1. parse and sanitize the report content;
-  2. render the React Email template to HTML and plain text;
-  3. submit the multipart message through Nodemailer.
+  2. render the React Email template to HTML;
+  3. submit the HTML message through Nodemailer.
 - Do not reuse the browser-only Markdown component or application CSS. Email output must be self-contained.
 - Do not add a hosted email-template service or restore Resend.
 - Preserve the existing `sendLookoutEmail` caller contract unless a narrow typed change makes rendering safer.
@@ -119,14 +116,13 @@ Replace the hand-built email HTML with a React Email template. Render the report
 ## Acceptance criteria
 
 1. A report containing the supported Markdown structures arrives as structured HTML without visible Markdown markers.
-2. The same message contains a complete and readable plain-text alternative.
-3. Raw HTML and unsafe links in a report cannot become active email content.
-4. The message remains readable in representative light and dark clients, including a client that honors custom dark styles and a client that applies forced color inversion.
-5. The primary action remains visible and understandable in each tested mode even when button background styling is changed by the client.
-6. The layout fits a narrow mobile reader without horizontal page scrolling.
-7. Empty and long reports render without broken markup.
-8. The existing Fastmail sender, owner signup-email recipient, subject purpose, report URL, and SMTP behavior remain intact.
-9. A production Lookout run sends one real message to the approved test recipient, and the delivered message passes the content, link, light-mode, dark-mode, mobile-width, and plain-text checks.
+2. Raw HTML and unsafe links in a report cannot become active email content.
+3. The message remains readable in representative light and dark clients, including a client that honors custom dark styles and a client that applies forced color inversion.
+4. The primary action remains visible and understandable in each tested mode even when button background styling is changed by the client.
+5. The layout fits a narrow mobile reader without horizontal page scrolling.
+6. Empty and long reports render without broken markup.
+7. The existing Fastmail sender, owner signup-email recipient, subject purpose, report URL, and SMTP behavior remain intact.
+8. A production Lookout run sends one real message to the approved test recipient, and the delivered message passes the content, link, light-mode, dark-mode, and mobile-width checks.
 
 ## Test plan
 
@@ -136,18 +132,17 @@ Replace the hand-built email HTML with a React Email template. Render the report
 - Test empty, very long, Unicode, long-link, and malformed Markdown inputs.
 - Test escaping for raw HTML, event-handler text, dangerous URL schemes, and malformed links.
 - Assert the generated HTML has the expected language, preheader, report title, safe report URL, color-scheme metadata, and dark-mode styles.
-- Assert the plain-text output contains the full report and URL without HTML or essential missing content.
 
 ### Integration tests
 
-- Mock Nodemailer and assert `sendLookoutEmail` submits `from`, `to`, `subject`, `html`, and `text` without exposing SMTP credentials.
+- Mock Nodemailer and assert `sendLookoutEmail` submits `from`, `to`, `subject`, and `html` without exposing SMTP credentials or adding a plain-text body.
 - Keep tests for complete, partial, and absent SMTP configuration.
 - Keep recipient tests proving delivery uses the owner's usable signup email and ignores a global override.
 - Exercise the `runLookout` handoff from extracted assistant text to the email boundary without changing report persistence or scheduling.
 
 ### Email-client acceptance
 
-Use one representative report fixture with headings, lists, emphasis, links, quotes, code, a long URL, and the MiniScira action. Inspect the delivered MIME message in:
+Use one representative report fixture with headings, lists, emphasis, links, quotes, code, a long URL, and the MiniScira action. Inspect the delivered HTML message in:
 
 - Fastmail web in light and dark appearance;
 - one Apple Mail client in light and dark mode;
@@ -155,7 +150,7 @@ Use one representative report fixture with headings, lists, emphasis, links, quo
 - one Outlook client or a reliable Outlook rendering preview;
 - a narrow mobile reader.
 
-Record client and platform versions. Check content order, contrast, forced inversion, links, code wrapping, mobile width, and the plain-text part. A static browser preview alone does not satisfy this check.
+Record client and platform versions. Check content order, contrast, forced inversion, links, code wrapping, and mobile width. A static browser preview alone does not satisfy this check.
 
 ### Authorization and security checks
 
@@ -175,7 +170,7 @@ After approval, implementation, tests, and deployment:
 2. Trigger one approved test Lookout with a report that exercises the supported Markdown structures.
 3. Confirm the Lookout run succeeds and the report remains available in MiniScira.
 4. Confirm the intended signup-email inbox receives exactly one message from `MiniScira`.
-5. Inspect the delivered HTML and plain-text alternatives and complete the email-client acceptance matrix.
+5. Inspect the delivered HTML and complete the email-client acceptance matrix.
 6. Open the email action and confirm it reaches the correct authenticated report chat.
 7. Verify scheduling and later Lookout delivery still operate normally.
 
@@ -215,7 +210,7 @@ After approval:
 1. Create TODOs that map every acceptance criterion to code, tests, email-client checks, production delivery, and rollback.
 2. Add the smallest React Email dependency set.
 3. Add safe report-content rendering and the React Email template.
-4. Send HTML and plain-text alternatives through the existing Nodemailer path.
+4. Send the rendered HTML through the existing Nodemailer path.
 5. Run focused tests and all applicable repository quality gates.
 6. Deploy through the canonical Umbrel procedure.
 7. Deliver and inspect the real production email before marking the idea done.
