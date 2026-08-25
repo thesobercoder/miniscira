@@ -34,7 +34,7 @@ Below the `md` breakpoint, the sidebar becomes a `Sheet`, but only `SidebarTrigg
 - Redesigning information architecture or adding new product routes.
 - Replacing the existing sidebar primitives.
 
-## Users and use cases
+## User stories
 
 Authenticated users must be able to:
 

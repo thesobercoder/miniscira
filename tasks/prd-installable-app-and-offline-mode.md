@@ -37,7 +37,7 @@ The application does not yet define a complete installable web-app contract acro
 - Custom install marketing banners and onboarding tours in the first release.
 - Persistently caching private API responses, conversations, attachments, credentials, or personalized route documents.
 
-## Users and use cases
+## User stories
 
 Users must be able to:
 
@@ -123,7 +123,7 @@ Users must be able to:
 - Prove that an offline shell cannot display private content from another account.
 - Inspect Cache Storage and require that it contains only approved public shell assets.
 
-### Deployment and rollback
+## Deployment and rollback requirements
 
 - Deploy manifest, icons, metadata, service-worker script, and referenced shell assets atomically or in a backward-compatible sequence.
 - Serve the service-worker script with headers that permit timely update checks and prevent an indefinitely stale worker.
@@ -196,14 +196,14 @@ Users must be able to:
 ## Open questions
 
 - Do all supported production, custom-domain, and self-hosted deployment paths terminate HTTPS at the public application origin?
-- What exact product name, short name, description, theme color, background color, and icon artwork are approved?
+- What exact short name, description, theme color, background color, and icon artwork are approved?
 - Should an available update activate on the next clean navigation, after explicit user confirmation, or under another safe policy?
 - Which desktop and mobile browser versions define the supported installability matrix?
 
 ## Deployment
 
-1. Complete and verify the separate responsive layout work.
-2. Obtain explicit approval for this PRD.
+1. Obtain explicit approval for this PRD.
+2. Complete and verify the separate responsive layout work before PWA and offline implementation starts.
 3. Resolve the supported HTTPS origin, start URL, scope, and offline-shell content.
 4. Create implementation TODOs that map each acceptance criterion to a check.
 5. Add and validate the manifest, metadata, and icons.
