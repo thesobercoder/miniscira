@@ -1,8 +1,6 @@
 import { RiAddLine } from "@remixicon/react"
-import { desc, eq } from "drizzle-orm"
 import Link from "next/link"
 import { ChatList } from "@/components/chat-list"
-import { LookoutList } from "@/components/lookout-list"
 import { SidebarNav } from "@/components/sidebar-nav"
 import { SidebarUser } from "@/components/sidebar-user"
 import { ThreadSearchButton } from "@/components/thread-search"
@@ -18,8 +16,6 @@ import {
   SidebarRail,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { db } from "@/lib/db"
-import { lookout } from "@/lib/db/schema"
 import { listHistoryPage } from "@/lib/history"
 
 type SidebarUserInfo = {
@@ -30,34 +26,10 @@ type SidebarUserInfo = {
 }
 
 export async function AppSidebar({ user }: { user: SidebarUserInfo }) {
-  const [chatHistory, lookouts] = await Promise.all([
-    listHistoryPage({ userId: user.id, scope: { kind: "active" } }),
-    db
-      .select({ id: lookout.id, name: lookout.name })
-      .from(lookout)
-      .where(eq(lookout.userId, user.id))
-      .orderBy(desc(lookout.createdAt)),
-  ])
-
-  const lookoutGroups = await Promise.all(
-    lookouts.map(async (item) => {
-      const history = await listHistoryPage({
-        userId: user.id,
-        scope: { kind: "lookout-reports", lookoutId: item.id },
-      })
-      return {
-        id: item.id,
-        name: item.name,
-        reports: history.rows
-          .filter((report) => report.reportChatId !== null)
-          .slice(0, 10)
-          .map((report) => ({
-            id: report.reportChatId as string,
-            timestamp: report.timestamp.toISOString(),
-          })),
-      }
-    })
-  )
+  const chatHistory = await listHistoryPage({
+    userId: user.id,
+    scope: { kind: "active" },
+  })
 
   return (
     <Sidebar collapsible="icon">
@@ -97,9 +69,6 @@ export async function AppSidebar({ user }: { user: SidebarUserInfo }) {
             <ThreadSearchButton />
           </SidebarMenuItem>
         </SidebarMenu>
-        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-          <LookoutList lookouts={lookoutGroups} />
-        </SidebarGroup>
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
           <ChatList
             initialPage={{

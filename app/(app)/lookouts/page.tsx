@@ -16,6 +16,7 @@ export default async function LookoutsPage() {
     .from(lookout)
     .where(eq(lookout.userId, session.user.id))
     .orderBy(desc(lookout.createdAt))
+    .limit(5)
 
   const initial = await Promise.all(
     rows.map(async (l) => {
