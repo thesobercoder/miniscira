@@ -1,6 +1,6 @@
 # Scalable research history Unit 1 contract
 
-- **Status:** Approved implementation record.
+- **Status:** Implementation record.
 - **Product ideas:** [Task index entry](../docs/PRODUCT_IDEAS.md#task-architecture-scalable-research-history-unit-1)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 

@@ -39,7 +39,7 @@ Allow independent default models for interactive chat, production evals, Lookout
 
 ## Task index
 
-- <a id="task-architecture-scalable-research-history-unit-1"></a>[Scalable research history Unit 1 contract](../tasks/architecture-scalable-research-history-unit-1.md). Approved implementation record.
+- <a id="task-architecture-scalable-research-history-unit-1"></a>[Scalable research history Unit 1 contract](../tasks/architecture-scalable-research-history-unit-1.md). Implementation record.
 - <a id="task-prd-artifact-library"></a>[Artifact library across all chats PRD](../tasks/prd-artifact-library.md). Draft, awaiting approval.
 - <a id="task-prd-built-in-github-search"></a>[Built-in GitHub search PRD](../tasks/prd-built-in-github-search.md). Draft, awaiting approval.
 - <a id="task-prd-document-generation"></a>[Sandbox document files PRD](../tasks/prd-document-generation.md). Approved.
