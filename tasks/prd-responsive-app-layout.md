@@ -134,12 +134,14 @@ The layout must remain navigable and structurally stable for:
 ### Integration checks
 
 - Exercise the authenticated app shell across New research, chats, Projects, Lookouts, MCP Servers, settings, account actions, and sign-in.
+- Exercise composer controls, dialogs, drawers, pickers, timelines, tables, and forms without viewport overflow.
 - Confirm that route transitions preserve the correct desktop or mobile navigation state.
 
 ### Browser and end-to-end checks
 
 - Exercise every primary route at 320, 375, 390, 430, 768, 1024, and 1440 CSS pixels.
 - Test pointer, touch, keyboard, browser Back and Forward, portrait, landscape, safe areas, browser-chrome resizing, and the software keyboard.
+- Test signed-out and signed-in states, the composer and Lookout forms with the software keyboard, and streaming responses with long timelines.
 - Test loading, empty, error, long-content, and streaming states in every supported theme and with reduced motion enabled.
 - Confirm that the document has no unintended horizontal overflow and that overlays do not hide essential controls.
 
