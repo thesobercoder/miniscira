@@ -1,7 +1,7 @@
 # PRD: artifact library across all chats
 
 - **Status:** Draft, awaiting approval.
-- **Product ideas:** [Task index entry](../docs/PRODUCT_IDEAS.md#task-prd-artifact-library)
+- **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-artifact-library)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Repository architecture:** [README](../README.md)
 - **Canonical engineering constraints:** [Development principles](../docs/DEVELOPMENT_PRINCIPLES.md), [Engineering invariants](../docs/ENGINEERING_INVARIANTS.md), and [Deployment guide](../docs/DEPLOYMENT.md)

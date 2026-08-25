@@ -1,7 +1,7 @@
 # PRD: natural-language image editing
 
 - **Status:** Draft, awaiting approval.
-- **Product ideas:** [Task index entry](../docs/PRODUCT_IDEAS.md#task-prd-image-editing)
+- **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-image-editing)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Repository:** `/opt/data/miniscira-src`
 - **Drafted:** 2026-08-23

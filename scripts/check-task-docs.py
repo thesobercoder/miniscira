@@ -11,6 +11,10 @@ PLANNING_LINK = (
     "- **Planning process:** "
     "[Product planning and execution](../docs/PRODUCT_PLANNING.md)"
 )
+PRODUCT_IDEAS_PATTERN = re.compile(
+    r"^- \*\*Product ideas:\*\* \[Idea entry\]"
+    r"\(\.\./docs/PRODUCT_IDEAS\.md#(idea-[a-z0-9-]+)\)$"
+)
 
 
 def relative_markdown_links(text: str) -> list[str]:
@@ -21,21 +25,35 @@ def main() -> int:
     errors: list[str] = []
     task_files = sorted(TASKS_DIR.glob("*.md"))
     product_ideas = PRODUCT_IDEAS.read_text()
-    task_index_marker = "## Task index\n"
-    if task_index_marker not in product_ideas:
-        print("Task documentation check failed:")
-        print("- docs/PRODUCT_IDEAS.md: missing Task index section")
-        return 1
-    task_index = product_ideas.split(task_index_marker, 1)[1]
+
+    if "## Task index" in product_ideas or "## Backlog" in product_ideas:
+        errors.append(
+            "docs/PRODUCT_IDEAS.md: use one lifecycle table, not separate backlog or task-index sections"
+        )
+
+    required_table_header = "| Idea | Status | Planning document | Summary |"
+    if required_table_header not in product_ideas:
+        errors.append("docs/PRODUCT_IDEAS.md: missing the product-ideas table header")
+
+    idea_anchors = re.findall(r'<a id="(idea-[a-z0-9-]+)"></a>', product_ideas)
+    duplicate_anchors = sorted(
+        anchor for anchor in set(idea_anchors) if idea_anchors.count(anchor) > 1
+    )
+    for anchor in duplicate_anchors:
+        errors.append(f"docs/PRODUCT_IDEAS.md: duplicate idea anchor: {anchor}")
+
+    prd_files = {task_file.name for task_file in task_files if task_file.name.startswith("prd-")}
+    linked_prd_files = set(
+        re.findall(r"\(\.\./tasks/(prd-[^)]+\.md)\)", product_ideas)
+    )
+    for task_name in sorted(linked_prd_files - prd_files):
+        errors.append(f"docs/PRODUCT_IDEAS.md: linked PRD does not exist: {task_name}")
+    for task_name in sorted(prd_files - linked_prd_files):
+        errors.append(f"docs/PRODUCT_IDEAS.md: PRD has no product-idea row: {task_name}")
 
     for task_file in task_files:
         lines = task_file.read_text().splitlines()
-        slug = task_file.stem
         task_name = task_file.name
-        product_ideas_link = (
-            "- **Product ideas:** [Task index entry]"
-            f"(../docs/PRODUCT_IDEAS.md#task-{slug})"
-        )
 
         if len(lines) < 5:
             errors.append(f"{task_name}: expected at least five lines")
@@ -46,25 +64,19 @@ def main() -> int:
             errors.append(f"{task_name}: line 2 must be blank")
         if not lines[2].startswith("- **Status:** "):
             errors.append(f"{task_name}: line 3 must contain the status metadata")
-        if lines[3] != product_ideas_link:
-            errors.append(f"{task_name}: line 4 must link to its task-index entry")
+
+        product_ideas_match = PRODUCT_IDEAS_PATTERN.fullmatch(lines[3])
+        if not product_ideas_match:
+            errors.append(f"{task_name}: line 4 must link to one product-idea row")
+        else:
+            anchor = product_ideas_match.group(1)
+            if product_ideas.count(f'<a id="{anchor}"></a>') != 1:
+                errors.append(
+                    f"{task_name}: product-idea anchor must exist exactly once: {anchor}"
+                )
+
         if lines[4] != PLANNING_LINK:
             errors.append(f"{task_name}: line 5 must link to the planning process")
-
-        anchor = f'<a id="task-{slug}"></a>'
-        task_link = f"(../tasks/{task_name})"
-        if task_index.count(anchor) != 1:
-            errors.append(f"{task_name}: task index must contain one unique anchor")
-        if task_index.count(task_link) != 1:
-            errors.append(f"{task_name}: task index must contain one link to the file")
-
-    indexed_task_links = re.findall(r"\(\.\./tasks/([^)]+\.md)\)", task_index)
-    expected_task_names = {task_file.name for task_file in task_files}
-    indexed_task_names = set(indexed_task_links)
-    for task_name in sorted(indexed_task_names - expected_task_names):
-        errors.append(f"docs/PRODUCT_IDEAS.md: indexed task does not exist: {task_name}")
-    for task_name in sorted(expected_task_names - indexed_task_names):
-        errors.append(f"docs/PRODUCT_IDEAS.md: task is not indexed: {task_name}")
 
     files_to_check = [
         ROOT / "docs" / "PRODUCT_IDEAS.md",
@@ -86,7 +98,10 @@ def main() -> int:
             print(f"- {error}")
         return 1
 
-    print(f"Task documentation check passed for {len(task_files)} files.")
+    print(
+        "Task documentation check passed for "
+        f"{len(task_files)} files and {len(idea_anchors)} product ideas."
+    )
     return 0
 
 

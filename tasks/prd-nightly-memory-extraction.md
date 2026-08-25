@@ -1,7 +1,7 @@
 # PRD: nightly memory extraction
 
 - **Status:** Draft, awaiting approval.
-- **Product ideas:** [Task index entry](../docs/PRODUCT_IDEAS.md#task-prd-nightly-memory-extraction)
+- **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-nightly-memory-extraction)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Repository:** `/opt/data/miniscira-src`
 - **Last updated:** 2026-08-23

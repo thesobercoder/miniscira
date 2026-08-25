@@ -1,7 +1,7 @@
 # PRD: Built-in GitHub search
 
 - **Status:** Draft, awaiting approval.
-- **Product ideas:** [Task index entry](../docs/PRODUCT_IDEAS.md#task-prd-built-in-github-search)
+- **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-built-in-github-search)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 
 ## Goal

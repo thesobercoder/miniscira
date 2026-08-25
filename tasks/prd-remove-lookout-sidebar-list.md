@@ -1,7 +1,7 @@
 # PRD: Remove the Lookout report list from the sidebar
 
 - **Status:** Approved on 2026-08-25.
-- **Product ideas:** [Task index entry](../docs/PRODUCT_IDEAS.md#task-prd-remove-lookout-sidebar-list)
+- **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-remove-lookout-sidebar-list)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 
 ## Goal

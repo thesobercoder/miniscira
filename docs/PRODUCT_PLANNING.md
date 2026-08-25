@@ -15,13 +15,16 @@ raw backlog idea
 → verified feature completion
 ```
 
-## 1. Backlog
+## 1. Product ideas
 
 - Record raw product ideas in `docs/PRODUCT_IDEAS.md`.
 - An idea may be brief or incomplete. It may include open questions.
-- A backlog entry records an idea. It does not allow implementation to start.
-- Keep one entry for each idea. Use `Draft PRD` as the link label for every PRD.
-- When a draft PRD contains the full scope, reduce the backlog entry to one line. Include the feature name, the `Draft PRD` link, and the `awaiting approval` status. Do not copy PRD requirements into the backlog.
+- A product-ideas row records an idea. It does not allow implementation to start.
+- Keep one table row for each idea through its full lifecycle, including after completion.
+- Use the table columns `Idea`, `Status`, `Planning document`, and `Summary`.
+- Use one of these status values: `Idea`, `Draft`, `Approved`, `In progress`, or `Done`. Add a short qualifier only when a feature has separate release gates.
+- Link the planning document when one exists. Use `Not drafted` for a raw idea without a PRD.
+- When a draft PRD contains the full scope, shorten the table summary. Do not copy PRD requirements into the table.
 
 ## 2. PRD
 
@@ -34,19 +37,19 @@ raw backlog idea
   # <document title>
 
   - **Status:** <current lifecycle status>
-  - **Product ideas:** [Task index entry](../docs/PRODUCT_IDEAS.md#task-<file-slug>)
+  - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-<feature-slug>)
   - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
   ```
 
-- Add every file under `tasks/` to the task index in `docs/PRODUCT_IDEAS.md`. Keep the index entry after approval so the task document always has a stable backlink.
-- Run `python3 scripts/check-task-docs.py` after you add, rename, or change task metadata. The check enforces the metadata block, task-index coverage, and relative links.
+- Point related PRDs, implementation plans, and implementation records to the same product-idea row. Do not create a second index of files.
+- Run `python3 scripts/check-task-docs.py` after you add, rename, or change task metadata. The check enforces the metadata block, product-idea backlinks, PRD coverage, and relative links.
 - Define the goals, user stories, scope, non-goals, functional requirements, technical requirements, acceptance criteria, deployment, observability, rollback, and open questions.
 - List every required check. Include unit, integration, browser/end-to-end, authorization/security, migration/rollback, deployment, and production acceptance checks.
 - For changes to agent behavior, prompts, tools, retrieval, memory, or model routing, define eval cases, fixtures or datasets, expected outcomes, and pass thresholds.
 - If model evals do not apply, explain why.
 - A written PRD is not approved unless the user says so. Ask the user to review it.
 - Record approval only after the user explicitly approves the PRD.
-- After explicit approval, mark the PRD planning work done. Remove the feature from the backlog section in `docs/PRODUCT_IDEAS.md` because it is no longer a backlog idea. Keep its compact task-index entry and the approved PRD as durable records. Approval does not mean the feature is implemented.
+- After explicit approval, mark the PRD as approved and update the product-ideas table. Approval does not mean the feature is implemented.
 
 ## 3. TODO tasks
 
@@ -72,5 +75,5 @@ raw backlog idea
   - you verify the production deployment when it applies; and
   - the repository meets the production source-control rules.
 - Keep the approved PRD as the durable record of intent and acceptance.
-- Remove completed features from the backlog section in `docs/PRODUCT_IDEAS.md`. Keep their compact task-index entries. Document shipped behavior in the relevant product or operations document. Use Git history and the retained PRD for past planning context.
+- Mark completed features as `Done` in `docs/PRODUCT_IDEAS.md`. Keep the row and its PRD link so past work remains readable. Document shipped behavior in the relevant product or operations document.
 - Keep completion evidence in commits, test results, eval results, and relevant operations documents.

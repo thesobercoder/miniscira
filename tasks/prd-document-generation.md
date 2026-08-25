@@ -1,7 +1,7 @@
 # PRD: sandbox document files
 
 - **Status:** Approved by Soham on 2026-08-24.
-- **Product ideas:** [Task index entry](../docs/PRODUCT_IDEAS.md#task-prd-document-generation)
+- **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-document-generation)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Scope:** PDF, DOCX, PPTX, and XLSX creation and editing
 

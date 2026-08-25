@@ -1,7 +1,7 @@
 # PRD: mobile layout and installable web app
 
 - **Status:** Draft, awaiting approval.
-- **Product ideas:** [Task index entry](../docs/PRODUCT_IDEAS.md#task-prd-mobile-layout-and-installable-app)
+- **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-mobile-layout-and-installable-app)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 
 ## 1. Summary

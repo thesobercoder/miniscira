@@ -1,7 +1,7 @@
 # PRD: scalable research history
 
 - **Status:** Approved by Soham on 2026-08-24. Implementation in progress.
-- **Product ideas:** [Task index entry](../docs/PRODUCT_IDEAS.md#task-prd-scalable-research-history)
+- **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-scalable-research-history)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Supersedes:** `tasks/prd-thread-archiving.md`
 - **Repository:** `/opt/data/miniscira-src`

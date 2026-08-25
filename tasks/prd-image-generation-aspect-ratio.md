@@ -1,7 +1,7 @@
 # PRD: Image generation aspect ratio
 
 - **Status:** Draft, awaiting approval.
-- **Product ideas:** [Task index entry](../docs/PRODUCT_IDEAS.md#task-prd-image-generation-aspect-ratio)
+- **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-image-generation-aspect-ratio)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 
 ## Goal
