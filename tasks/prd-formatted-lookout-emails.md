@@ -30,7 +30,7 @@ Replace the hand-built email HTML with a React Email template. Render the report
 - Use React Email components and its render utility for the HTML email.
 - Keep Nodemailer and the current Fastmail SMTP transport.
 - Keep the recipient as the Lookout owner's signup email. Do not add a global recipient override.
-- Keep the sender name `MiniScira` through the existing deployment-managed sender configuration.
+- Use `MiniScira` as the sender display name and keep the deployment-configured `LOOKOUT_EMAIL_FROM` or SMTP account as the sender address. Do not replace the configured address.
 - Send the Lookout report as HTML email. Do not add a plain-text alternative.
 - Keep the full report in the email. The link to MiniScira is an additional action, not a replacement for the content.
 - Use a simple, single-column layout with a maximum readable width. Do not reproduce the web application shell in email.
@@ -58,7 +58,8 @@ Replace the hand-built email HTML with a React Email template. Render the report
    - links with visible labels;
    - inline code and fenced code blocks;
    - block quotes;
-   - horizontal rules.
+   - horizontal rules;
+   - Markdown tables.
 4. Unsupported Markdown remains readable as text. It must not disappear or corrupt the rest of the message.
 5. Raw HTML in the Markdown is escaped or removed. It must not create scripts, forms, embedded objects, style injection, event handlers, tracking images, or arbitrary email markup.
 6. Links rendered from report Markdown allow only safe web URLs. Unsafe or malformed destinations remain non-clickable text.
@@ -128,7 +129,7 @@ Replace the hand-built email HTML with a React Email template. Render the report
 
 ### Unit tests
 
-- Render representative Markdown fixtures and assert headings, paragraphs, lists, emphasis, links, code, quotes, and rules appear correctly.
+- Render representative Markdown fixtures and assert headings, paragraphs, lists, emphasis, links, code, quotes, rules, and tables appear correctly.
 - Test empty, very long, Unicode, long-link, and malformed Markdown inputs.
 - Test escaping for raw HTML, event-handler text, dangerous URL schemes, and malformed links.
 - Assert the generated HTML has the expected language, preheader, report title, safe report URL, color-scheme metadata, and dark-mode styles.
@@ -142,7 +143,7 @@ Replace the hand-built email HTML with a React Email template. Render the report
 
 ### Email-client acceptance
 
-Use one representative report fixture with headings, lists, emphasis, links, quotes, code, a long URL, and the MiniScira action. Inspect the delivered HTML message in:
+Use one representative report fixture with headings, lists, emphasis, links, quotes, code, a table, a long URL, and the MiniScira action. Inspect the delivered HTML message in:
 
 - Fastmail web in light and dark appearance;
 - one Apple Mail client in light and dark mode;
@@ -197,7 +198,6 @@ Live Eve evals are not required because the agent output contract does not chang
 ## Open questions
 
 - Which exact Outlook environment or rendering service is available for acceptance testing?
-- Should the first implementation support Markdown tables, or leave them as readable text until real Lookout reports show a need?
 
 ## Approval gate
 
