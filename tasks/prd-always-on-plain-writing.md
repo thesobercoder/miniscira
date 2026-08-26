@@ -119,6 +119,10 @@ Pass requirements:
 
 Run the existing skill-routing, fact-check, comparison, news, deep-research, question-and-resume, document-research, and Lookout-related evals that apply. The expanded core writing rules must not replace or suppress task-specific skill loads.
 
+Add a headless Lookout eval that sends the same `clientContext.lookout` shape used by `runLookout`. Verify the report follows the plain-writing rules, keeps the required research skill and tools, and completes without an `unslop` skill call. This exercises the affected model path without changing recipients or sending email.
+
+Add or retain a deterministic email-boundary regression test with Nodemailer mocked. Pass representative model output to `sendLookoutEmail` and assert that the current recipient, sender, subject, link, and HTML-only payload contract remain unchanged. Do not add React Email, a delivery-capture service, a recipient override, or a plain-text alternative in this PRD.
+
 ### Production acceptance
 
 Use `python3 scripts/run-production-evals.py` against the deployed MiniScira system.
@@ -129,7 +133,7 @@ Verify at least:
 2. A researched answer loads its task-specific skill, keeps inline citations, and has no trailing source list.
 3. A structured-format request returns only the requested format.
 4. An explicit tone instruction in the production eval prompt remains visible in the final answer. The eval must not alter saved personalization for the dedicated eval account.
-5. Run one production Lookout with a safe eval-only recipient or delivery capture. Verify the expected task-specific skill and tools, completed timeline, generated report, React Email HTML rendering, and HTML-only delivery. Do not send the test to Soham's normal recipient.
+5. The headless Lookout production eval uses the real Lookout client context, loads the expected research skill and tools, returns a completed report, and makes no `unslop` skill call. It must not create a scheduled Lookout or send email.
 
 Inspect the production timeline to confirm that there is no `unslop` skill call and no loading loop.
 
@@ -146,7 +150,8 @@ Inspect the production timeline to confirm that there is no `unslop` skill call 
 - [ ] Applicable existing agent evals pass.
 - [ ] Production Eve evals pass against the deployed system.
 - [ ] The production timeline shows normal task work with no `unslop` skill load.
-- [ ] A production Lookout passes task routing, timeline, report rendering, and safe HTML-only delivery acceptance.
+- [ ] The headless Lookout production eval passes task routing, tool use, report completion, and plain-writing checks without sending email.
+- [ ] A mocked Nodemailer regression proves that the current Lookout sender, owner recipient, subject, report link, and HTML-only payload remain unchanged.
 - [ ] Typecheck, lint, the full test suite, repository checks, and production build pass.
 
 ## Non-goals
