@@ -1,6 +1,6 @@
 # PRD: sandbox document files
 
-- **Status:** Done
+- **Status:** In progress
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-document-generation)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Approval:** Approved by Soham on 2026-08-24
@@ -73,24 +73,30 @@ Extend the existing `run_code` timeline node with a small file-download list. Do
 
 - [x] The four clean-room MiniScira skills are discoverable and load on demand.
 - [x] The production Sandbox contains the tools required by each skill.
-- [x] The agent creates one valid PDF, DOCX, PPTX, and XLSX fixture through the real chat flow.
+- [ ] The agent creates one valid PDF, DOCX, PPTX, and XLSX fixture through the real chat flow.
 - [x] Each file appears in the originating `run_code` result and downloads with the correct filename and MIME type.
-- [x] Each download still works after reloading the chat and recreating the app container.
-- [x] A user can upload a DOCX, PPTX, or XLSX file, ask for a small edit, and download the edited result.
+- [ ] Each download still works after reloading the chat and recreating the app container.
+- [ ] A user can upload a DOCX, PPTX, or XLSX file, ask for a small edit, and download the edited result.
 - [x] Existing image generation and image rendering still work.
 - [x] Unsupported Sandbox files are not published.
 - [x] Output filenames cannot escape storage or inject response headers.
 - [x] Sandbox isolation, egress restrictions, and cleanup checks still pass.
-- [x] Focused tests, the full test suite, lint, typecheck, repository checks, build, and real browser verification pass.
+- [ ] Focused tests, the full test suite, lint, typecheck, repository checks, build, and real browser verification pass.
 
 ## Completion evidence
 
 - Implementation: `aa765ff` (`feat: add sandbox document files`).
 - Production routing eval: `python3 scripts/run-production-evals.py document-generation-routing` passed 32/32 gates on 2026-08-26.
-- Production file acceptance: `python3 scripts/run-production-evals.py document-files-production-acceptance` passed 30/30 gates on 2026-08-26. It created and downloaded PDF, DOCX, PPTX, and XLSX files through deployed Eve, verified their MIME types and non-empty bytes, then uploaded, edited, and downloaded a DOCX fixture.
-- Durability: all five generated file URLs returned HTTP 200 with the expected MIME types and unchanged non-empty bytes after restarting the production app container.
+- Partial production file acceptance: `python3 scripts/run-production-evals.py document-files-production-acceptance` passed 30/30 gates on 2026-08-26. It created and downloaded PDF, DOCX, PPTX, and XLSX outputs through deployed Eve, verified their MIME types and non-empty bytes, then uploaded and downloaded a returned DOCX. The eval does not yet inspect each document with a format-aware reader or prove that the requested edit changed the DOCX contents.
+- Partial durability evidence: all five saved file URLs returned HTTP 200 with the expected MIME types and non-empty bytes after restarting the production app container. Chat reload and persisted timeline-link behavior still need browser verification.
 - Regression checks: the focused document, file-route, attachment, timeline, and chat tests passed 26/26. The current full suite passed 333/333, and the production build completed successfully.
 - Deployment and security: the production image includes the pinned document libraries. Existing Docker Sandbox isolation, egress, cleanup, image output, header safety, and unsupported-file behavior remained covered by the delivery validation and focused regressions.
+
+### Remaining completion work
+
+- Inspect each downloaded format with an appropriate reader and verify the requested contents.
+- Inspect the edited DOCX and verify that the replacement text exists and the original text does not.
+- Use the production browser to create and download each format, reload the chat, download from the persisted timeline result, and complete an uploaded-file edit flow.
 
 ## Non-goals
 
