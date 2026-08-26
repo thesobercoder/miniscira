@@ -7,11 +7,12 @@ This table keeps every product idea visible through its full lifecycle. Follow [
 | <a id="idea-artifact-library"></a>Artifact library across all chats | To do | [PRD](../tasks/prd-artifact-library.md) | Browse generated artifacts across chats. |
 | <a id="idea-built-in-github-search"></a>Built-in GitHub search | To do | [PRD](../tasks/prd-built-in-github-search.md) | Find public GitHub repositories without GitHub authentication. |
 | <a id="idea-camera-photo-attachments"></a>Camera photo attachments | To do | [PRD](../tasks/prd-camera-photo-attachments.md) | Capture and attach photos from the composer "+" menu, as many as wanted. |
-| <a id="idea-document-generation"></a>Sandbox document files | In progress | [PRD](../tasks/prd-document-generation.md) | Create and edit PDF, DOCX, PPTX, and XLSX files in the sandbox. |
+| <a id="idea-document-generation"></a>Sandbox document files | Done | [PRD](../tasks/prd-document-generation.md) | Create and edit PDF, DOCX, PPTX, and XLSX files in the sandbox. |
 | <a id="idea-formatted-lookout-emails"></a>Formatted Lookout emails | To do | [PRD](../tasks/prd-formatted-lookout-emails.md) | Render Lookout reports as readable HTML email in light and dark email readers. |
 | <a id="idea-image-editing"></a>Edit uploaded images with natural-language instructions | To do | [PRD](../tasks/prd-image-editing.md) | Edit an uploaded image through the existing image-generation provider. |
 | <a id="idea-image-generation-aspect-ratio"></a>Default image-generation aspect ratio | To do | [PRD](../tasks/prd-image-generation-aspect-ratio.md) | Let users choose the default aspect ratio for generated images. |
 | <a id="idea-installable-app-and-offline-mode"></a>Installable app and offline mode | To do | [PRD](../tasks/prd-installable-app-and-offline-mode.md) | Add browser installation, standalone launch, and an offline shell that does not cache private data after the layout work. |
+| <a id="idea-inline-question-requests"></a>Inline question requests | To do | [PRD](../tasks/prd-inline-question-requests.md) | Keep agent questions visible and answerable without opening a collapsed timeline step. |
 | <a id="idea-mcp-oauth-and-self-hosted-endpoints"></a>MCP OAuth and self-hosted endpoints | In progress | [PRD](../tasks/prd-mcp-oauth-and-self-hosted-endpoints.md) | Connect OAuth and self-hosted MCP servers. |
 | <a id="idea-nightly-memory-extraction"></a>Nightly memory extraction from the day's chats | To do | [PRD](../tasks/prd-nightly-memory-extraction.md) | Extract durable memory from the day's conversations. |
 | <a id="idea-progressive-mcp-tool-discovery"></a>Progressive MCP tool discovery | To do | Not drafted | Show the model only the MCP servers and tool schemas relevant to the current task. |
