@@ -6,6 +6,7 @@ This table keeps every product idea visible through its full lifecycle. Follow [
 |---|---|---|---|
 | <a id="idea-artifact-library"></a>Artifact library across all chats | To do | [PRD](../tasks/prd-artifact-library.md) | Browse generated artifacts across chats. |
 | <a id="idea-built-in-github-search"></a>Built-in GitHub search | To do | [PRD](../tasks/prd-built-in-github-search.md) | Find public GitHub repositories without GitHub authentication. |
+| <a id="idea-camera-photo-attachments"></a>Camera photo attachments | To do | [PRD](../tasks/prd-camera-photo-attachments.md) | Capture and attach photos from the composer "+" menu, as many as wanted. |
 | <a id="idea-document-generation"></a>Sandbox document files | In progress | [PRD](../tasks/prd-document-generation.md) | Create and edit PDF, DOCX, PPTX, and XLSX files in the sandbox. |
 | <a id="idea-formatted-lookout-emails"></a>Formatted Lookout emails | To do | [PRD](../tasks/prd-formatted-lookout-emails.md) | Render Lookout reports as readable HTML email in light and dark email readers. |
 | <a id="idea-image-editing"></a>Edit uploaded images with natural-language instructions | To do | [PRD](../tasks/prd-image-editing.md) | Edit an uploaded image through the existing image-generation provider. |
