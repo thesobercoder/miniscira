@@ -1,6 +1,6 @@
 # Paged research history implementation record
 
-- **Status:** Done. Production acceptance passed on 2026-08-25.
+- **Status:** Done
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-scalable-research-history)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 

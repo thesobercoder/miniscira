@@ -1,8 +1,9 @@
 # PRD: search previous threads by date
 
-- **Status:** Approved by Soham on 2026-08-24.
+- **Status:** In progress
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-thread-search-by-date)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
+- **Approval:** Approved by Soham on 2026-08-24
 - **Last updated:** 2026-08-24
 
 ## Purpose

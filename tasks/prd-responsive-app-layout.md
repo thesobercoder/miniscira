@@ -1,8 +1,9 @@
 # PRD: responsive app layout
 
-- **Status:** Draft, awaiting approval.
+- **Status:** To do
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-responsive-app-layout)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
+- **Approval:** Not approved
 
 ## Summary
 

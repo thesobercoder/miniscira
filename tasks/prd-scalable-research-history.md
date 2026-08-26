@@ -1,8 +1,9 @@
 # PRD: paged research history
 
-- **Status:** Done. Approved by Soham on 2026-08-24. Production acceptance passed on 2026-08-25.
+- **Status:** Done
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-scalable-research-history)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
+- **Approval:** Approved by Soham on 2026-08-24
 
 ## Problem
 

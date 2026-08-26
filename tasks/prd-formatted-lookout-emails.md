@@ -1,8 +1,9 @@
 # PRD: formatted Lookout emails
 
-- **Status:** Draft, awaiting approval.
+- **Status:** To do
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-formatted-lookout-emails)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
+- **Approval:** Not approved
 
 ## Summary
 

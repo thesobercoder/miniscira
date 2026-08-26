@@ -1,6 +1,6 @@
 # Paged research history implementation notes
 
-- **Status:** Implementation record.
+- **Status:** Done
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-scalable-research-history)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 

@@ -4,19 +4,19 @@ This table keeps every product idea visible through its full lifecycle. Follow [
 
 | Idea | Status | Planning document | Summary |
 |---|---|---|---|
-| <a id="idea-artifact-library"></a>Artifact library across all chats | Draft | [PRD](../tasks/prd-artifact-library.md) | Browse generated artifacts across chats. |
-| <a id="idea-built-in-github-search"></a>Built-in GitHub search | Draft | [PRD](../tasks/prd-built-in-github-search.md) | Find public GitHub repositories without GitHub authentication. |
-| <a id="idea-document-generation"></a>Sandbox document files | Approved | [PRD](../tasks/prd-document-generation.md) | Create and edit PDF, DOCX, PPTX, and XLSX files in the sandbox. |
-| <a id="idea-formatted-lookout-emails"></a>Formatted Lookout emails | Draft | [PRD](../tasks/prd-formatted-lookout-emails.md) | Render Lookout reports as readable HTML email in light and dark email readers. |
-| <a id="idea-image-editing"></a>Edit uploaded images with natural-language instructions | Draft | [PRD](../tasks/prd-image-editing.md) | Edit an uploaded image through the existing image-generation provider. |
-| <a id="idea-image-generation-aspect-ratio"></a>Default image-generation aspect ratio | Draft | [PRD](../tasks/prd-image-generation-aspect-ratio.md) | Let users choose the default aspect ratio for generated images. |
-| <a id="idea-installable-app-and-offline-mode"></a>Installable app and offline mode | Draft | [PRD](../tasks/prd-installable-app-and-offline-mode.md) | Add browser installation, standalone launch, and an offline shell that does not cache private data after the layout work. |
+| <a id="idea-artifact-library"></a>Artifact library across all chats | To do | [PRD](../tasks/prd-artifact-library.md) | Browse generated artifacts across chats. |
+| <a id="idea-built-in-github-search"></a>Built-in GitHub search | To do | [PRD](../tasks/prd-built-in-github-search.md) | Find public GitHub repositories without GitHub authentication. |
+| <a id="idea-document-generation"></a>Sandbox document files | In progress | [PRD](../tasks/prd-document-generation.md) | Create and edit PDF, DOCX, PPTX, and XLSX files in the sandbox. |
+| <a id="idea-formatted-lookout-emails"></a>Formatted Lookout emails | To do | [PRD](../tasks/prd-formatted-lookout-emails.md) | Render Lookout reports as readable HTML email in light and dark email readers. |
+| <a id="idea-image-editing"></a>Edit uploaded images with natural-language instructions | To do | [PRD](../tasks/prd-image-editing.md) | Edit an uploaded image through the existing image-generation provider. |
+| <a id="idea-image-generation-aspect-ratio"></a>Default image-generation aspect ratio | To do | [PRD](../tasks/prd-image-generation-aspect-ratio.md) | Let users choose the default aspect ratio for generated images. |
+| <a id="idea-installable-app-and-offline-mode"></a>Installable app and offline mode | To do | [PRD](../tasks/prd-installable-app-and-offline-mode.md) | Add browser installation, standalone launch, and an offline shell that does not cache private data after the layout work. |
 | <a id="idea-mcp-oauth-and-self-hosted-endpoints"></a>MCP OAuth and self-hosted endpoints | In progress | [PRD](../tasks/prd-mcp-oauth-and-self-hosted-endpoints.md) | Connect OAuth and self-hosted MCP servers. |
-| <a id="idea-nightly-memory-extraction"></a>Nightly memory extraction from the day's chats | Draft | [PRD](../tasks/prd-nightly-memory-extraction.md) | Extract durable memory from the day's conversations. |
-| <a id="idea-progressive-mcp-tool-discovery"></a>Progressive MCP tool discovery | Idea | Not drafted | Show the model only the MCP servers and tool schemas relevant to the current task. |
-| <a id="idea-remove-lookout-sidebar-list"></a>Remove the Lookout report list from the sidebar | Approved | [PRD](../tasks/prd-remove-lookout-sidebar-list.md) | Keep Lookout creation in the sidebar and move report history to Lookout pages. |
-| <a id="idea-responsive-app-layout"></a>Responsive app layout | Draft | [PRD](../tasks/prd-responsive-app-layout.md) | Fix authenticated app-shell navigation and responsive usability across desktop and mobile. |
+| <a id="idea-nightly-memory-extraction"></a>Nightly memory extraction from the day's chats | To do | [PRD](../tasks/prd-nightly-memory-extraction.md) | Extract durable memory from the day's conversations. |
+| <a id="idea-progressive-mcp-tool-discovery"></a>Progressive MCP tool discovery | To do | Not drafted | Show the model only the MCP servers and tool schemas relevant to the current task. |
+| <a id="idea-remove-lookout-sidebar-list"></a>Remove the Lookout report list from the sidebar | In progress | [PRD](../tasks/prd-remove-lookout-sidebar-list.md) | Keep Lookout creation in the sidebar and move report history to Lookout pages. |
+| <a id="idea-responsive-app-layout"></a>Responsive app layout | To do | [PRD](../tasks/prd-responsive-app-layout.md) | Fix authenticated app-shell navigation and responsive usability across desktop and mobile. |
 | <a id="idea-scalable-research-history"></a>Paged research history | Done | [PRD](../tasks/prd-scalable-research-history.md) | Load 30 research threads first, then load older threads as the user scrolls. |
-| <a id="idea-separate-model-defaults"></a>Separate model defaults by workload | Idea | Not drafted | Configure independent defaults for chat, evals, Lookouts, subagents, and headless work. |
-| <a id="idea-thread-search"></a>Search and read previous threads | Approved | [PRD](../tasks/prd-thread-search.md) | Search past threads and read the relevant conversation context. Phase 2 keeps a separate release gate. |
-| <a id="idea-thread-search-by-date"></a>Search previous threads by date | Approved | [PRD](../tasks/prd-thread-search-by-date.md) | Restrict previous-thread search to a requested date range. |
+| <a id="idea-separate-model-defaults"></a>Separate model defaults by workload | To do | Not drafted | Configure independent defaults for chat, evals, Lookouts, subagents, and headless work. |
+| <a id="idea-thread-search"></a>Search and read previous threads | In progress | [PRD](../tasks/prd-thread-search.md) | Search past threads and read the relevant conversation context. Phase 2 keeps a separate release gate. |
+| <a id="idea-thread-search-by-date"></a>Search previous threads by date | In progress | [PRD](../tasks/prd-thread-search-by-date.md) | Restrict previous-thread search to a requested date range. |

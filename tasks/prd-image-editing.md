@@ -1,8 +1,9 @@
 # PRD: natural-language image editing
 
-- **Status:** Draft, awaiting approval.
+- **Status:** To do
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-image-editing)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
+- **Approval:** Not approved
 - **Repository:** `/opt/data/miniscira-src`
 - **Drafted:** 2026-08-23
 - **Scope:** Full backlog scope. This document does not authorize implementation.

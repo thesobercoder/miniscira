@@ -15,6 +15,7 @@ PRODUCT_IDEAS_PATTERN = re.compile(
     r"^- \*\*Product ideas:\*\* \[Idea entry\]"
     r"\(\.\./docs/PRODUCT_IDEAS\.md#(idea-[a-z0-9-]+)\)$"
 )
+LIFECYCLE_STATUSES = {"To do", "In progress", "Done"}
 
 
 def relative_markdown_links(text: str) -> list[str]:
@@ -55,6 +56,13 @@ def main() -> int:
         if anchor_match:
             idea_rows[anchor_match.group(1)] = line
 
+    for anchor, row in idea_rows.items():
+        cells = [cell.strip() for cell in row.strip().strip("|").split("|")]
+        if len(cells) != 4 or cells[1] not in LIFECYCLE_STATUSES:
+            errors.append(
+                f"docs/PRODUCT_IDEAS.md: {anchor} must use To do, In progress, or Done"
+            )
+
     prd_files = {task_file.name for task_file in task_files if task_file.name.startswith("prd-")}
     linked_prd_files = set(
         re.findall(r"\(\.\./tasks/(prd-[^)]+\.md)\)", product_ideas)
@@ -92,6 +100,12 @@ def main() -> int:
             errors.append(f"{task_name}: line 2 must be blank")
         if not lines[2].startswith("- **Status:** "):
             errors.append(f"{task_name}: line 3 must contain the status metadata")
+        else:
+            status = lines[2].removeprefix("- **Status:** ").strip()
+            if status not in LIFECYCLE_STATUSES:
+                errors.append(
+                    f"{task_name}: status must be To do, In progress, or Done"
+                )
 
         product_ideas_match = PRODUCT_IDEAS_PATTERN.fullmatch(lines[3])
         if not product_ideas_match:
@@ -113,6 +127,21 @@ def main() -> int:
 
         if lines[4] != PLANNING_LINK:
             errors.append(f"{task_name}: line 5 must link to the planning process")
+
+        if task_name.startswith("prd-"):
+            if len(lines) < 6 or not lines[5].startswith("- **Approval:** "):
+                errors.append(f"{task_name}: line 6 must contain approval metadata")
+            elif product_ideas_match:
+                anchor = product_ideas_match.group(1)
+                row = idea_rows.get(anchor, "")
+                cells = [cell.strip() for cell in row.strip().strip("|").split("|")]
+                if len(cells) == 4:
+                    row_status = cells[1]
+                    status = lines[2].removeprefix("- **Status:** ").strip()
+                    if row_status != status:
+                        errors.append(
+                            f"{task_name}: status does not match its Product Ideas row"
+                        )
 
     files_to_check = [
         ROOT / "docs" / "PRODUCT_IDEAS.md",

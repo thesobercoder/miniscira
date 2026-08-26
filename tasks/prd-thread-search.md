@@ -1,8 +1,9 @@
 # PRD: search and read previous threads
 
-- **Status:** Approved by Soham on 2026-08-23. Phase 1 implementation is authorized. Phase 2 keeps its separate release gate.
+- **Status:** In progress
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-thread-search)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
+- **Approval:** Approved by Soham on 2026-08-23. Phase 1 only; Phase 2 keeps its separate release gate.
 - **Repository:** `/opt/data/miniscira-src`
 - **Last updated:** 2026-08-23
 

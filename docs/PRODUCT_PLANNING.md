@@ -15,6 +15,16 @@ raw backlog idea
 → verified feature completion
 ```
 
+Use only these lifecycle statuses:
+
+| Status | Meaning |
+|---|---|
+| `To do` | Work has not started. This includes raw ideas, draft PRDs, and approved PRDs that have not entered execution. |
+| `In progress` | Implementation or required completion verification has started and is not finished. |
+| `Done` | Implementation and every required completion check are finished. |
+
+Approval is a gate, not a lifecycle status. Record approval in the PRD. An approved item stays `To do` until implementation or completion verification starts.
+
 ## 1. Product ideas
 
 - Record raw product ideas in `docs/PRODUCT_IDEAS.md`.
@@ -22,7 +32,7 @@ raw backlog idea
 - A product-ideas row records an idea. It does not allow implementation to start.
 - Keep one table row for each idea through its full lifecycle, including after completion.
 - Use the table columns `Idea`, `Status`, `Planning document`, and `Summary`.
-- Use one of these status values: `Idea`, `Draft`, `Approved`, `In progress`, or `Done`. Add a short qualifier only when a feature has separate release gates.
+- Use only `To do`, `In progress`, or `Done` in the Status column.
 - Link the planning document when one exists. Use `Not drafted` for a raw idea without a PRD.
 - When a draft PRD contains the full scope, shorten the table summary. Do not copy PRD requirements into the table.
 
@@ -39,6 +49,7 @@ raw backlog idea
   - **Status:** <current lifecycle status>
   - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-<feature-slug>)
   - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
+  - **Approval:** <Not approved, or approved by the user with the date>
   ```
 
 - Point related PRDs, implementation plans, and implementation records to the same product-idea row. Do not create a second index of files.
@@ -49,7 +60,7 @@ raw backlog idea
 - If model evals do not apply, explain why.
 - A written PRD is not approved unless the user says so. Ask the user to review it.
 - Record approval only after the user explicitly approves the PRD.
-- After explicit approval, mark the PRD as approved and update the product-ideas table. Approval does not mean the feature is implemented.
+- After explicit approval, record the approval in the PRD. Keep the lifecycle status `To do` until implementation or required completion verification starts.
 
 ## 3. TODO tasks
 

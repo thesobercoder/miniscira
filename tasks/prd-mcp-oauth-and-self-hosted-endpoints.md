@@ -1,8 +1,9 @@
 # PRD: MCP OAuth and self-hosted endpoints
 
-- **Status:** Approved by Soham on 2026-08-23. Implementation in progress.
+- **Status:** In progress
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-mcp-oauth-and-self-hosted-endpoints)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
+- **Approval:** Approved by Soham on 2026-08-23
 
 ## Goal
 

@@ -1,8 +1,9 @@
 # PRD: artifact library across all chats
 
-- **Status:** Draft, awaiting approval.
+- **Status:** To do
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-artifact-library)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
+- **Approval:** Not approved
 - **Repository architecture:** [README](../README.md)
 - **Canonical engineering constraints:** [Development principles](../docs/DEVELOPMENT_PRINCIPLES.md), [Engineering invariants](../docs/ENGINEERING_INVARIANTS.md), and [Deployment guide](../docs/DEPLOYMENT.md)
 - **Scope:** Planning only. This document does not allow implementation. The user must approve this PRD before implementation TODOs are created or executed.
