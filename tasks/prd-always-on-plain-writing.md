@@ -23,7 +23,9 @@ Use the public skill as design input:
 
 `https://github.com/cursor/plugins/blob/main/pstack/skills/unslop/SKILL.md`
 
-Do not copy it verbatim. Adapt the useful rules into MiniScira's shorter core writing standard. Record source or license attribution only if the final text requires it after implementation review.
+Do not copy it verbatim. Adapt the useful rules into MiniScira's shorter core writing standard.
+
+Before implementation, inspect the upstream repository license and compare the final wording with the source. If the adopted text copies or substantially reproduces protected wording, preserve the required MIT license notice in the repository. Record the review result even if attribution is not required.
 
 ## Product behavior
 
@@ -38,6 +40,7 @@ Do not copy it verbatim. Adapt the useful rules into MiniScira's shorter core wr
 
 Replace the current short Style subsection with a fuller but still compact standard. It should cover these rules:
 
+- Keep the existing defaults: use the user's language, use Markdown unless the user requests another format, state the date when recency matters, and prefer the newest reliable source.
 - Be concise. Cut filler, hype, puffery, generic conclusions, chatbot openings, and repeated summaries.
 - Use plain words, active voice, concrete claims, and short sentences when a sentence becomes hard to parse.
 - Prefer `is`, `has`, and direct verbs over inflated substitutes.
@@ -73,6 +76,8 @@ The core writing standard is a default editing rule. It must not override:
 8. The standard respects explicit output formats such as JSON, tables, code-only responses, short answers, or requested headings.
 9. Scheduled Lookout reports retain their current HTML-only delivery contract.
 10. The system prompt grows only by the compact adopted rules, with no duplicated checklist elsewhere.
+11. The existing language, Markdown, recency-date, and newest-reliable-source defaults remain in force.
+12. A pre-implementation license review records whether the adopted wording requires the upstream MIT notice, and the repository includes that notice when required.
 
 ## Test plan
 
@@ -84,24 +89,31 @@ The core writing standard is a default editing rule. It must not override:
 
 ### Model evals
 
-Add an eval set with deterministic checks and a small rubric. Use prompts that tend to produce the habits the standard targets.
+Add an eval set with deterministic assertions. Use prompts that tend to produce the habits the standard targets.
 
 Cases:
 
 1. **Short explanation.** Ask for a plain explanation of a technical topic. Reject stock chatbot openings, inflated significance, filler, and a trailing generic conclusion.
 2. **Cited research answer.** Ask a current factual question. Require normal search and read behavior, inline citations, and no trailing Sources section.
 3. **Recommendation.** Ask the model to choose between two options. Require a clear recommendation with specific reasons, not a neutral list padded to three points.
-4. **User tone override.** Supply a supported tone or standing instruction. Verify that the answer follows it while retaining the plain-writing baseline.
+4. **User tone override.** Send an explicit tone instruction in the eval prompt. Verify that the answer follows it while retaining the plain-writing baseline. Do not mutate production user personalization for this case.
 5. **Exact-format preservation.** Ask for a table, JSON object, or code-only response. Verify that the model adds no introduction, conclusion, or extra prose.
 6. **Quoted and technical text preservation.** Give exact names, code, paths, numbers, and a quotation. Verify that the answer does not rewrite them.
 7. **Punctuation exception.** Request prose or code where parentheses, colons, or dashes are correct. Verify that the standard prevents overuse rather than banning valid punctuation.
 
 Pass requirements:
 
+- Every case must pass every deterministic assertion on every production run. There is no partial style threshold.
 - No case calls `load_skill` for `unslop`.
+- The short-explanation case starts with its answer, contains none of the fixture's banned opening or puffery phrases, and adds no generic closing paragraph.
+- The cited-research case performs its required search and read calls, includes the required inline citation links, uses the newest reliable dated source in the fixture, and adds no trailing `Sources` heading.
+- The recommendation case names one choice in its first paragraph, gives at least one concrete reason tied to the fixture, and does not invent a third reason merely to form a list.
+- The tone case contains the prompt's required tone marker and none of its forbidden tone markers. The fixture uses an explicit prompt instruction, so it does not change account state.
+- The exact-format cases parse as the requested JSON or table shape, or contain code only when code only is requested. They include no surrounding prose.
+- The preservation case contains every supplied exact name, path, number, code token, and quotation byte-for-byte.
+- The punctuation case retains the punctuation required by its fixture and stays below the fixture's explicit repeated-punctuation limit.
 - All existing task-specific skill and tool gates still pass.
 - No case loses required citations or required output structure.
-- The style rubric passes every case. Test observable habits, not a subjective claim that the answer has "soul."
 
 ### Regression evals
 
@@ -116,8 +128,8 @@ Verify at least:
 1. A short answer returns concise, direct prose with no extra skill load.
 2. A researched answer loads its task-specific skill, keeps inline citations, and has no trailing source list.
 3. A structured-format request returns only the requested format.
-4. A user tone setting remains visible in the final answer.
-5. A Lookout report still renders and sends through the existing HTML-only path when that flow is affected by the core-instruction change.
+4. An explicit tone instruction in the production eval prompt remains visible in the final answer. The eval must not alter saved personalization for the dedicated eval account.
+5. Run one production Lookout with a safe eval-only recipient or delivery capture. Verify the expected task-specific skill and tools, completed timeline, generated report, React Email HTML rendering, and HTML-only delivery. Do not send the test to Soham's normal recipient.
 
 Inspect the production timeline to confirm that there is no `unslop` skill call and no loading loop.
 
@@ -126,12 +138,15 @@ Inspect the production timeline to confirm that there is no `unslop` skill call 
 - [ ] MiniScira's core instructions adopt the useful Unslop writing rules in a compact form.
 - [ ] MiniScira does not add or load an `unslop` skill.
 - [ ] The final core section does not duplicate the full upstream checklist.
+- [ ] The existing language, Markdown, recency-date, and newest-reliable-source defaults remain intact.
+- [ ] The license review is recorded and any required MIT notice is included.
 - [ ] Accuracy, inline citations, exact values, code, quotations, requested formats, and user tone survive the writing rules.
 - [ ] Existing task-specific skills still load and control their tasks.
-- [ ] The new style eval cases pass.
+- [ ] Every new deterministic style eval case passes all of its assertions.
 - [ ] Applicable existing agent evals pass.
 - [ ] Production Eve evals pass against the deployed system.
 - [ ] The production timeline shows normal task work with no `unslop` skill load.
+- [ ] A production Lookout passes task routing, timeline, report rendering, and safe HTML-only delivery acceptance.
 - [ ] Typecheck, lint, the full test suite, repository checks, and production build pass.
 
 ## Non-goals
