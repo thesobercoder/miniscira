@@ -4,6 +4,7 @@ This table keeps every product idea visible through its full lifecycle. Follow [
 
 | Idea | Status | Planning document | Summary |
 |---|---|---|---|
+| <a id="idea-always-on-plain-writing"></a>Always-on plain writing | To do | [PRD](../tasks/prd-always-on-plain-writing.md) | Apply an adapted Unslop skill before final answers without overriding accuracy, citations, formats, or user tone. |
 | <a id="idea-artifact-library"></a>Artifact library across all chats | To do | [PRD](../tasks/prd-artifact-library.md) | Browse generated artifacts across chats. |
 | <a id="idea-built-in-github-search"></a>Built-in GitHub search | To do | [PRD](../tasks/prd-built-in-github-search.md) | Find public GitHub repositories without GitHub authentication. |
 | <a id="idea-camera-photo-attachments"></a>Camera photo attachments | To do | [PRD](../tasks/prd-camera-photo-attachments.md) | Capture and attach photos from the composer "+" menu, as many as wanted. |
