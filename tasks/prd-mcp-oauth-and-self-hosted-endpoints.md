@@ -121,21 +121,21 @@ Keep OAuth client ID and secret settings under the MCP server's Advanced panel.
 
 ## Acceptance criteria
 
-1. A normal OAuth MCP opens authorization in a new tab and completes without replacing the MCP settings page.
-2. The original MCP page shows the connected state after automatic OAuth completes.
-3. A manual-mode MCP uses the exact configured callback URL in client registration, authorization, and token exchange.
-4. Pasting a valid final callback URL completes OAuth and marks the correct MCP as connected.
-5. A callback with a missing, malformed, mismatched, replayed, expired, or foreign-user state is rejected.
-6. A pasted URL whose origin or path differs from the frozen callback URL is rejected.
-7. MiniScira never logs or returns OAuth tokens, client secrets, PKCE verifiers, authorization codes, or the complete pasted callback URL.
-8. Changing callback settings clears credentials and pending OAuth material that were bound to the previous callback.
-9. HTTP and HTTPS MCP endpoint URLs can be added when otherwise valid.
-10. Unsupported schemes, credentials in URLs, fragments, and malformed endpoint URLs are rejected by the API.
-11. The UI clearly warns before saving or using an HTTP MCP endpoint.
-12. Existing MCP servers continue to use automatic callback mode after migration.
-13. Existing encrypted OAuth credentials and tokens remain readable when callback settings are unchanged.
-14. The real automatic and manual user flows are exercised in a browser.
-15. Production deployment preserves existing users, chats, uploads, MCP records, encrypted credentials, database volume, and uploads volume.
+- [ ] A normal OAuth MCP opens authorization in a new tab and completes without replacing the MCP settings page.
+- [ ] The original MCP page shows the connected state after automatic OAuth completes.
+- [ ] A manual-mode MCP uses the exact configured callback URL in client registration, authorization, and token exchange.
+- [ ] Pasting a valid final callback URL completes OAuth and marks the correct MCP as connected.
+- [ ] A callback with a missing, malformed, mismatched, replayed, expired, or foreign-user state is rejected.
+- [ ] A pasted URL whose origin or path differs from the frozen callback URL is rejected.
+- [ ] MiniScira never logs or returns OAuth tokens, client secrets, PKCE verifiers, authorization codes, or the complete pasted callback URL.
+- [ ] Changing callback settings clears credentials and pending OAuth material that were bound to the previous callback.
+- [ ] HTTP and HTTPS MCP endpoint URLs can be added when otherwise valid.
+- [ ] Unsupported schemes, credentials in URLs, fragments, and malformed endpoint URLs are rejected by the API.
+- [ ] The UI clearly warns before saving or using an HTTP MCP endpoint.
+- [ ] Existing MCP servers continue to use automatic callback mode after migration.
+- [ ] Existing encrypted OAuth credentials and tokens remain readable when callback settings are unchanged.
+- [ ] The real automatic and manual user flows are exercised in a browser.
+- [ ] Production deployment preserves existing users, chats, uploads, MCP records, encrypted credentials, database volume, and uploads volume.
 
 ## Test plan
 

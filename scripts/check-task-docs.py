@@ -25,6 +25,23 @@ def relative_markdown_links(text: str) -> list[str]:
     return re.findall(r"\[[^\]]*\]\(([^)]+)\)", text)
 
 
+def has_unchecked_acceptance_criterion(text: str) -> bool:
+    acceptance_seen = False
+
+    for line in text.splitlines():
+        stripped = line.strip()
+        if re.fullmatch(r"#{2,6} Acceptance criteria:?", stripped, re.IGNORECASE):
+            acceptance_seen = True
+            continue
+        if stripped.lower() == "**acceptance criteria:**":
+            acceptance_seen = True
+            continue
+        if acceptance_seen and re.fullmatch(r"- \[ \] .+", stripped):
+            return True
+
+    return False
+
+
 def main() -> int:
     errors: list[str] = []
     task_files = sorted(TASKS_DIR.glob("*.md"))
@@ -91,8 +108,10 @@ def main() -> int:
             )
 
     for task_file in task_files:
-        lines = task_file.read_text().splitlines()
+        task_text = task_file.read_text()
+        lines = task_text.splitlines()
         task_name = task_file.name
+        status: str | None = None
 
         if len(lines) < 5:
             errors.append(f"{task_name}: expected at least five lines")
@@ -147,6 +166,13 @@ def main() -> int:
                         errors.append(
                             f"{task_name}: status does not match its Product Ideas row"
                         )
+
+            if status == "In progress" and not has_unchecked_acceptance_criterion(
+                task_text
+            ):
+                errors.append(
+                    f"{task_name}: In progress PRD must have at least one unchecked acceptance criterion"
+                )
 
     files_to_check = [
         ROOT / "docs" / "PRODUCT_IDEAS.md",

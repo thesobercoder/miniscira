@@ -47,14 +47,14 @@ Keep the sidebar focused on primary navigation and active research history.
 
 ## Acceptance criteria
 
-- Desktop and narrow-screen sidebars show the `Lookouts` navigation item once.
-- No expanded Lookout section appears in the sidebar.
-- Selecting `Lookouts` opens `/lookouts`.
-- The Lookouts page displays at most the five newest Lookouts and their report history.
-- A user with more than five Lookouts does not see older Lookouts on the page.
-- Sidebar chat history and thread search still work.
-- Focused tests, the full test suite, typecheck, lint, build, and `git diff --check` pass.
-- Production browser verification covers the sidebar and Lookouts page.
+- [ ] Desktop and narrow-screen sidebars show the `Lookouts` navigation item once.
+- [ ] No expanded Lookout section appears in the sidebar.
+- [ ] Selecting `Lookouts` opens `/lookouts`.
+- [ ] The Lookouts page displays at most the five newest Lookouts and their report history.
+- [ ] A user with more than five Lookouts does not see older Lookouts on the page.
+- [ ] Sidebar chat history and thread search still work.
+- [ ] Focused tests, the full test suite, typecheck, lint, build, and `git diff --check` pass.
+- [ ] Production browser verification covers the sidebar and Lookouts page.
 
 ## Evals
 

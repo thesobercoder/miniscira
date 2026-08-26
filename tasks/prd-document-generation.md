@@ -94,9 +94,17 @@ Extend the existing `run_code` timeline node with a small file-download list. Do
 
 ### Remaining completion work
 
-- Inspect each downloaded format with an appropriate reader and verify the requested contents.
-- Inspect the edited DOCX and verify that the replacement text exists and the original text does not.
-- Use the production browser to create and download each format, reload the chat, download from the persisted timeline result, and complete an uploaded-file edit flow.
+The feature implementation exists and the main production paths work. The remaining items are stronger completion checks, not known missing product behavior.
+
+| Pending item | Kind | How to resolve it | Completion evidence |
+|---|---|---|---|
+| Prove that generated PDF, DOCX, PPTX, and XLSX files are valid and contain the requested fixture content. | Automated production Eve eval | Strengthen `document-files-production-acceptance` to download each file, open it with a format-aware reader, and assert its expected text, slide, sheet, or cell content. | A production eval run passes every structural and content assertion for all four formats. |
+| Prove that an uploaded office document is edited rather than returned unchanged. | Automated production Eve eval | Use a deterministic DOCX fixture. Inspect the returned DOCX and assert that the replacement text exists and the original text is absent. | The production edit eval passes both semantic assertions. |
+| Prove that generated links survive the user-visible persistence path. | Production browser acceptance | Create files in a signed-in chat, reload the chat, find the persisted `run_code` result, and download the files again. Recreate the app container and repeat the reload and download check. | A recorded browser run shows the persisted timeline links working after both reload and container recreation. |
+| Prove the complete upload, edit, and download experience in the deployed UI. | Production browser acceptance | Upload one supported office file, request a small edit, wait for the timeline result, download it, and inspect the edited content. | A recorded browser run and inspected output confirm the deployed flow. |
+| Close the repository quality gates against the final acceptance-eval changes. | Automated repository checks | Run focused tests, the full test suite, lint, typecheck, repository checks, build, and `git diff --check` after the stronger eval lands. | Every command passes on the final committed revision. |
+
+Soham's manual test is useful product confirmation. It supports the conclusion that the feature works, but the PRD remains `In progress` until the reproducible content, persistence, and browser evidence above is recorded.
 
 ## Non-goals
 

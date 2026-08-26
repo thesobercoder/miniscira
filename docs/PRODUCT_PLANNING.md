@@ -55,6 +55,8 @@ Approval is a gate, not a lifecycle status. Record approval in the PRD. An appro
 - Point related PRDs, implementation plans, and implementation records to the same product-idea row. Do not create a second index of files.
 - Run `python3 scripts/check-task-docs.py` after you add, rename, or change task metadata. The check enforces the metadata block, product-idea backlinks, PRD coverage, and relative links.
 - Define the goals, user stories, scope, non-goals, functional requirements, technical requirements, acceptance criteria, deployment, observability, rollback, and open questions.
+- Write acceptance criteria as Markdown task-list items. Prefer one `## Acceptance criteria` section. A long PRD may keep criteria under individual user stories.
+- An `In progress` PRD must have at least one unchecked acceptance criterion. The unchecked items are the durable list of work or verification still required before `Done`.
 - List every required check. Include unit, integration, browser/end-to-end, authorization/security, migration/rollback, deployment, and production acceptance checks.
 - For changes to agent behavior, prompts, tools, retrieval, memory, or model routing, define eval cases, fixtures or datasets, expected outcomes, and pass thresholds.
 - If model evals do not apply, explain why.
@@ -85,6 +87,7 @@ Approval is a gate, not a lifecycle status. Record approval in the PRD. An appro
   - you exercise the real user-visible flow;
   - you verify the production deployment when it applies; and
   - the repository meets the production source-control rules.
+- Before changing `In progress` to `Done`, check every acceptance criterion and attach the required completion evidence. If any criterion remains unchecked, the PRD stays `In progress`.
 - Keep the approved PRD as the durable record of intent and acceptance.
 - Mark completed features as `Done` in `docs/PRODUCT_IDEAS.md`. Keep the row and its PRD link so past work remains readable. Document shipped behavior in the relevant product or operations document.
 - Keep completion evidence in commits, test results, eval results, and relevant operations documents.

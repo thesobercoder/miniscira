@@ -54,6 +54,18 @@ PostgreSQL must filter `chat.user_id` before ranking or limiting results. A read
 - Invalid, reversed, and excessively wide ranges return safe errors.
 - Real signed-in browser continuity flow for “What did we talk about yesterday?”
 
+## Acceptance criteria
+
+- [ ] `search_previous_threads` accepts valid absolute `from` and `to` timestamps and keeps title search optional.
+- [ ] Date ranges use inclusive `from`, exclusive `to`, require both bounds, and reject invalid, reversed, or longer-than-366-day ranges.
+- [ ] PostgreSQL filters by authenticated user, current project, current-thread exclusion, and `chat.updated_at` before ranking or limiting.
+- [ ] Empty-title, title-only, date-only, and combined searches return deterministic owned results.
+- [ ] Relative-date routing evals convert “yesterday,” “last Friday,” and explicit dates into correct absolute UTC ranges.
+- [ ] Foreign-thread searches and reads return safe not-found behavior and never expose another user's thread IDs or contents.
+- [ ] Focused tests, the full repository gates, and the PostgreSQL query-plan check pass.
+- [ ] The signed-in production browser flow shows the search and read timeline and a final linked answer for “What did we talk about yesterday?”
+- [ ] Production deployment, data preservation, health, source-control, and rollback checks pass.
+
 ## Locked decisions
 
 1. The first release uses UTC only.
