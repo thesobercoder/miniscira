@@ -897,4 +897,4 @@ Implementation agents must follow the approved PRD exactly, ask/stop if ambiguit
 
 ## 24. Approval gate
 
-This is a **Draft PRD**, not implementation authorization. The next step is user review and explicit approval or requested revisions. Only after explicit approval may the backlog status become `PRD approved` and an execution TODO/test/eval plan be created from section 18.
+This PRD is not implementation authorization. The next step is user review and explicit approval or requested revisions. After approval, record it in this PRD and create the execution TODO, test, and eval plan from section 18. Keep the backlog status `To do` until implementation starts.

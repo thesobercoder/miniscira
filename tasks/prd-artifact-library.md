@@ -898,7 +898,7 @@ This PRD does not include:
 This PRD remains **Draft — not approved**. Before implementation:
 
 1. The user must explicitly approve this PRD and resolve approval-blocking open questions.
-2. The backlog entry must be updated to `PRD approved` only after that explicit approval.
+2. Record the approval in this PRD. Keep the backlog status `To do` until implementation starts.
 3. Ordered atomic implementation TODOs must be derived from Section 18.
 4. Every TODO must map to the requirements and exact tests/evals in Sections 16–19.
 5. Only then may implementation begin under the canonical repository planning process.

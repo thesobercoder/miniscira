@@ -16,6 +16,9 @@ PRODUCT_IDEAS_PATTERN = re.compile(
     r"\(\.\./docs/PRODUCT_IDEAS\.md#(idea-[a-z0-9-]+)\)$"
 )
 LIFECYCLE_STATUSES = {"To do", "In progress", "Done"}
+APPROVAL_PATTERN = re.compile(
+    r"^- \*\*Approval:\*\* (?:Not approved|Approved by Soham on \d{4}-\d{2}-\d{2}(?:\. .+)?)$"
+)
 
 
 def relative_markdown_links(text: str) -> list[str]:
@@ -129,8 +132,10 @@ def main() -> int:
             errors.append(f"{task_name}: line 5 must link to the planning process")
 
         if task_name.startswith("prd-"):
-            if len(lines) < 6 or not lines[5].startswith("- **Approval:** "):
-                errors.append(f"{task_name}: line 6 must contain approval metadata")
+            if len(lines) < 6 or not APPROVAL_PATTERN.fullmatch(lines[5]):
+                errors.append(
+                    f"{task_name}: line 6 approval must be Not approved or Approved by Soham on YYYY-MM-DD"
+                )
             elif product_ideas_match:
                 anchor = product_ideas_match.group(1)
                 row = idea_rows.get(anchor, "")

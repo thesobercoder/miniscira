@@ -884,7 +884,7 @@ This document is a **draft**, not implementation authorization. Before work star
 
 1. Resolve OQ-003 and OQ-004 and any other open question that changes architecture or UX.
 2. Review and explicitly approve this PRD.
-3. Update the backlog entry status/link to `PRD approved` only after explicit approval.
+3. Record approval in this PRD. Keep the backlog status `To do` until implementation starts.
 4. Convert Section 17 into ordered session TODOs with exact files, dependencies, tests, and eval commands.
 5. Do not enable auto-promotion; it requires the separate gates and later approval in Section 12.
 

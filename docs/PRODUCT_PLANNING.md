@@ -41,7 +41,7 @@ Approval is a gate, not a lifecycle status. Record approval in the PRD. An appro
 - Follow the mandatory simplified technical English standard in `docs/DEVELOPMENT_PRINCIPLES.md`.
 - When an idea is selected, create `tasks/prd-<feature-name>.md`.
 - Link the backlog entry to the PRD.
-- Start every file under `tasks/` with the same metadata block:
+- Start every PRD under `tasks/` with this metadata block:
 
   ```markdown
   # <document title>
