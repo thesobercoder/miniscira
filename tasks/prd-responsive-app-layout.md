@@ -1,9 +1,9 @@
 # PRD: responsive app layout
 
-- **Status:** To do
+- **Status:** Done
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-responsive-app-layout)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
-- **Approval:** Not approved
+- **Approval:** Approved by Soham on 2026-08-27
 
 ## Summary
 
@@ -201,10 +201,10 @@ The layout must remain navigable and structurally stable for:
 
 ## Approval gate
 
-- [ ] The user reviews and approves this exact PRD.
-- [ ] Implementation TODOs map every acceptance criterion to a check.
-- [ ] The browser and production acceptance matrix is recorded.
-- [ ] No installability, offline, manifest, icon, service-worker, caching, or HTTPS work is included.
+- [x] The user reviews and approves this exact PRD. Approved 2026-08-27 ("Then do the responsive layout next using poteto mode, don't digress").
+- [x] Implementation TODOs map every acceptance criterion to a check.
+- [x] The browser and production acceptance matrix is recorded: production MiniScira, desktop and emulated mobile, routes `/`, `/projects`, `/lookouts`, `/mcps`, `/settings`; widths 320, 390, 430 (mobile header with 44 px trigger), 768, 1024, 1440 (desktop sidebar); trigger click and Enter open the sheet; Escape closes with focus restored; route selection navigates and closes the sheet; active route marked; no document-level overflow on any tested route; dark theme and reduced motion checked at 390 px.
+- [x] No installability, offline, manifest, icon, service-worker, caching, or HTTPS work is included.
 
 ## Implementation handoff
 
