@@ -457,6 +457,9 @@ After deployment, verify all of the following:
 - Do not attach Sandboxes to `docker-control`.
 - Do not attach the app or middleware to `sandbox-egress`.
 - Do not mount `/data/docker.sock` into the app.
+- The app container was rebuilt by hand on 2026-08-27 without Compose labels.
+  The next Compose-managed deploy must `docker rm miniscira-app-1` first or
+  creation fails with a name conflict.
 
 To move the middleware or egress container to a newly built image ID, update the Stack even when the mutable image tag has not changed.
 
