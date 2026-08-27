@@ -4,6 +4,7 @@ import {
   RiAddLine,
   RiArrowUpLine,
   RiAttachmentLine,
+  RiCameraLine,
   RiCheckLine,
   RiCloseLine,
   RiCompass3Line,
@@ -115,10 +116,12 @@ function ComposerPlusMenu({
   mode,
   setMode,
   onAttach,
+  onCamera,
 }: {
   mode: Mode
   setMode: (m: Mode) => void
   onAttach: () => void
+  onCamera: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [servers, setServers] = useState<McpSource[] | null>(null)
@@ -170,6 +173,21 @@ function ComposerPlusMenu({
         <RiAddLine className="size-4.5" />
       </PopoverTrigger>
       <PopoverContent align="start" side="bottom" className="w-64 gap-0 p-1">
+        <button
+          type="button"
+          onClick={() => {
+            onCamera()
+            setOpen(false)
+          }}
+          className={MENU_ROW}
+        >
+          <RiCameraLine className="size-4 shrink-0 text-muted-foreground" />
+          Take photo
+          <span className="ml-auto text-[10px] text-muted-foreground">
+            Photo
+          </span>
+        </button>
+
         <button
           type="button"
           onClick={() => {
@@ -393,6 +411,7 @@ export const Composer = memo(function Composer({
   uploading,
 }: ComposerProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const cameraInputRef = useRef<HTMLInputElement | null>(null)
   const dragDepthRef = useRef(0)
   const [dragActive, setDragActive] = useState(false)
   // Sending with an upload in flight would leave that file behind, so the
@@ -434,6 +453,17 @@ export const Composer = memo(function Composer({
         type="file"
         multiple
         accept={DOC_ACCEPT}
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files) onUpload(e.target.files)
+          e.target.value = ""
+        }}
+      />
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
         className="hidden"
         onChange={(e) => {
           if (e.target.files) onUpload(e.target.files)
@@ -517,6 +547,7 @@ export const Composer = memo(function Composer({
               mode={mode}
               setMode={onModeChange}
               onAttach={() => fileInputRef.current?.click()}
+              onCamera={() => cameraInputRef.current?.click()}
             />
 
             <ModelPickerDialog

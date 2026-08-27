@@ -1,9 +1,9 @@
 # PRD: Camera photo attachments
 
-- **Status:** To do
+- **Status:** In progress
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-camera-photo-attachments)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
-- **Approval:** Not approved
+- **Approval:** Approved by Soham on 2026-08-27
 
 ## Goal
 

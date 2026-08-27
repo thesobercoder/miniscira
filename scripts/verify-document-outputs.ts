@@ -22,16 +22,7 @@ async function download(path: string): Promise<Buffer> {
   return Buffer.from(await response.arrayBuffer())
 }
 
-function ooxmlText(buffer: Buffer, memberPattern: RegExp): string {
-  const start = buffer.readUInt32LE(0)
-  if (start !== 0x04034b50) throw new Error("not a zip archive")
-  // Minimal central-directory scan: find member headers and inflate raw parts.
-  // Bun ships zlib; each local file header carries its own compressed payload.
-  return ""
-}
-
-// zipfile parsing without a dependency: use the Python-free approach —
-// Bun exposes node:zlib; but a full zip reader is error-prone. Instead shell
+// zipfile parsing without a dependency: shell
 // out to python3 zipfile, present on this host.
 import { execFileSync } from "node:child_process"
 import { mkdtempSync, writeFileSync as writeTmp } from "node:fs"
@@ -63,6 +54,7 @@ function ooxmlMemberText(buffer: Buffer, memberSubstring: string): string {
 }
 
 import { rmSync } from "node:fs"
+
 function rmDir(dir: string) {
   try {
     rmSync(dir, { recursive: true, force: true })
@@ -80,16 +72,17 @@ async function checkPdf(path: string) {
 
 async function checkOoxml(
   path: string,
-  memberPattern: RegExp,
+  memberSubstring: string,
   expect: string[],
   forbid: string[] = []
 ) {
   const buffer = await download(path)
-  const text = ooxmlMemberText(buffer, memberPattern)
+  const text = ooxmlMemberText(buffer, memberSubstring)
   for (const needle of expect)
     if (!text.includes(needle)) failures.push(`${path}: missing "${needle}"`)
   for (const needle of forbid)
-    if (text.includes(needle)) failures.push(`${path}: still contains "${needle}"`)
+    if (text.includes(needle))
+      failures.push(`${path}: still contains "${needle}"`)
 }
 
 const paths: string[] = JSON.parse(
@@ -100,9 +93,12 @@ await checkPdf(paths[0])
 await checkOoxml(paths[1], "word/document", [phrase])
 await checkOoxml(paths[2], "ppt/slides/slide", [phrase])
 await checkOoxml(paths[3], "xl/", [phrase])
-await checkOoxml(paths[4], "word/document", [
-  "Edited by MiniScira production",
-], ["Original production edit fixture"])
+await checkOoxml(
+  paths[4],
+  "word/document",
+  ["Edited by MiniScira production"],
+  ["Original production edit fixture"]
+)
 
 if (failures.length > 0) {
   console.error("FAILED:\n" + failures.map((f) => `- ${f}`).join("\n"))
