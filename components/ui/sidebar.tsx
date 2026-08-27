@@ -190,6 +190,12 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
+          onClickCapture={(event) => {
+            const target = event.target
+            if (target instanceof Element && target.closest("a")) {
+              setOpenMobile(false)
+            }
+          }}
           className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
           style={
             {

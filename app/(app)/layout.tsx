@@ -1,6 +1,7 @@
 import { cookies, headers } from "next/headers"
 import { redirect } from "next/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
+import { MobileShellHeader } from "@/components/mobile-shell-header"
 import { NewResearchShortcut } from "@/components/new-research-shortcut"
 import { SettingsProvider } from "@/components/settings-provider"
 import { ThreadSearchProvider } from "@/components/thread-search"
@@ -46,6 +47,7 @@ export default async function AppLayout({
             id="main-content"
             className="flex h-dvh flex-col overflow-hidden"
           >
+            <MobileShellHeader />
             <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
           </SidebarInset>
         </ThreadSearchProvider>
