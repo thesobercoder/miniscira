@@ -20,7 +20,8 @@ const createRequests = [
   },
   {
     skill: "docx",
-    prompt: "Create a Word document meeting agenda for a 30-minute product review.",
+    prompt:
+      "Create a Word document meeting agenda for a 30-minute product review.",
   },
   {
     skill: "pptx",
