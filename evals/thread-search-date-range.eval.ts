@@ -11,7 +11,7 @@ export default defineEval({
   tags: ["thread-search", "date-search", "routing", "release-gate"],
   async test(t) {
     const turn = await t.send(
-      "Find our PostgreSQL discussion from August 23, 2026. Search previous threads before answering."
+      "Find our PostgreSQL discussion from August 23, 2026. Search previous threads and read the relevant one before answering."
     )
 
     t.succeeded()

@@ -101,11 +101,26 @@ def fixture_sql() -> str:
     )
     foreign_answer = "FOREIGN-USER-SECRET-MARKER must never appear in another user's search results or read output."
 
+    # Fixture timestamps are computed at prepare time. "Yesterday" tracks the
+    # run date; the other stamps keep fixed times of day and stay clear of
+    # boundaries so half-open UTC day windows behave deterministically.
+    import datetime as dt
+
+    now = dt.datetime.now(dt.UTC)
+    def stamp(days_ago: int, hour: int) -> str:
+        day = (now - dt.timedelta(days=days_ago)).strftime("%Y-%m-%d")
+        return f"{day} {hour:02d}:00:00+00"
+
+    four_days_ago = stamp(4, 12)
+    three_days_ago = stamp(3, 12)
+    yesterday_stamp = stamp(1, 18)
+    foreign_stamp = (now - dt.timedelta(hours=30)).strftime("%Y-%m-%d %H:%M:%S+00")
+
     values = [
         (PRIMARY_CHAT_ID, EVAL_USER_ID, "PostgreSQL thread search Phase 1 decision", "2026-08-23 12:00:00+00", useful_question, useful_answer),
-        (STALE_CHAT_ID, EVAL_USER_ID, "Earlier thread search design discussion", "2026-08-22 12:00:00+00", stale_question, stale_answer),
-        (YESTERDAY_CHAT_ID, EVAL_USER_ID, "Yesterday continuity search release gate", "2026-08-23 18:00:00+00", yesterday_question, yesterday_answer),
-        (FOREIGN_CHAT_ID, FOREIGN_USER_ID, "PostgreSQL thread search Phase 1 decision", "2026-08-23 13:00:00+00", useful_question, foreign_answer),
+        (STALE_CHAT_ID, EVAL_USER_ID, "Earlier thread search design discussion", four_days_ago, stale_question, stale_answer),
+        (YESTERDAY_CHAT_ID, EVAL_USER_ID, "Yesterday continuity search release gate", yesterday_stamp, yesterday_question, yesterday_answer),
+        (FOREIGN_CHAT_ID, FOREIGN_USER_ID, "PostgreSQL thread search Phase 1 decision", foreign_stamp, useful_question, foreign_answer),
     ]
     statements = [
         "BEGIN",
