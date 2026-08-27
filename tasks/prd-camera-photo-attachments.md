@@ -1,6 +1,6 @@
 # PRD: Camera photo attachments
 
-- **Status:** In progress
+- **Status:** Done
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-camera-photo-attachments)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Approval:** Approved by Soham on 2026-08-27
@@ -69,3 +69,12 @@ Restore the previous app image. No data, schema, or configuration rollback is re
 ## Open questions
 
 None. Placement between `Attach files` and the mode section follows existing information hierarchy and can move during implementation review without scope change.
+
+## Completion evidence (2026-08-27)
+
+- `components/chat/composer.tsx`: `Take photo` row (`RiCameraLine`, `Photo` hint) above `Attach files`; hidden camera input with `accept="image/*" capture="environment"` feeding the existing `onUpload`. One focused static-render test covers both attributes. Commit `8f17e3a`.
+- Gates: typecheck, lint, `bun test` 334/334 across 55 files, `git diff --check` all pass.
+- Deployed to production Stack 30 as image `miniscira:camera-photo-attachments-20260827-1`; `/api/health` 200; data counts unchanged (80 chats pre-deploy).
+- Live production browser flow: two captures staged through the camera input into one send, both chips accumulated, sent turn rendered two photo thumbnails plus a correct assistant description, 17 events persisted including the base64 file part, state survived full reload, stored file re-downloaded as `200 image/png`.
+- Caveat: automation-browser captures exercise the picker fallback path (no mobile camera hardware attached). Mobile Safari/Android Chrome camera-open behavior is verified by markup and platform spec, not on live hardware.
+- Test-data note: verification created four throwaway production chats between 07:29 and 07:42 UTC, three of them dead rows from an automation-hostname limitation (`umbrel.local` unresolvable from the test browser); left in place as eval-account data.
