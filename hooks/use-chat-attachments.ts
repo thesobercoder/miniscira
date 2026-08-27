@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { useMountEffect } from "@/hooks/use-mount-effect"
 import { mutateOrToast } from "@/lib/api-client"
 import { DOCUMENT_MEDIA_TYPES } from "@/lib/document-files"
+import { normalizeImage } from "@/lib/image-normalize"
 
 /**
  * Owns the attachment lifecycle for one chat: files staged in the composer for
@@ -128,9 +129,10 @@ export function useChatAttachments({
       // nothing here depends on ordering. Sequential awaits meant dropping four
       // files cost four round trips end to end.
       const upload = async (file: File) => {
-        const tempId = `tmp-${file.name}-${file.size}-${file.lastModified}`
-        const isImage = file.type.startsWith("image/")
-        const previewUrl = isImage ? URL.createObjectURL(file) : undefined
+        const normalized = await normalizeImage(file)
+        const tempId = `tmp-${normalized.name}-${normalized.size}-${normalized.lastModified}`
+        const isImage = normalized.type.startsWith("image/")
+        const previewUrl = isImage ? URL.createObjectURL(normalized) : undefined
         if (previewUrl) previewUrlsRef.current.add(previewUrl)
         setDocuments((prev) => {
           const replaced = prev.find((d) => d.id === tempId)
@@ -141,19 +143,19 @@ export function useChatAttachments({
           return [
             {
               id: tempId,
-              filename: file.name,
+              filename: normalized.name,
               status: "processing",
               kind: isImage ? "image" : "document",
               url: previewUrl,
-              mimeType: file.type,
+              mimeType: normalized.type,
               // Kept so a failure can offer Retry instead of a dead-end icon.
-              file,
+              file: normalized,
             },
             ...prev.filter((d) => d.id !== tempId),
           ]
         })
         const body = new FormData()
-        body.set("file", file)
+        body.set("file", normalized)
         const id = currentChatId()
         if (id) body.set("chatId", id)
         if (projectId) body.set("projectId", projectId)
@@ -195,7 +197,7 @@ export function useChatAttachments({
                 : d
             )
           )
-          toast.error(`Couldn't upload ${file.name}`)
+          toast.error(`Couldn't upload ${normalized.name}`)
         }
       }
       await Promise.all(list.map(upload))

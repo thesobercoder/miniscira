@@ -667,6 +667,9 @@ export function ResearchChat({
                             ) : (
                               <AssistantTurn
                                 message={message}
+                                hasAttachments={(
+                                  attachmentsByTurn[userTurnOf[i - 1]] ?? []
+                                ).some((document) => document.kind === "image")}
                                 streaming={isBusy && i === messages.length - 1}
                                 onAnswer={answerInput}
                                 busy={isBusy}

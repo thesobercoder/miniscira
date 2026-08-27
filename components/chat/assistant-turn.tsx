@@ -364,6 +364,7 @@ type AssistantTurnProps = {
   activeArtifactId: string | null
   /** Lifecycle facts the eve reducer drops (failure, cancellation, compaction). */
   annotation?: TurnAnnotation
+  hasAttachments?: boolean
   /** Child-session parts per subagent callId, for the nested timeline. */
   childParts?: Record<string, readonly EveMessagePart[]>
 }
@@ -386,6 +387,7 @@ function turnPropsEqual(prev: AssistantTurnProps, next: AssistantTurnProps) {
     // Annotations arrive after the message settles (a failure lands with
     // turn.failed), so a settled turn must still re-render when they change.
     prev.annotation === next.annotation &&
+    prev.hasAttachments === next.hasAttachments &&
     prev.childParts === next.childParts &&
     Boolean(prev.onRetry) === Boolean(next.onRetry) &&
     Boolean(prev.onBranch) === Boolean(next.onBranch)
@@ -402,6 +404,7 @@ export const AssistantTurn = memo(function AssistantTurn({
   onOpenArtifact,
   activeArtifactId,
   annotation,
+  hasAttachments,
   childParts,
 }: AssistantTurnProps) {
   const { nodes, hasText } = renderBody(message, {
@@ -431,6 +434,7 @@ export const AssistantTurn = memo(function AssistantTurn({
           streaming={streaming}
           onRetry={onRetry}
           busy={busy}
+          hasAttachments={hasAttachments}
         />
         {/* Compaction is worth showing even mid-stream — it explains a sudden
             pause and any loss of earlier detail while the turn continues. */}

@@ -22,7 +22,7 @@ export default defineEval({
   async test(t) {
     const good = await t.send({
       message: "Reply with exactly: ROUTED",
-      clientContext: { chatModel: "anthropic/claude-sonnet-4.6" },
+      clientContext: { chatModel: "gpt-5.5" },
     })
     t.check(
       good.status,

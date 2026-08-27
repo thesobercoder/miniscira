@@ -74,11 +74,13 @@ export function TurnStatusNote({
   streaming,
   onRetry,
   busy,
+  hasAttachments,
 }: {
   annotation?: TurnAnnotation
   streaming: boolean
   onRetry?: (modelId?: string) => void
   busy?: boolean
+  hasAttachments?: boolean
 }) {
   if (!annotation || streaming) return null
 
@@ -103,6 +105,12 @@ export function TurnStatusNote({
       <RiRestartLine className="size-3.5" /> Retry
     </Button>
   ) : undefined
+  const photoFailure =
+    hasAttachments &&
+    failure &&
+    (failure.code.includes("1210") ||
+      failure.message.includes("图片") ||
+      failure.message.includes("not valid for encoding"))
 
   return (
     <div className="space-y-2">
@@ -111,9 +119,13 @@ export function TurnStatusNote({
       {failure && (
         <Note icon={RiErrorWarningLine} tone="danger" action={retry} live>
           <p className="font-medium">This turn failed</p>
-          <p className="text-destructive/80">{failure.message}</p>
+          <p className="text-destructive/80">
+            {photoFailure
+              ? "Your model couldn't process your photo this time. Try sending again."
+              : failure.message}
+          </p>
           <p className="font-mono text-[10px] text-destructive/60">
-            {failure.code}
+            {failure.code} {photoFailure ? failure.message : null}
           </p>
         </Note>
       )}
