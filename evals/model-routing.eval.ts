@@ -8,7 +8,7 @@ import { satisfies } from "eve/evals/expect"
  * still fail, and that only works when the two ids are distinct.
  */
 const GOOD_PICK =
-  process.env.EVAL_CHAT_MODEL ?? "gpt-5.5"
+  process.env.EVAL_CHAT_MODEL ?? "glm-5.3-flash"
 
 /**
  * `agent/agent.ts` resolves the per-turn model from a `chatModel` marker eve
