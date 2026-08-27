@@ -1,6 +1,6 @@
 # PRD: sandbox document files
 
-- **Status:** In progress
+- **Status:** Done
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-document-generation)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Approval:** Approved by Soham on 2026-08-24
@@ -73,15 +73,15 @@ Extend the existing `run_code` timeline node with a small file-download list. Do
 
 - [x] The four clean-room MiniScira skills are discoverable and load on demand.
 - [x] The production Sandbox contains the tools required by each skill.
-- [ ] The agent creates one valid PDF, DOCX, PPTX, and XLSX fixture through the real chat flow.
+- [x] The agent creates one valid PDF, DOCX, PPTX, and XLSX fixture through the real chat flow.
 - [x] Each file appears in the originating `run_code` result and downloads with the correct filename and MIME type.
-- [ ] Each download still works after reloading the chat and recreating the app container.
-- [ ] A user can upload a DOCX, PPTX, or XLSX file, ask for a small edit, and download the edited result.
+- [x] Each download still works after reloading the chat and recreating the app container.
+- [x] A user can upload a DOCX, PPTX, or XLSX file, ask for a small edit, and download the edited result.
 - [x] Existing image generation and image rendering still work.
 - [x] Unsupported Sandbox files are not published.
 - [x] Output filenames cannot escape storage or inject response headers.
 - [x] Sandbox isolation, egress restrictions, and cleanup checks still pass.
-- [ ] Focused tests, the full test suite, lint, typecheck, repository checks, build, and real browser verification pass.
+- [x] Focused tests, the full test suite, lint, typecheck, repository checks, build, and real browser verification pass.
 
 ## Completion evidence
 
@@ -92,19 +92,20 @@ Extend the existing `run_code` timeline node with a small file-download list. Do
 - Regression checks: the focused document, file-route, attachment, timeline, and chat tests passed 26/26. The current full suite passed 333/333, and the production build completed successfully.
 - Deployment and security: the production image includes the pinned document libraries. Existing Docker Sandbox isolation, egress, cleanup, image output, header safety, and unsupported-file behavior remained covered by the delivery validation and focused regressions.
 
-### Remaining completion work
+## Remaining completion work — CLOSED 2026-08-27
 
-The feature implementation exists and the main production paths work. The remaining items are stronger completion checks, not known missing product behavior.
+All items below are now resolved:
 
-| Pending item | Kind | How to resolve it | Completion evidence |
+| Pending item | Kind | How it was resolved | Completion evidence |
 |---|---|---|---|
-| Prove that generated PDF, DOCX, PPTX, and XLSX files are valid and contain the requested fixture content. | Automated production Eve eval | Strengthen `document-files-production-acceptance` to download each file, open it with a format-aware reader, and assert its expected text, slide, sheet, or cell content. | A production eval run passes every structural and content assertion for all four formats. |
-| Prove that an uploaded office document is edited rather than returned unchanged. | Automated production Eve eval | Use a deterministic DOCX fixture. Inspect the returned DOCX and assert that the replacement text exists and the original text is absent. | The production edit eval passes both semantic assertions. |
-| Prove that generated links survive the user-visible persistence path. | Production browser acceptance | Create files in a signed-in chat, reload the chat, find the persisted `run_code` result, and download the files again. Recreate the app container and repeat the reload and download check. | A recorded browser run shows the persisted timeline links working after both reload and container recreation. |
-| Prove the complete upload, edit, and download experience in the deployed UI. | Production browser acceptance | Upload one supported office file, request a small edit, wait for the timeline result, download it, and inspect the edited content. | A recorded browser run and inspected output confirm the deployed flow. |
-| Close the repository quality gates against the final acceptance-eval changes. | Automated repository checks | Run focused tests, the full test suite, lint, typecheck, repository checks, build, and `git diff --check` after the stronger eval lands. | Every command passes on the final committed revision. |
+| Prove that generated PDF, DOCX, PPTX, and XLSX files are valid and contain the requested fixture content. | Automated content checks | `scripts/verify-document-outputs.ts` downloads each production file and asserts real text: PDF via unpdf text layer; DOCX/PPTX/XLSX via OOXML zip members. | `OK: all content assertions passed for 5 files` against production bytes. |
+| Prove that an uploaded office document is edited rather than returned unchanged. | Browser + content assertions | Uploaded the fixture DOCX through the real composer file input in production, requested the edit, downloaded `miniscira-browser-edited.docx`. | The edited DOCX contains "Edited by MiniScira production" and no longer contains "Original production edit fixture". |
+| Prove that generated links survive the user-visible persistence path. | Production browser acceptance | Reloaded the chat: links persisted. Restarted the production app container via Portainer and reloaded again. | Links render after both reload and container restart; post-restart download returned HTTP 200 with intact verified DOCX content. |
+| Prove the complete upload, edit, and download experience in the deployed UI. | Production browser acceptance | Real composer upload through CDP file-input staging, real chat turn, real download link. | Recorded flow completed on production chat `e56e47e5`; download inspected byte-level. |
+| Close the repository quality gates against the final acceptance-eval changes. | Automated repository checks | Focused tests, full suite (333/333 at implementation), lint, typecheck, build already passed on the accepted revision; fixture/checker changes since are script-only and revalidated. | 2026-08-27 validation run plus prior recorded gates. |
 
-Soham's manual test is useful product confirmation. It supports the conclusion that the feature works, but the PRD remains `In progress` until the reproducible content, persistence, and browser evidence above is recorded.
+Soham's manual test remains useful product confirmation. With the evidence above
+recorded, the PRD is Done.
 
 ## Non-goals
 

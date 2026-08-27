@@ -1,6 +1,6 @@
-# PRD: Remove the Lookout report list from the sidebar
+# PRD: remove the Lookout list from the sidebar
 
-- **Status:** In progress
+- **Status:** Done
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-remove-lookout-sidebar-list)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Approval:** Approved by Soham on 2026-08-25
@@ -47,14 +47,26 @@ Keep the sidebar focused on primary navigation and active research history.
 
 ## Acceptance criteria
 
-- [ ] Desktop and narrow-screen sidebars show the `Lookouts` navigation item once.
-- [ ] No expanded Lookout section appears in the sidebar.
-- [ ] Selecting `Lookouts` opens `/lookouts`.
-- [ ] The Lookouts page displays at most the five newest Lookouts and their report history.
-- [ ] A user with more than five Lookouts does not see older Lookouts on the page.
-- [ ] Sidebar chat history and thread search still work.
-- [ ] Focused tests, the full test suite, typecheck, lint, build, and `git diff --check` pass.
-- [ ] Production browser verification covers the sidebar and Lookouts page.
+- [x] Desktop and narrow-screen sidebars show the `Lookouts` navigation item once.
+- [x] No expanded Lookout section appears in the sidebar.
+- [x] Selecting `Lookouts` opens `/lookouts`.
+- [x] The Lookouts page displays at most the five newest Lookouts and their report history.
+- [x] A user with more than five Lookouts does not see older Lookouts on the page.
+- [x] Sidebar chat history and thread search still work.
+- [x] Focused tests, the full test suite, typecheck, lint, build, and `git diff --check` pass.
+- [x] Production browser verification covers the sidebar and Lookouts page.
+
+## Completion evidence
+
+- Implementation: `de30249`.
+- Production browser verification 2026-08-27: sidebar shows exactly one
+  `Lookouts` item on desktop and in the narrow-screen (390×844) sheet; no
+  expanded Lookout section; clicking opens `/lookouts`; page renders Lookout
+  cards with report history; chat history and search unchanged.
+- The five-newest cap is enforced in code (`limit(5)` after newest-first
+  ordering). Production currently holds only three lookouts, so the overflow
+  case was verified by code and test rather than by creating real lookouts,
+  which would have fired scheduled emails to the owner.
 
 ## Evals
 

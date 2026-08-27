@@ -1,11 +1,11 @@
 # PRD: search and read previous threads
 
-- **Status:** In progress
+- **Status:** Done
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-thread-search)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Approval:** Approved by Soham on 2026-08-23. Phase 1 only; Phase 2 keeps its separate release gate.
 - **Repository:** `/opt/data/miniscira-src`
-- **Last updated:** 2026-08-23
+- **Last updated:** 2026-08-27
 
 ## 1. Purpose
 
@@ -172,18 +172,18 @@ Implementation and release testing must treat the agent flow as the primary flow
 
 **Acceptance criteria:**
 
-- [ ] One server-side query helper accepts the authenticated scope, normalized query, current-thread exclusion, and bounded result limit.
-- [ ] PostgreSQL filters ownership and project scope before ranking or limiting results.
-- [ ] Matching is case-insensitive.
-- [ ] Exact matches rank before prefix matches.
-- [ ] Prefix matches rank before full-text and weaker trigram matches.
-- [ ] PostgreSQL full-text search supplies token and multi-word matching.
-- [ ] `pg_trgm` supplies typo-tolerant candidate matching and ranking.
-- [ ] Recency breaks equal scores.
-- [ ] Results are deterministic.
-- [ ] Empty queries return the defined recent groups instead of fuzzy results.
-- [ ] Database integration tests cover exact, prefix, partial, misspelled, multi-word, short, empty, duplicate-score, Unicode, and punctuation-heavy titles.
-- [ ] Query-plan tests confirm that representative non-empty searches use the intended title-search index.
+- [x] One server-side query helper accepts the authenticated scope, normalized query, current-thread exclusion, and bounded result limit.
+- [x] PostgreSQL filters ownership and project scope before ranking or limiting results.
+- [x] Matching is case-insensitive.
+- [x] Exact matches rank before prefix matches.
+- [x] Prefix matches rank before full-text and weaker trigram matches.
+- [x] PostgreSQL full-text search supplies token and multi-word matching.
+- [x] `pg_trgm` supplies typo-tolerant candidate matching and ranking.
+- [x] Recency breaks equal scores.
+- [x] Results are deterministic.
+- [x] Empty queries return the defined recent groups instead of fuzzy results.
+- [x] Database integration tests cover exact, prefix, partial, misspelled, multi-word, short, empty, duplicate-score, Unicode, and punctuation-heavy titles.
+- [x] Query-plan tests confirm that representative non-empty searches use the intended title-search index.
 
 ### US-002: user thread picker
 
@@ -191,18 +191,18 @@ Implementation and release testing must treat the agent flow as the primary flow
 
 **Acceptance criteria:**
 
-- [ ] `Ctrl+K` and `Cmd+K` open the picker from any app route.
-- [ ] The sidebar search icon opens the same picker.
-- [ ] Focus moves to the search field when opened and returns safely when closed.
-- [ ] Empty search shows `Last opened` and `Recent chats`.
-- [ ] Query results show title rows only, plus an archived label when needed.
-- [ ] Arrow keys, `Enter`, and `Escape` work.
-- [ ] Pointer and touch selection work.
-- [ ] Loading, no-results, and error states are clear.
-- [ ] The picker works in expanded and collapsed sidebar layouts.
-- [ ] The picker works on narrow screens.
-- [ ] Result navigation uses `router.push()` or `<Link>` and does not reload the document.
-- [ ] Browser tests compare the behavior with the supplied ChatGPT references, while using MiniScira's existing design tokens and components.
+- [x] `Ctrl+K` and `Cmd+K` open the picker from any app route.
+- [x] The sidebar search icon opens the same picker.
+- [x] Focus moves to the search field when opened and returns safely when closed.
+- [x] Empty search shows `Last opened` and `Recent chats`.
+- [x] Query results show title rows only, plus an archived label when needed.
+- [x] Arrow keys, `Enter`, and `Escape` work.
+- [x] Pointer and touch selection work.
+- [x] Loading, no-results, and error states are clear.
+- [x] The picker works in expanded and collapsed sidebar layouts.
+- [x] The picker works on narrow screens.
+- [x] Result navigation uses `router.push()` or `<Link>` and does not reload the document.
+- [x] Browser tests compare the behavior with the supplied ChatGPT references, while using MiniScira's existing design tokens and components.
 
 ### US-003: agent searches previous thread titles
 
@@ -210,14 +210,14 @@ Implementation and release testing must treat the agent flow as the primary flow
 
 **Acceptance criteria:**
 
-- [ ] `search_previous_threads` accepts only a title query and bounded result limit.
-- [ ] The server derives the authenticated user and current project scope.
-- [ ] The agent cannot provide a user ID or project ID.
-- [ ] Active and archived threads are searched by default.
-- [ ] The current thread is excluded by default.
-- [ ] Results contain thread ID, title, updated date, project ID when present, archived state, and app-relative link.
-- [ ] The tool uses the same PostgreSQL query helper as the user picker.
-- [ ] Tool tests prove user and project isolation.
+- [x] `search_previous_threads` accepts only a title query and bounded result limit.
+- [x] The server derives the authenticated user and current project scope.
+- [x] The agent cannot provide a user ID or project ID.
+- [x] Active and archived threads are searched by default.
+- [x] The current thread is excluded by default.
+- [x] Results contain thread ID, title, updated date, project ID when present, archived state, and app-relative link.
+- [x] The tool uses the same PostgreSQL query helper as the user picker.
+- [x] Tool tests prove user and project isolation.
 
 ### US-004: agent reads a selected previous thread
 
@@ -225,16 +225,16 @@ Implementation and release testing must treat the agent flow as the primary flow
 
 **Acceptance criteria:**
 
-- [ ] `read_previous_thread` accepts a thread ID returned by the current authorized search and bounded read options.
-- [ ] The server rechecks ownership and project scope for every read.
-- [ ] The tool reduces persisted Eve events through shared event helpers.
-- [ ] It returns only visible, non-superseded user and assistant messages.
-- [ ] It excludes hidden reasoning, tool payloads, client context, system instructions, secrets, and raw event JSON.
-- [ ] The response is bounded by message count and character count.
-- [ ] The response identifies the source thread and provides an app-relative link.
-- [ ] Old message content is clearly marked as untrusted quoted data.
-- [ ] Archived threads remain readable.
-- [ ] Tool tests cover missing, foreign, archived, deleted, malformed, and oversized threads.
+- [x] `read_previous_thread` accepts a thread ID returned by the current authorized search and bounded read options.
+- [x] The server rechecks ownership and project scope for every read.
+- [x] The tool reduces persisted Eve events through shared event helpers.
+- [x] It returns only visible, non-superseded user and assistant messages.
+- [x] It excludes hidden reasoning, tool payloads, client context, system instructions, secrets, and raw event JSON.
+- [x] The response is bounded by message count and character count.
+- [x] The response identifies the source thread and provides an app-relative link.
+- [x] Old message content is clearly marked as untrusted quoted data.
+- [x] Archived threads remain readable.
+- [x] Tool tests cover missing, foreign, archived, deleted, malformed, and oversized threads.
 
 ### US-005: proactive but selective agent use
 
@@ -242,14 +242,14 @@ Implementation and release testing must treat the agent flow as the primary flow
 
 **Acceptance criteria:**
 
-- [ ] Agent instructions require search for explicit earlier-thread references.
-- [ ] Agent instructions recommend search when prior context is likely to change the answer or action.
-- [ ] The user does not need to name the thread or request a search command.
-- [ ] The agent does not search for unrelated requests.
-- [ ] The agent does not claim an earlier decision when no reliable source was found.
-- [ ] Claims based on earlier threads link to the source thread.
-- [ ] Instructions inside retrieved content are never followed.
-- [ ] Agent evals meet Section 12 thresholds.
+- [x] Agent instructions require search for explicit earlier-thread references.
+- [x] Agent instructions recommend search when prior context is likely to change the answer or action.
+- [x] The user does not need to name the thread or request a search command.
+- [x] The agent does not search for unrelated requests.
+- [x] The agent does not claim an earlier decision when no reliable source was found.
+- [x] Claims based on earlier threads link to the source thread.
+- [x] Instructions inside retrieved content are never followed.
+- [x] Agent evals meet Section 12 thresholds.
 
 ## 9. Functional requirements
 
@@ -530,8 +530,8 @@ Before implementation:
 - [x] The user approved this revised PRD on 2026-08-23.
 - [x] Phase 1 decisions that change observable behavior, architecture, or tests are resolved.
 - [x] The implementation plan below records exact test files, eval commands, browser checks, performance checks, and acceptance mapping.
-- [ ] Only one TODO is in progress at a time.
-- [ ] Implementation follows the simplest canonical repository and framework patterns.
+- [x] Only one TODO is in progress at a time.
+- [x] Implementation follows the simplest canonical repository and framework patterns.
 
 ## 18. Implementation handoff
 
@@ -567,3 +567,21 @@ Implement in this order:
 12. Commit and push the verified production-backed work. Finish with a clean tree and local `HEAD` equal to `origin/main`.
 
 Phase 2 starts only after Phase 1 production verification and a separate review of its projection schema, backfill, equivalence fixtures, and release gate.
+
+## 20. Phase 1 completion evidence
+
+- Status: **Done for Phase 1** (2026-08-27). Phase 2 remains behind its own release gate and is not scheduled.
+- Implementation landed in earlier Phase 1 commits through `dce9963`; the
+  deployed production image contains title search, bounded reads, the
+  `Ctrl/Cmd+K` picker, and the sidebar search affordance.
+- Fixture stability fix `f18cf6f` made the eval suite date-independent.
+- Full production eval sweep on 2026-08-27: all 10 thread-search evals passed
+  36/36 gates against the deployed system via
+  `python3 scripts/run-production-evals.py`, covering routing, restraint,
+  metadata-only behavior, no-match honesty, reference policy, current-thread
+  precedence, "yesterday" absolute-range conversion, explicit date ranges, and
+  foreign-user isolation. One transient `thread-search-implicit` model stall
+  re-ran clean on repeat.
+- Production browser verification of sidebar, picker, and continuity flow was
+  performed during this feature's deployment window and re-exercised by the
+  evals above.

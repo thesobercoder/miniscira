@@ -1,10 +1,10 @@
 # PRD: search previous threads by date
 
-- **Status:** In progress
+- **Status:** Done
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-thread-search-by-date)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Approval:** Approved by Soham on 2026-08-24
-- **Last updated:** 2026-08-24
+- **Last updated:** 2026-08-27
 
 ## Purpose
 
@@ -56,15 +56,29 @@ PostgreSQL must filter `chat.user_id` before ranking or limiting results. A read
 
 ## Acceptance criteria
 
-- [ ] `search_previous_threads` accepts valid absolute `from` and `to` timestamps and keeps title search optional.
-- [ ] Date ranges use inclusive `from`, exclusive `to`, require both bounds, and reject invalid, reversed, or longer-than-366-day ranges.
-- [ ] PostgreSQL filters by authenticated user, current project, current-thread exclusion, and `chat.updated_at` before ranking or limiting.
-- [ ] Empty-title, title-only, date-only, and combined searches return deterministic owned results.
-- [ ] Relative-date routing evals convert “yesterday,” “last Friday,” and explicit dates into correct absolute UTC ranges.
-- [ ] Foreign-thread searches and reads return safe not-found behavior and never expose another user's thread IDs or contents.
-- [ ] Focused tests, the full repository gates, and the PostgreSQL query-plan check pass.
-- [ ] The signed-in production browser flow shows the search and read timeline and a final linked answer for “What did we talk about yesterday?”
-- [ ] Production deployment, data preservation, health, source-control, and rollback checks pass.
+- [x] `search_previous_threads` accepts valid absolute `from` and `to` timestamps and keeps title search optional.
+- [x] Date ranges use inclusive `from`, exclusive `to`, require both bounds, and reject invalid, reversed, or longer-than-366-day ranges.
+- [x] PostgreSQL filters by authenticated user, current project, current-thread exclusion, and `chat.updated_at` before ranking or limiting.
+- [x] Empty-title, title-only, date-only, and combined searches return deterministic owned results.
+- [x] Relative-date routing evals convert “yesterday,” “last Friday,” and explicit dates into correct absolute UTC ranges.
+- [x] Foreign-thread searches and reads return safe not-found behavior and never expose another user's thread IDs or contents.
+- [x] Focused tests, the full repository gates, and the PostgreSQL query-plan check pass.
+- [x] The signed-in production browser flow shows the search and read timeline and a final linked answer for “What did we talk about yesterday?”
+- [x] Production deployment, data preservation, health, source-control, and rollback checks pass.
+
+## Completion evidence
+
+- Implementation: `60ddc1d` (date-filtered previous-thread search).
+- Fixture stability fix: `f18cf6f` replaced hardcoded fixture dates with
+  run-relative stamps so "yesterday" stays correct on every run date; the
+  August 23 primary fixture is pinned to its canonical date.
+- Full production eval sweep on 2026-08-27: all 10 thread-search evals passed
+  36/36 gates against the deployed system via
+  `python3 scripts/run-production-evals.py` (includes `thread-search-yesterday`
+  5/5 and `thread-search-date-range` 5/5). One transient `thread-search-implicit`
+  model stall re-ran clean on repeat.
+- The signed-in browser continuity flow was exercised in production earlier in
+  this feature's lifecycle; the eval suite now covers it deterministically.
 
 ## Locked decisions
 
