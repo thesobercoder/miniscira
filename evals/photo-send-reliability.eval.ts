@@ -15,7 +15,7 @@ export default defineEval({
     const turn = await t.sendFile(
       "A photo is attached. Reply with the exact code printed in the image and its dominant color.",
       PHOTO,
-      "image/jpeg",
+      "image/jpeg"
     )
     turn.expectOk()
     const reply = (t.reply ?? "").toLowerCase()

@@ -1,7 +1,8 @@
 const MAX_DIMENSION = 1600
 const SMALL_JPEG_BYTES = 300_000
 const JPEG_QUALITY = 0.85
-const KNOWN_IMAGE_EXTENSION = /\.(?:avif|bmp|gif|heic|heif|jpe?g|png|tiff?|webp)$/i
+const KNOWN_IMAGE_EXTENSION =
+  /\.(?:avif|bmp|gif|heic|heif|jpe?g|png|tiff?|webp)$/i
 
 export function renameToJpg(filename: string): string {
   return KNOWN_IMAGE_EXTENSION.test(filename)

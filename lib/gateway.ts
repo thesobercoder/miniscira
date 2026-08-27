@@ -15,7 +15,10 @@ const WIRE_LOG = process.env.MINISCIRA_WIRE_LOG === "1"
 function errorDetails(error: unknown) {
   return {
     errorName: error instanceof Error ? error.name : typeof error,
-    message: String(error instanceof Error ? error.message : error).slice(0, 200),
+    message: String(error instanceof Error ? error.message : error).slice(
+      0,
+      200
+    ),
   }
 }
 
@@ -23,7 +26,9 @@ function shouldRetry(error: unknown) {
   return error instanceof Error && error.name === "AI_APICallError"
 }
 
-export function withOneRetry<T extends { readonly modelId: string }>(model: T): T {
+export function withOneRetry<T extends { readonly modelId: string }>(
+  model: T
+): T {
   return new Proxy(model, {
     get(target, property) {
       const value = Reflect.get(target, property, target)
@@ -36,7 +41,9 @@ export function withOneRetry<T extends { readonly modelId: string }>(model: T): 
           try {
             const result = await Reflect.apply(value, target, args)
             if (WIRE_LOG)
-              console.debug(JSON.stringify({ modelId: target.modelId, ok: true }))
+              console.debug(
+                JSON.stringify({ modelId: target.modelId, ok: true })
+              )
             return result
           } catch (error) {
             if (WIRE_LOG)
