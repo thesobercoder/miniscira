@@ -443,6 +443,12 @@ After deployment, verify all of the following:
 
 - Production Stack ID is `30`.
 - Always fetch and preserve the existing `Env` array.
+- Only update through `/opt/data/bin/portainerctl` (`update-stack`), never a
+  hand-rolled PUT. A raw request with the wrong route or body shape can write
+  garbage into Portainer's on-disk stack env; from then on every update fails
+  to parse that file before it can rewrite it, so the only fix is deleting and
+  recreating the stack record. This happened on 2026-08-27 and cost a full
+  outage plus manual container reconstruction.
 - Back up the exact current `StackFileContent`, redacted Env names, running image
   IDs, volume names, and data counts before update.
 - Use `PullImage: false` for locally built tags.
