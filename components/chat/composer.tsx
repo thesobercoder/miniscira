@@ -417,11 +417,22 @@ export const Composer = memo(function Composer({
   // Sending with an upload in flight would leave that file behind, so the
   // button waits for it rather than silently dropping the attachment.
   const canSend = input.trim().length > 0 && !uploading
+  // Sending should collapse the phone software keyboard so the answer is
+  // readable instead of hiding behind it. Coarse pointers only: on desktop a
+  // blur would force a click before typing a follow-up.
+  const dismissKeyboardOnSend = () => {
+    if (!window.matchMedia("(pointer: coarse)").matches) return
+    ;(document.activeElement as HTMLElement | null)?.blur()
+  }
+
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault()
-        if (canSend) onSubmit()
+        if (canSend) {
+          dismissKeyboardOnSend()
+          onSubmit()
+        }
       }}
       onDragEnter={(e) => {
         if (!e.dataTransfer.types.includes("Files")) return
@@ -528,7 +539,10 @@ export const Composer = memo(function Composer({
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault()
-                if (canSend && !isBusy) onSubmit()
+                if (canSend && !isBusy) {
+                  dismissKeyboardOnSend()
+                  onSubmit()
+                }
               }
             }}
             aria-label="Ask a research question"
