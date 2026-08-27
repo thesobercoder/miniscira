@@ -2,6 +2,15 @@ import { defineEval } from "eve/evals"
 import { satisfies } from "eve/evals/expect"
 
 /**
+ * The valid model pick under test. Env-configurable (12 factor): swap models
+ * without touching code. Must differ from the compiled default — if the pick
+ * were silently dropped and the fallback answered instead, this eval must
+ * still fail, and that only works when the two ids are distinct.
+ */
+const GOOD_PICK =
+  process.env.EVAL_CHAT_MODEL ?? "gpt-5.5"
+
+/**
  * `agent/agent.ts` resolves the per-turn model from a `chatModel` marker eve
  * serializes into a user message from clientContext.
  *
@@ -20,9 +29,15 @@ export default defineEval({
   description:
     "A model pick in clientContext is honoured — a valid one answers, an unusable one fails loudly instead of falling back.",
   async test(t) {
+    const fallback = (await import("@/lib/models")).DEFAULT_CHAT_MODEL
+    if (GOOD_PICK === fallback) {
+      t.skip(
+        `EVAL_CHAT_MODEL "${GOOD_PICK}" equals the compiled default — the routing distinction is untestable`
+      )
+    }
     const good = await t.send({
       message: "Reply with exactly: ROUTED",
-      clientContext: { chatModel: "gpt-5.5" },
+      clientContext: { chatModel: GOOD_PICK },
     })
     t.check(
       good.status,
