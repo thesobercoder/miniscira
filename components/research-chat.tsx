@@ -388,7 +388,7 @@ export function ResearchChat({
     }
     setChatId(id)
     if (!replacement && createdRef.current) {
-      const bound = await persistTurnBinding(attached, turnIndex)
+      const bound = await persistTurnBinding(attached, null)
       if (!bound) {
         abandonTurn()
         setInput((current) => current || text)

@@ -281,12 +281,12 @@ export function useChatAttachments({
   }, [])
 
   const persistTurnBinding = useCallback(
-    async (attached: readonly UploadedDoc[], turnIndex: number) => {
+    async (
+      attached: readonly UploadedDoc[],
+      turnIndex: number | null
+    ) => {
       const id = currentChatId()
       if (attached.length === 0 || !id) return true
-      // A failed binding means the attachments render on this turn now but not
-      // after a reload — worth telling the reader, since re-attaching is the
-      // only fix and nothing else would reveal it.
       return await mutateOrToast("/api/documents", {
         method: "PATCH",
         body: {
@@ -301,7 +301,6 @@ export function useChatAttachments({
     [currentChatId]
   )
 
-  /** Move a retried question's existing attachment bindings to its new turn. */
   const rebindTurnAttachments = useCallback(
     async (attached: readonly UploadedDoc[], turnIndex: number) => {
       if (!(await persistTurnBinding(attached, turnIndex))) return false
