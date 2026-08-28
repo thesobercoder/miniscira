@@ -15,5 +15,5 @@ Use `run_code`. The sandbox already has `yt-dlp`. Do not install packages during
 
    For another language, pass it in `--sub-langs` (manual captions win over auto-generated for the same language).
 3. Read `/workspace/yt.*.vtt` and use its spoken content.
-4. Cite moments as `[mm:ss]` in your answer, taken from real cue timestamps.
+4. Every answer that reports what the video says must include at least one `[mm:ss]` moment taken from a real cue timestamp in the `.vtt`.
 5. No `.vtt` file means the video has no captions. Say so plainly. Never invent spoken content.
