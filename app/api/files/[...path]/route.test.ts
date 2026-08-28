@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import crypto from "node:crypto"
 import { promises as fs } from "node:fs"
 import os from "node:os"
@@ -8,6 +8,10 @@ import { GET } from "./route"
 
 const originalStorageDir = process.env.LOCAL_STORAGE_DIR
 const temporaryDirectories: string[] = []
+
+beforeEach(() => {
+  process.env.LOCAL_STORAGE_DIR = originalStorageDir
+})
 
 afterEach(async () => {
   process.env.LOCAL_STORAGE_DIR = originalStorageDir
