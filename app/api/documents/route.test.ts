@@ -44,11 +44,29 @@ mock.module("@/lib/api-auth", () => ({
     ) =>
     (request: NextRequest) =>
       handler(request, { userId: "user-1" }),
+  authedWithParams:
+    <P>(
+      handler: (
+        request: NextRequest,
+        context: { userId: string; params: P }
+      ) => Promise<Response>
+    ) =>
+    async (request: NextRequest, segment: { params: Promise<P> }) =>
+      handler(request, {
+        userId: "user-1",
+        params: await segment.params,
+      }),
+  forbidden: () => Response.json({ error: "Forbidden" }, { status: 403 }),
   notFound: () => Response.json({ error: "Not found" }, { status: 404 }),
 }))
 mock.module("@/lib/api-ownership", () => ({
   ownedChat: async () => ({ id: "chat-1" }),
+  ownedLookout: async () => ({ id: "lookout-1" }),
+  ownedMcpServer: async () => ({ id: "mcp-1" }),
   ownedProject: async () => ({ id: "project-1" }),
+  requireOwnedChat: async () => ({
+    chat: { id: "chat-1", userId: "user-1" },
+  }),
 }))
 mock.module("@/lib/db", () => ({ db }))
 mock.module("@/lib/local-blob", () => ({ put }))

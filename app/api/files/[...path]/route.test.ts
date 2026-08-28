@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import crypto from "node:crypto"
 import { promises as fs } from "node:fs"
 import os from "node:os"
 import path from "node:path"
 
-import { put } from "@/lib/local-blob"
 import { GET } from "./route"
 
 const originalStorageDir = process.env.LOCAL_STORAGE_DIR
@@ -29,13 +29,9 @@ async function putFile(name: string): Promise<URL> {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "miniscira-files-"))
   temporaryDirectories.push(directory)
   process.env.LOCAL_STORAGE_DIR = directory
-  return new URL(
-    (
-      await put(name, new TextEncoder().encode("fixture"), {
-        addRandomSuffix: true,
-      })
-    ).url
-  )
+  const stored = `${crypto.randomUUID()}-${path.basename(name)}`
+  await fs.writeFile(path.join(directory, stored), "fixture")
+  return new URL(`http://localhost/api/files/${encodeURIComponent(stored)}`)
 }
 
 describe("file route", () => {
