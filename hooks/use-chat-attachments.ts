@@ -303,13 +303,14 @@ export function useChatAttachments({
 
   /** Move a retried question's existing attachment bindings to its new turn. */
   const rebindTurnAttachments = useCallback(
-    (attached: readonly UploadedDoc[], turnIndex: number) => {
-      if (attached.length === 0) return
-      setAttachmentsByTurn((prev) => ({
-        ...prev,
-        [turnIndex]: [...attached],
-      }))
-      persistTurnBinding(attached, turnIndex)
+    async (attached: readonly UploadedDoc[], turnIndex: number) => {
+      if (!(await persistTurnBinding(attached, turnIndex))) return false
+      if (attached.length > 0)
+        setAttachmentsByTurn((prev) => ({
+          ...prev,
+          [turnIndex]: [...attached],
+        }))
+      return true
     },
     [persistTurnBinding]
   )

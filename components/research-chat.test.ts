@@ -3,6 +3,7 @@ import type { EveMessage, EveMessagePart } from "eve/client"
 
 import {
   acceptAttachmentTurn,
+  acceptReplacementTurn,
   modelFileParts,
   selectChildParts,
 } from "@/components/research-chat"
@@ -46,6 +47,46 @@ describe("attachment acceptance wiring", () => {
       })
     ).toBe(false)
     expect(accepted).toBe(false)
+  })
+})
+
+describe("replacement attachment acceptance", () => {
+  test("supersedes the old turn only after rebinding succeeds", async () => {
+    const calls: string[] = []
+    const accepted = await acceptReplacementTurn({
+      attachments: [
+        { id: "photo-1", filename: "photo.jpg", status: "ready" },
+      ],
+      turnIndex: 3,
+      ids: ["old-question", "old-answer"],
+      rebind: async (attachments, turnIndex) => {
+        calls.push(`bind:${attachments[0]?.id}:${turnIndex}`)
+        return true
+      },
+      commitSupersede: (ids) => calls.push(`supersede:${ids.join(",")}`),
+    })
+
+    expect(accepted).toBe(true)
+    expect(calls).toEqual([
+      "bind:photo-1:3",
+      "supersede:old-question,old-answer",
+    ])
+  })
+
+  test("keeps the old turn when rebinding fails", async () => {
+    let superseded = false
+    const accepted = await acceptReplacementTurn({
+      attachments: [],
+      turnIndex: 3,
+      ids: ["old-question"],
+      rebind: async () => false,
+      commitSupersede: () => {
+        superseded = true
+      },
+    })
+
+    expect(accepted).toBe(false)
+    expect(superseded).toBe(false)
   })
 })
 

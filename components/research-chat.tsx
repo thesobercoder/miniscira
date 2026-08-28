@@ -137,6 +137,27 @@ export async function acceptAttachmentTurn({
   return true
 }
 
+export async function acceptReplacementTurn({
+  attachments,
+  turnIndex,
+  ids,
+  rebind,
+  commitSupersede,
+}: {
+  attachments: readonly UploadedDoc[]
+  turnIndex: number
+  ids: readonly string[]
+  rebind: (
+    attachments: readonly UploadedDoc[],
+    turnIndex: number
+  ) => Promise<boolean>
+  commitSupersede: (ids: readonly string[]) => void
+}): Promise<boolean> {
+  if (!(await rebind(attachments, turnIndex))) return false
+  commitSupersede(ids)
+  return true
+}
+
 /**
  * The entries of `childParts` this message actually renders: the ones keyed by
  * a tool call id in its own parts, which is exactly what
@@ -466,9 +487,13 @@ export function ResearchChat({
       onAccepted: async () => {
         if (accepted) return
         if (replacement) {
-          accepted = true
-          commitSupersede(replacement.ids)
-          rebindTurnAttachments(replacement.attachments, replacement.turnIndex)
+          accepted = await acceptReplacementTurn({
+            attachments: replacement.attachments,
+            turnIndex: replacement.turnIndex,
+            ids: replacement.ids,
+            rebind: rebindTurnAttachments,
+            commitSupersede,
+          })
         } else {
           accepted = await acceptAttachmentTurn({
             attachments: attached,
