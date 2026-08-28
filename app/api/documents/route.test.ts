@@ -82,6 +82,18 @@ function upload(file: File): NextRequest {
   })
 }
 
+function observableUpload(file: File): NextRequest {
+  const request = new NextRequest("http://localhost/api/documents", {
+    method: "POST",
+  })
+  Object.defineProperty(request, "formData", {
+    value: async () => ({
+      get: (name: string) => (name === "file" ? file : null),
+    }),
+  })
+  return request
+}
+
 beforeEach(() => {
   insertedValues.length = 0
   updatedValues.length = 0
@@ -91,6 +103,25 @@ beforeEach(() => {
 })
 
 describe("POST /api/documents", () => {
+  test("reads the upload once and passes that buffer to storage", async () => {
+    const bytes = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+      0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52,
+      0, 0, 0, 1, 0, 0, 0, 1,
+      8, 6, 0, 0, 0,
+      0, 0, 0, 0,
+    ])
+    const buffer = bytes.buffer
+    const file = new File([bytes], "camera.png", { type: "image/png" })
+    const arrayBuffer = mock(async () => buffer)
+    Object.defineProperty(file, "arrayBuffer", { value: arrayBuffer })
+    const response = await POST(observableUpload(file))
+
+    expect(response.status).toBe(201)
+    expect(arrayBuffer).toHaveBeenCalledTimes(1)
+    expect(put.mock.calls[0]?.[1]).toBe(buffer)
+  })
+
   test("rejects malformed claimed-image bytes before storage or persistence", async () => {
     const response = await POST(
       upload(new File(["not an image"], "camera.jpg", { type: "image/jpeg" }))
