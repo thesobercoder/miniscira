@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { APICallError } from "@ai-sdk/provider"
+import { generateText } from "ai"
 
 import { summarizeLanguageModelRequest, withOneRetry } from "@/lib/gateway"
 
@@ -15,6 +16,31 @@ function apiError(isRetryable: boolean) {
 }
 
 describe("withOneRetry", () => {
+  test("limits the real AI SDK to two underlying attempts", async () => {
+    let calls = 0
+    const model = withOneRetry({
+      specificationVersion: "v4" as const,
+      provider: "test",
+      modelId: "test-model",
+      supportedUrls: {},
+      async doGenerate() {
+        calls += 1
+        throw apiError(true)
+      },
+      async doStream() {
+        throw new Error("not used")
+      },
+    })
+
+    await expect(generateText({ model, prompt: "private" })).rejects.toMatchObject(
+      {
+        name: "AI_APICallError",
+        isRetryable: false,
+      }
+    )
+    expect(calls).toBe(2)
+  })
+
   test("retries an API call error once", async () => {
     let calls = 0
     const model = withOneRetry({
@@ -186,6 +212,24 @@ describe("wire request metadata", () => {
         modelId: "test-model",
         ...summarizeLanguageModelRequest({ prompt }),
       })
+
+      for (const entry of [firstEntry, secondEntry]) {
+        expect(Object.keys(entry).sort()).toEqual([
+          "attempt",
+          "files",
+          "modelId",
+          "partTypeCounts",
+          "requestId",
+          "roleCounts",
+        ])
+        for (const file of entry.files) {
+          expect(Object.keys(file).sort()).toEqual(
+            file.byteSize === undefined
+              ? ["mediaType"]
+              : ["byteSize", "mediaType"]
+          )
+        }
+      }
 
       const combinedLogs = debugEntries.join("\n")
       for (const privateValue of [
