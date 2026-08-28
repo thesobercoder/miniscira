@@ -84,18 +84,6 @@ export const POST = authed(async (request, { userId }) => {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 })
   }
-  const kind = isClaimedImageUpload(file.type, file.name)
-    ? "image"
-    : attachmentKind(file.type, file.name)
-  if (!kind) {
-    return NextResponse.json(
-      {
-        error:
-          "Unsupported file type. Upload an image, PDF, DOCX, PPTX, XLSX, or text file.",
-      },
-      { status: 415 }
-    )
-  }
   if (file.size > MAX_UPLOAD_BYTES) {
     return NextResponse.json(
       { error: "File is too large (max 50 MB)." },
@@ -128,14 +116,17 @@ export const POST = authed(async (request, { userId }) => {
   if (chatId && !ownsChat) return notFound()
   if (projectId && !ownsProject) return notFound()
 
-  if (kind === "image") {
-    const detectedMimeType = detectImageMediaType(buffer)
-    if (!detectedMimeType) {
-      return NextResponse.json(
-        { error: "The uploaded file is not a supported image." },
-        { status: 415 }
-      )
-    }
+  const detectedMimeType = detectImageMediaType(buffer)
+  const kind = detectedMimeType
+    ? "image"
+    : attachmentKind(file.type, file.name)
+  if (!kind) {
+    const error = isClaimedImageUpload(file.type, file.name)
+      ? "The uploaded file is not a supported image."
+      : "Unsupported file type. Upload an image, PDF, DOCX, PPTX, XLSX, or text file."
+    return NextResponse.json({ error }, { status: 415 })
+  }
+  if (detectedMimeType) {
     mimeType = detectedMimeType
   }
 

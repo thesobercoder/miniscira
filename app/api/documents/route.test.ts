@@ -88,7 +88,13 @@ describe("POST /api/documents", () => {
   })
 
   test("stores valid mislabeled PNG bytes with the detected media type", async () => {
-    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+    const png = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+      0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52,
+      0, 0, 0, 1, 0, 0, 0, 1,
+      8, 6, 0, 0, 0,
+      0, 0, 0, 0,
+    ])
     const response = await POST(
       upload(new File([png], "camera.jpg", { type: "image/jpeg" }))
     )
@@ -113,6 +119,28 @@ describe("POST /api/documents", () => {
         status: "ready",
       }),
     })
+  })
+
+  test("accepts valid image bytes without a browser image hint", async () => {
+    const png = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+      0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52,
+      0, 0, 0, 1, 0, 0, 0, 1,
+      8, 6, 0, 0, 0,
+      0, 0, 0, 0,
+    ])
+    const response = await POST(
+      upload(new File([png], "upload.bin", { type: "application/octet-stream" }))
+    )
+
+    expect(response.status).toBe(201)
+    expect(put.mock.calls[0]?.[2]).toEqual({
+      addRandomSuffix: true,
+      contentType: "image/png",
+    })
+    expect(insertedValues).toEqual([
+      expect.objectContaining({ kind: "image", mimeType: "image/png" }),
+    ])
   })
 
   test("keeps the non-image document upload path unchanged", async () => {

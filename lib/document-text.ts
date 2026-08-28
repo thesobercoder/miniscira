@@ -1,7 +1,6 @@
 import { classifyPdf, processPdf } from "@firecrawl/pdf-inspector"
 import { extractText, getDocumentProxy } from "unpdf"
 import { storedDocumentMimeType } from "@/lib/document-files"
-import { isClaimedImageUpload } from "@/lib/image-signature"
 
 /**
  * Turning an uploaded file into indexable text.
@@ -24,12 +23,11 @@ export function storedMimeType(mimeType: string, filename: string): string {
   )
 }
 
-/** Classify an upload: "image" → vision input, "document" → parsed & embedded, null → unsupported. */
+/** Classify a non-image upload as a parsed or model-editable document. */
 export function attachmentKind(
   mimeType: string,
   filename: string
-): "image" | "document" | null {
-  if (isClaimedImageUpload(mimeType, filename)) return "image"
+): "document" | null {
   return kindForFile(mimeType, filename) ? "document" : null
 }
 
