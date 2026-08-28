@@ -115,7 +115,6 @@ async function buildFileParts(docs: UploadedDoc[]) {
   )
 }
 
-/** @public Regression seam for attachment payload tests. */
 export const modelFileParts = buildFileParts
 
 export async function acceptAttachmentTurn({

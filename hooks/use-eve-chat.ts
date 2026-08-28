@@ -233,7 +233,6 @@ export function useEveChat({
             ingest(event)
           },
           signal: abortRef.current?.signal,
-          reconnectPolicy: EVE_LONG_RUNNING_STREAM_POLICY,
         })
         settled = consumed.settled
         received = consumed.received

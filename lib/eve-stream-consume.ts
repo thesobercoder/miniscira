@@ -1,5 +1,3 @@
-import type { StreamReconnectPolicy } from "eve/client"
-
 /**
  * Outer reconnect loop for a durable Eve turn.
  *
@@ -14,15 +12,12 @@ export async function consumeDurableTurn<T>({
   isBoundary,
   onEvent,
   signal,
-  reconnectPolicy: _reconnectPolicy,
 }: {
   initialStream: AsyncIterable<T>
   reopen: () => AsyncIterable<T>
   isBoundary: (event: T) => boolean
   onEvent: (event: T) => void | Promise<void>
   signal?: AbortSignal
-  /** Documents that each iterator is expected to use this SDK policy. */
-  reconnectPolicy?: StreamReconnectPolicy
 }): Promise<{ settled: boolean; received: number }> {
   let stream = initialStream
   let received = 0

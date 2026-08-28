@@ -98,7 +98,7 @@ export function useChatAttachments({
   initialStagedDocuments = [],
   currentChatId,
 }: Options) {
-  // Staged in the composer for the next message; cleared when Eve accepts it.
+  // Staged in the composer until Eve accepts the turn and durable binding succeeds.
   const [documents, setDocuments] = useState<UploadedDoc[]>(() =>
     initialStagedDocuments.filter((document) => document.status === "ready")
   )
@@ -294,8 +294,7 @@ export function useChatAttachments({
           chatId: id,
           messageIndex: turnIndex,
         },
-        errorMessage:
-          "Attachments may not stay on this message after a reload.",
+        errorMessage: "Couldn't attach these files to the message.",
       })
     },
     [currentChatId]
