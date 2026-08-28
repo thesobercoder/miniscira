@@ -1,6 +1,7 @@
 import { classifyPdf, processPdf } from "@firecrawl/pdf-inspector"
 import { extractText, getDocumentProxy } from "unpdf"
 import { storedDocumentMimeType } from "@/lib/document-files"
+import { isClaimedImageUpload } from "@/lib/image-signature"
 
 /**
  * Turning an uploaded file into indexable text.
@@ -28,13 +29,7 @@ export function attachmentKind(
   mimeType: string,
   filename: string
 ): "image" | "document" | null {
-  const name = filename.toLowerCase()
-  if (
-    mimeType.startsWith("image/") ||
-    /\.(png|jpe?g|webp|gif|avif|heic|bmp)$/.test(name)
-  ) {
-    return "image"
-  }
+  if (isClaimedImageUpload(mimeType, filename)) return "image"
   return kindForFile(mimeType, filename) ? "document" : null
 }
 

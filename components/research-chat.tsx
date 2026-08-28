@@ -118,6 +118,25 @@ async function buildFileParts(docs: UploadedDoc[]) {
 /** @public Regression seam for attachment payload tests. */
 export const modelFileParts = buildFileParts
 
+export async function acceptAttachmentTurn({
+  attachments,
+  turnIndex,
+  acceptSnapshot,
+  persistBinding,
+}: {
+  attachments: readonly UploadedDoc[]
+  turnIndex: number
+  acceptSnapshot: () => void
+  persistBinding: (
+    attachments: readonly UploadedDoc[],
+    turnIndex: number
+  ) => Promise<boolean>
+}) {
+  if (!(await persistBinding(attachments, turnIndex))) return false
+  acceptSnapshot()
+  return true
+}
+
 /**
  * The entries of `childParts` this message actually renders: the ones keyed by
  * a tool call id in its own parts, which is exactly what
@@ -230,7 +249,7 @@ export function ResearchChat({
     uploadFiles,
     retryUpload,
     removeDocument,
-    attachToTurn,
+    snapshotAttachments,
     persistTurnBinding,
     rebindTurnAttachments,
   } = useChatAttachments({
@@ -327,12 +346,14 @@ export function ResearchChat({
       if (previousSession) await restoreSession(previousSession)
     }
 
-    // Staged attachments ride along with THIS message.
     const turnIndex =
       replacement?.turnIndex ?? messages.filter((m) => m.role === "user").length
+    const attachmentSnapshot = replacement
+      ? null
+      : snapshotAttachments(turnIndex)
     const attached = replacement
       ? [...replacement.attachments]
-      : attachToTurn(turnIndex)
+      : (attachmentSnapshot?.attachments ?? [])
 
     const id = await ensureChat(text)
     if (!id) {
@@ -345,7 +366,7 @@ export function ResearchChat({
       return false
     }
     setChatId(id)
-    if (!replacement) {
+    if (!replacement && createdRef.current) {
       const bound = await persistTurnBinding(attached, turnIndex)
       if (!bound) {
         abandonTurn()
@@ -442,17 +463,21 @@ export function ResearchChat({
           : text,
       clientContext: context(hasSession() ? null : recap()),
       freshContext: () => context(recap()),
-      onAccepted: replacement
-        ? () => {
-            if (accepted) return
-            accepted = true
-            commitSupersede(replacement.ids)
-            rebindTurnAttachments(
-              replacement.attachments,
-              replacement.turnIndex
-            )
-          }
-        : undefined,
+      onAccepted: async () => {
+        if (accepted) return
+        if (replacement) {
+          accepted = true
+          commitSupersede(replacement.ids)
+          rebindTurnAttachments(replacement.attachments, replacement.turnIndex)
+        } else {
+          accepted = await acceptAttachmentTurn({
+            attachments: attached,
+            turnIndex,
+            acceptSnapshot: () => attachmentSnapshot?.accept(),
+            persistBinding: persistTurnBinding,
+          })
+        }
+      },
     })
 
     // A send that never landed leaves the reader with an empty composer and no

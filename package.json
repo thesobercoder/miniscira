@@ -19,7 +19,7 @@
     "format": "biome format --write agent app components evals hooks lib scripts *.ts *.mjs",
     "check": "biome check --write agent app components evals hooks lib scripts *.ts *.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "bun test",
+    "test": "bun test --isolate --max-concurrency=1",
     "eval:thread-search": "eve eval --url http://127.0.0.1:8325 --tag thread-search --strict --max-concurrency 1",
     "knip": "bunx knip@5 --include exports",
     "db:generate": "drizzle-kit generate",

@@ -4,14 +4,10 @@ import {
   DOC_ACCEPT,
   isModelFileAttachment,
   OFFICE_MIME_TYPES,
+  snapshotReadyAttachments,
   type UploadedDoc,
 } from "@/hooks/use-chat-attachments"
 
-/**
- * The rule `attachToTurn` applies when a message is sent. Extracted here as the
- * pure predicate it is: the hook itself needs a React renderer, but the bug was
- * never in the wiring — it was in which docs leave the composer.
- */
 const staysStaged = (d: UploadedDoc) => d.status !== "ready"
 const ridesAlong = (d: UploadedDoc) => d.status === "ready"
 
@@ -21,7 +17,7 @@ const doc = (id: string, status: UploadedDoc["status"]): UploadedDoc => ({
   status,
 })
 
-describe("attachToTurn partitioning", () => {
+describe("ready attachment snapshots", () => {
   test("only ready docs ride along with the message", () => {
     const staged = [
       doc("a", "ready"),
@@ -32,8 +28,6 @@ describe("attachToTurn partitioning", () => {
   })
 
   test("an in-flight upload survives the send", () => {
-    // Regression: the composer used to clear every chip, so sending mid-upload
-    // silently discarded the file with no message anywhere.
     const staged = [doc("a", "ready"), doc("b", "processing")]
     expect(staged.filter(staysStaged).map((d) => d.id)).toEqual(["b"])
   })
@@ -55,9 +49,52 @@ describe("attachToTurn partitioning", () => {
       ...staged.filter(staysStaged),
     ]).toHaveLength(staged.length)
   })
+
+  test("acceptance removes only the ready documents in the snapshot", () => {
+    const staged = [
+      doc("a", "ready"),
+      doc("b", "processing"),
+      doc("c", "error"),
+    ]
+    const snapshot = snapshotReadyAttachments(staged)
+
+    expect(snapshot.attachments.map((document) => document.id)).toEqual(["a"])
+    expect(snapshot.accept(staged).map((document) => document.id)).toEqual([
+      "b",
+      "c",
+    ])
+  })
+
+  test("acceptance is idempotent and leaves newer ready documents staged", () => {
+    const snapshot = snapshotReadyAttachments([doc("a", "ready")])
+    const current = [doc("a", "ready"), doc("b", "ready")]
+    const accepted = snapshot.accept(current)
+
+    expect(accepted.map((document) => document.id)).toEqual(["b"])
+    expect(snapshot.accept(accepted)).toEqual(accepted)
+  })
 })
 
 describe("office attachments", () => {
+  test("the file picker includes every accepted image extension", () => {
+    const accepted = DOC_ACCEPT.split(",")
+    for (const extension of [
+      ".avif",
+      ".bmp",
+      ".gif",
+      ".heic",
+      ".heif",
+      ".jpeg",
+      ".jpg",
+      ".png",
+      ".tif",
+      ".tiff",
+      ".webp",
+    ]) {
+      expect(accepted).toContain(extension)
+    }
+  })
+
   test("the file picker accepts office extensions and exact MIME types", () => {
     const accepted = DOC_ACCEPT.split(",")
     for (const extension of [".docx", ".pptx", ".xlsx"]) {

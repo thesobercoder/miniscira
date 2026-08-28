@@ -204,7 +204,10 @@ export function useEveChat({
    * the caller should start a fresh one rather than keep retrying a dead id.
    */
   const consume = useCallback(
-    async (iterable: AsyncIterable<ChatEvent>, onStarted?: () => void) => {
+    async (
+      iterable: AsyncIterable<ChatEvent>,
+      onStarted?: () => void | Promise<void>
+    ) => {
       setTurn(beginStreaming)
       // A turn ends when a boundary event says so — not when an iterator stops.
       // Each Eve iterator has a bounded retry budget; once spent, reopen from
@@ -222,10 +225,10 @@ export function useEveChat({
               streamReconnectPolicy: EVE_LONG_RUNNING_STREAM_POLICY,
             }),
           isBoundary: isTurnBoundary,
-          onEvent: (event) => {
+          onEvent: async (event) => {
             if (!started) {
               started = true
-              onStarted?.()
+              await onStarted?.()
             }
             ingest(event)
           },
@@ -300,7 +303,7 @@ export function useEveChat({
         sessionId?: string
         continuationToken?: string
       } & AsyncIterable<ChatEvent>,
-      onStarted?: () => void
+      onStarted?: () => void | Promise<void>
     ) => {
       cursorRef.current = {
         sessionId: turnResponse.sessionId,

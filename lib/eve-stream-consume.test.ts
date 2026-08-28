@@ -17,7 +17,9 @@ describe("consumeDurableTurn", () => {
         return reopens === 5 ? events(["done"]) : events([])
       },
       isBoundary: (event) => event === "done",
-      onEvent: (event) => seen.push(event),
+      onEvent: (event) => {
+        seen.push(event)
+      },
     })
 
     expect(result).toEqual({ settled: true, received: 2 })

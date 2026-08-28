@@ -6,6 +6,7 @@ import { useMountEffect } from "@/hooks/use-mount-effect"
 import { mutateOrToast } from "@/lib/api-client"
 import { DOCUMENT_MEDIA_TYPES } from "@/lib/document-files"
 import { normalizeImage } from "@/lib/image-normalize"
+import { SUPPORTED_IMAGE_EXTENSIONS } from "@/lib/image-signature"
 
 /**
  * Owns the attachment lifecycle for one chat: files staged in the composer for
@@ -39,13 +40,44 @@ export const OFFICE_MIME_TYPES = [
 
 const MODEL_DOCUMENT_MIME_TYPES = new Set<string>(["application/pdf"])
 
-export const DOC_ACCEPT = `image/*,.png,.jpg,.jpeg,.webp,.gif,.avif,.pdf,.docx,.pptx,.xlsx,.txt,.md,.markdown,.csv,.json,.log,.tsv,.html,.xml,.yaml,.yml,text/*,application/pdf,${OFFICE_MIME_TYPES.join(",")}`
+const IMAGE_ACCEPT_EXTENSIONS = SUPPORTED_IMAGE_EXTENSIONS.map(
+  (extension) => `.${extension}`
+).join(",")
+
+export const DOC_ACCEPT = `image/*,${IMAGE_ACCEPT_EXTENSIONS},.pdf,.docx,.pptx,.xlsx,.txt,.md,.markdown,.csv,.json,.log,.tsv,.html,.xml,.yaml,.yml,text/*,application/pdf,${OFFICE_MIME_TYPES.join(",")}`
 
 export function isModelFileAttachment(document: UploadedDoc): boolean {
   return (
     document.kind === "image" ||
     (document.mimeType != null &&
       MODEL_DOCUMENT_MIME_TYPES.has(document.mimeType))
+  )
+}
+
+export function snapshotReadyAttachments(documents: readonly UploadedDoc[]) {
+  const attachments = documents.filter(
+    (document) => document.status === "ready"
+  )
+  const ids = new Set(attachments.map((document) => document.id))
+  return {
+    attachments,
+    accept: (current: readonly UploadedDoc[]) =>
+      current.filter((document) => !ids.has(document.id)),
+  }
+}
+
+export async function normalizeFilesInOrder(
+  files: readonly File[],
+  normalize: (file: File) => Promise<File> = normalizeImage
+) {
+  return await Promise.all(
+    files.map(async (file) => {
+      try {
+        return await normalize(file)
+      } catch {
+        return file
+      }
+    })
   )
 }
 
@@ -66,7 +98,7 @@ export function useChatAttachments({
   initialStagedDocuments = [],
   currentChatId,
 }: Options) {
-  // Staged in the composer for the NEXT message; cleared when it's sent.
+  // Staged in the composer for the next message; cleared when Eve accepts it.
   const [documents, setDocuments] = useState<UploadedDoc[]>(() =>
     initialStagedDocuments.filter((document) => document.status === "ready")
   )
@@ -125,11 +157,8 @@ export function useChatAttachments({
     async (files: FileList | File[]) => {
       const list = Array.from(files)
       if (list.length === 0) return
-      // Concurrent: each file owns its own optimistic row (keyed by tempId), so
-      // nothing here depends on ordering. Sequential awaits meant dropping four
-      // files cost four round trips end to end.
-      const upload = async (file: File) => {
-        const normalized = await normalizeImage(file)
+      const normalizedFiles = await normalizeFilesInOrder(list)
+      const upload = async (normalized: File) => {
         const tempId = `tmp-${normalized.name}-${normalized.size}-${normalized.lastModified}`
         const isImage = normalized.type.startsWith("image/")
         const previewUrl = isImage ? URL.createObjectURL(normalized) : undefined
@@ -140,19 +169,18 @@ export function useChatAttachments({
             URL.revokeObjectURL(replaced.url)
             previewUrlsRef.current.delete(replaced.url)
           }
-          return [
-            {
-              id: tempId,
-              filename: normalized.name,
-              status: "processing",
-              kind: isImage ? "image" : "document",
-              url: previewUrl,
-              mimeType: normalized.type,
-              // Kept so a failure can offer Retry instead of a dead-end icon.
-              file: normalized,
-            },
-            ...prev.filter((d) => d.id !== tempId),
-          ]
+          const next = {
+            id: tempId,
+            filename: normalized.name,
+            status: "processing" as const,
+            kind: isImage ? ("image" as const) : ("document" as const),
+            url: previewUrl,
+            mimeType: normalized.type,
+            file: normalized,
+          }
+          return prev.some((document) => document.id === tempId)
+            ? prev.map((document) => (document.id === tempId ? next : document))
+            : [...prev, next]
         })
         const body = new FormData()
         body.set("file", normalized)
@@ -200,7 +228,7 @@ export function useChatAttachments({
           toast.error(`Couldn't upload ${normalized.name}`)
         }
       }
-      await Promise.all(list.map(upload))
+      await Promise.all(normalizedFiles.map(upload))
     },
     [projectId, currentChatId]
   )
@@ -234,27 +262,24 @@ export function useChatAttachments({
     })
   }, [])
 
-  /**
-   * Hand the staged, ready attachments to the message being sent: clear the
-   * composer, show them on that turn optimistically, and bind them server-side
-   * to the chat and turn index. Returns what rode along, for the caller to turn
-   * into message parts.
-   */
-  const attachToTurn = useCallback(
-    (turnIndex: number): UploadedDoc[] => {
-      const attached = documents.filter((d) => d.status === "ready")
-      if (attached.length === 0) return []
-      // Only the docs that actually rode along leave the composer. Clearing the
-      // whole list would silently discard an upload still in flight and any
-      // failed one the user has yet to retry.
-      setDocuments((prev) => prev.filter((d) => d.status !== "ready"))
-      setAttachmentsByTurn((prev) => ({ ...prev, [turnIndex]: attached }))
-      return attached
-    },
-    [documents]
-  )
+  const snapshotAttachments = useCallback((turnIndex: number) => {
+    const snapshot = snapshotReadyAttachments(documentsRef.current)
+    let accepted = false
+    return {
+      attachments: snapshot.attachments,
+      accept: () => {
+        if (accepted) return
+        accepted = true
+        setDocuments((current) => snapshot.accept(current))
+        if (snapshot.attachments.length > 0)
+          setAttachmentsByTurn((current) => ({
+            ...current,
+            [turnIndex]: snapshot.attachments,
+          }))
+      },
+    }
+  }, [])
 
-  /** Persist the binding once the chat row is guaranteed to exist. */
   const persistTurnBinding = useCallback(
     async (attached: readonly UploadedDoc[], turnIndex: number) => {
       const id = currentChatId()
@@ -297,7 +322,7 @@ export function useChatAttachments({
     uploadFiles,
     retryUpload,
     removeDocument,
-    attachToTurn,
+    snapshotAttachments,
     persistTurnBinding,
     rebindTurnAttachments,
   }

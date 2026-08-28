@@ -1,7 +1,53 @@
 import { describe, expect, test } from "bun:test"
 import type { EveMessage, EveMessagePart } from "eve/client"
 
-import { modelFileParts, selectChildParts } from "@/components/research-chat"
+import {
+  acceptAttachmentTurn,
+  modelFileParts,
+  selectChildParts,
+} from "@/components/research-chat"
+
+describe("attachment acceptance wiring", () => {
+  test("commits the draft only after the durable binding succeeds", async () => {
+    const calls: string[] = []
+    const attachment = {
+      id: "photo-1",
+      filename: "photo.jpg",
+      status: "ready" as const,
+    }
+
+    expect(
+      await acceptAttachmentTurn({
+        attachments: [attachment],
+        turnIndex: 2,
+        acceptSnapshot: () => calls.push("accept"),
+        persistBinding: async (attachments, turnIndex) => {
+          calls.push(`bind:${attachments[0]?.id}:${turnIndex}`)
+          return true
+        },
+      })
+    ).toBe(true)
+    expect(calls).toEqual(["bind:photo-1:2", "accept"])
+  })
+
+  test("keeps the draft when the durable binding fails", async () => {
+    let accepted = false
+
+    expect(
+      await acceptAttachmentTurn({
+        attachments: [
+          { id: "photo-1", filename: "photo.jpg", status: "ready" },
+        ],
+        turnIndex: 2,
+        acceptSnapshot: () => {
+          accepted = true
+        },
+        persistBinding: async () => false,
+      })
+    ).toBe(false)
+    expect(accepted).toBe(false)
+  })
+})
 
 function toolCall(toolCallId: string): EveMessagePart {
   return {

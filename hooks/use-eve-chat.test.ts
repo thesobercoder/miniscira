@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { drainUntilBoundary, shouldForgetSession } from "@/hooks/use-eve-chat"
 import type { ChatEvent } from "@/lib/chat-events"
+import { consumeDurableTurn } from "@/lib/eve-stream-consume"
 
 const response = { turnId: "turn_1" }
 
@@ -101,5 +102,34 @@ describe("drainUntilBoundary", () => {
       settled: false,
       received: 2,
     })
+  })
+})
+
+describe("consumeDurableTurn", () => {
+  test("waits for asynchronous event work before reading the next event", async () => {
+    const calls: string[] = []
+    async function* two() {
+      calls.push("yield:first")
+      yield event("message.part.delta")
+      calls.push("yield:second")
+      yield event("session.completed")
+    }
+
+    await consumeDurableTurn({
+      initialStream: two(),
+      reopen: two,
+      isBoundary: (item) => item.type === "session.completed",
+      onEvent: async (item) => {
+        await Promise.resolve()
+        calls.push(`handled:${item.type}`)
+      },
+    })
+
+    expect(calls).toEqual([
+      "yield:first",
+      "handled:message.part.delta",
+      "yield:second",
+      "handled:session.completed",
+    ])
   })
 })

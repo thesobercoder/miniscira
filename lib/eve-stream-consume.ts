@@ -19,7 +19,7 @@ export async function consumeDurableTurn<T>({
   initialStream: AsyncIterable<T>
   reopen: () => AsyncIterable<T>
   isBoundary: (event: T) => boolean
-  onEvent: (event: T) => void
+  onEvent: (event: T) => void | Promise<void>
   signal?: AbortSignal
   /** Documents that each iterator is expected to use this SDK policy. */
   reconnectPolicy?: StreamReconnectPolicy
@@ -31,7 +31,7 @@ export async function consumeDurableTurn<T>({
     try {
       for await (const event of stream) {
         received += 1
-        onEvent(event)
+        await onEvent(event)
         if (isBoundary(event)) return { settled: true, received }
       }
     } catch (err) {

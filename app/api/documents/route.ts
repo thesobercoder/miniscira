@@ -9,6 +9,10 @@ import {
   extractDocumentText,
   storedMimeType,
 } from "@/lib/document-text"
+import {
+  detectImageMediaType,
+  isClaimedImageUpload,
+} from "@/lib/image-signature"
 import { put } from "@/lib/local-blob"
 import { chunkText } from "@/lib/rag"
 import { MAX_UPLOAD_BYTES, uploadPathname } from "@/lib/upload-limits"
@@ -80,7 +84,9 @@ export const POST = authed(async (request, { userId }) => {
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 })
   }
-  const kind = attachmentKind(file.type, file.name)
+  const kind = isClaimedImageUpload(file.type, file.name)
+    ? "image"
+    : attachmentKind(file.type, file.name)
   if (!kind) {
     return NextResponse.json(
       {
@@ -105,7 +111,7 @@ export const POST = authed(async (request, { userId }) => {
   }
   const chatId = field("chatId")
   const projectId = field("projectId")
-  const mimeType = storedMimeType(file.type, file.name)
+  let mimeType = storedMimeType(file.type, file.name)
 
   // Validate the parent ids before the upload: rejecting after `put` would
   // leave an orphan blob behind for a request we are about to refuse.
@@ -121,6 +127,17 @@ export const POST = authed(async (request, { userId }) => {
   ])
   if (chatId && !ownsChat) return notFound()
   if (projectId && !ownsProject) return notFound()
+
+  if (kind === "image") {
+    const detectedMimeType = detectImageMediaType(buffer)
+    if (!detectedMimeType) {
+      return NextResponse.json(
+        { error: "The uploaded file is not a supported image." },
+        { status: 415 }
+      )
+    }
+    mimeType = detectedMimeType
+  }
 
   let blobUrl: string
   try {
@@ -161,7 +178,6 @@ export const POST = authed(async (request, { userId }) => {
       createdAt: document.createdAt,
     })
 
-  // Images are sent straight to the model as vision input — no parsing/embedding.
   if (kind === "image") {
     return NextResponse.json(
       { document: { ...doc, status: "ready", kind, url: blobUrl, mimeType } },
