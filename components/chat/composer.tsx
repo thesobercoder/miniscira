@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/popover"
 import { Switch } from "@/components/ui/switch"
 import { DOC_ACCEPT, type UploadedDoc } from "@/hooks/use-chat-attachments"
+import { useMountEffect } from "@/hooks/use-mount-effect"
 import { mutateOrToast } from "@/lib/api-client"
 import { catalogIconForUrl } from "@/lib/mcp-catalog"
 import { providerOf } from "@/lib/models"
@@ -94,6 +95,19 @@ const MODES: Record<
     icon: RiCompass3Line,
     hint: "Thorough, multi-source report",
   },
+}
+
+// Autofocus is a desktop affordance: on a coarse-pointer device a mount-time
+// focus() opens the software keyboard — including the thread page mounting
+// right after send, which would reopen the keyboard that send just dismissed.
+function useDesktopAutofocus<T extends HTMLElement>() {
+  const ref = useRef<T | null>(null)
+  useMountEffect(() => {
+    if (typeof window === "undefined") return
+    if (window.matchMedia?.("(pointer: coarse)").matches) return
+    ref.current?.focus()
+  })
+  return ref
 }
 
 type McpSource = {
@@ -413,6 +427,7 @@ export const Composer = memo(function Composer({
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const cameraInputRef = useRef<HTMLInputElement | null>(null)
   const dragDepthRef = useRef(0)
+  const textareaRef = useDesktopAutofocus<HTMLTextAreaElement>()
   const [dragActive, setDragActive] = useState(false)
   // Sending with an upload in flight would leave that file behind, so the
   // button waits for it rather than silently dropping the attachment.
@@ -527,7 +542,7 @@ export const Composer = memo(function Composer({
             </InputGroupAddon>
           )}
           <InputGroupTextarea
-            autoFocus
+            ref={textareaRef}
             value={input}
             onChange={(e) => onInputChange(e.target.value)}
             onPaste={(e) => {

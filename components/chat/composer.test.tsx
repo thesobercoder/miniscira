@@ -36,7 +36,6 @@ describe("Composer", () => {
     )?.[0]
 
     expect(textarea).toBeDefined()
-    expect(textarea).toContain('autofocus=""')
   })
 
   test("renders a camera input for taking photos", () => {
