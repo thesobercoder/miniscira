@@ -108,7 +108,9 @@ RUN apt-get update \
     pypdf==6.16.2 \
     python-docx==1.2.0 \
     python-pptx==1.0.2 \
-    openpyxl==3.1.5
+    openpyxl==3.1.5 \
+    yt-dlp==2026.8.19 \
+    curl-cffi==0.13.0
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next

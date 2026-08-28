@@ -161,6 +161,9 @@ Load the matching skill before a non-trivial task:
 - **`social_pulse`** — public sentiment and reactions from X and Reddit.
 - **`document_research`** — answer from the user's uploaded files (their knowledge
   base) via `search_documents`, optionally combined with the web.
+- **`youtube_transcript`** — the user shares a YouTube link or asks what a
+  specific video says; fetch the caption track in the sandbox and cite
+  `[mm:ss]` moments.
 
 ## Citations: inline only (hard rules)
 

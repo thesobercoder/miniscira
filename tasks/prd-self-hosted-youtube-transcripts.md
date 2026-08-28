@@ -1,9 +1,9 @@
 # PRD: self-hosted YouTube transcripts
 
-- **Status:** To do
+- **Status:** In progress
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-self-hosted-youtube-transcripts)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
-- **Approval:** Not approved
+- **Approval:** Approved by Soham on 2026-08-27
 - **Revision:** 2 (2026-08-27). Revision 1 planned an Invidious sidecar plus a dedicated `youtube_transcript` tool. A proof of concept on 2026-08-27 showed the Docker Sandbox reaches YouTube captions directly once two egress entries exist. This revision makes the sandbox the primary architecture and demotes the sidecar to a documented upgrade path.
 
 ## Problem
