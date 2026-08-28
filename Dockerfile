@@ -92,8 +92,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # carries both the Docker CLI (which talks only to the private socket proxy) and
 # the offline Python analysis stack used inside sibling sandbox containers.
 # Baking pandas/numpy/matplotlib here avoids network access during bootstrap.
-RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates curl python3 python3-pip \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl python3 python3-pip unzip \
  && docker_arch="$(dpkg --print-architecture)" \
  && case "$docker_arch" in amd64) docker_arch=x86_64 ;; arm64) docker_arch=aarch64 ;; esac \
  && curl -fsSL "https://download.docker.com/linux/static/stable/${docker_arch}/docker-27.5.1.tgz" \
@@ -111,6 +111,18 @@ RUN apt-get update \
     openpyxl==3.1.5 \
     yt-dlp==2026.8.19 \
     curl-cffi==0.13.0
+
+# yt-dlp's YouTube extractor needs a JavaScript runtime for current Innertube
+# challenges. Without deno the extraction path is deprecated and intermittently
+# fails. The release is pinned for a reproducible image.
+RUN deno_arch="$(dpkg --print-architecture)" \
+ && case "$deno_arch" in amd64) deno_arch=x86_64 ;; arm64) deno_arch=aarch64 ;; esac \
+ && curl -fsSL "https://github.com/denoland/deno/releases/download/v2.1.4/deno-${deno_arch}-unknown-linux-gnu.zip" \
+    -o /tmp/deno.zip \
+ && unzip -o /tmp/deno.zip -d /usr/local/bin \
+ && chmod +x /usr/local/bin/deno \
+ && rm /tmp/deno.zip \
+ && deno --version | head -1
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/.next ./.next
