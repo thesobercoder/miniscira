@@ -69,7 +69,7 @@ describe("emailConfigured", () => {
 })
 
 describe("renderLookoutEmail", () => {
-  test("renders a semantic responsive document and supported Markdown", async () => {
+  test("renders the MiniScira brand, report hierarchy, and supported Markdown", async () => {
     const html = await renderLookoutEmail({
       lookoutName: "Weekly research",
       chatUrl: "https://miniscira.example/chat/123",
@@ -100,6 +100,20 @@ const result = true
     expect(html).toContain('content="light dark" name="color-scheme"')
     expect(html).toContain("prefers-color-scheme: dark")
     expect(html).toContain("max-width: 620px")
+    expect(html).toContain("miniscira")
+    expect(html.indexOf('class="brand-wordmark"')).toBeLessThan(
+      html.indexOf('class="email-title"')
+    )
+    expect(html).toContain("Scheduled research · Lookout")
+    expect(html).toContain("background-color:#0d100e")
+    expect(html).toContain("background-color:#80d900")
+    expect(html).toContain("background-color:#f7f9f6")
+    expect(html).toContain("background-color:#fdfefc")
+    expect(html).toContain("color:#10130d")
+    expect(html).toContain("color:#63685f")
+    expect(html).toContain("border:1px solid #dfe3db")
+    expect(html).toContain("background-color:#9ae600")
+    expect(html).toContain("color:#497d00")
     expect(html).toContain("Weekly research")
     expect(html).toContain("Findings")
     expect(html).toContain("<strong>strong</strong>")
@@ -111,7 +125,32 @@ const result = true
     expect(html).toContain("<table")
     expect(html).toContain('href="https://miniscira.example/chat/123"')
     expect(html).toContain("Open in MiniScira")
-    expect(html).toContain("scheduled research from MiniScira")
+    expect(html).toContain("text-decoration:underline")
+    expect(html).toContain(
+      ".email-body { background-color: #0f110e !important; }"
+    )
+    expect(html).toContain(
+      ".email-card { background-color: #1a1d18 !important;"
+    )
+    expect(html).toContain(
+      ".brand-wordmark { color: #f2f5ef !important; }"
+    )
+    expect(html).toContain(".email-rule { border-color: #7ccf00 !important; }")
+    expect(html).toContain(".email-muted, .email-content blockquote")
+    expect(html).toContain(
+      ".email-content code, .email-content th { background-color: #242921"
+    )
+    expect(html).toContain(
+      ".email-content code, .email-content td, .email-content th { border-color: #3b4238"
+    )
+    expect(html).toContain(".email-action { background-color: #7ccf00 !important;")
+    expect(html).not.toContain("#137a38")
+    expect(html).not.toContain("@font-face")
+    expect(html).not.toContain("data:image")
+    expect(html).not.toContain("base64")
+    expect(html).not.toContain("<svg")
+    expect(html).not.toContain("<img")
+    expect(html).not.toMatch(/\ssrc=/)
   })
 
   test("escapes raw HTML, blocks remote images, and does not link unsafe URLs", async () => {
