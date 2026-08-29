@@ -2,7 +2,6 @@ import nodemailer from "nodemailer"
 
 import { renderLookoutEmail, type LookoutEmailContent } from "./lookout-email"
 
-/** Whether Fastmail/SMTP delivery is fully configured. */
 export function emailConfigured() {
   return !!(
     process.env.SMTP_HOST &&
