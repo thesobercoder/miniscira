@@ -1,9 +1,9 @@
 # PRD: formatted Lookout emails
 
-- **Status:** To do
+- **Status:** In progress
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-formatted-lookout-emails)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
-- **Approval:** Not approved
+- **Approval:** Approved by Soham on 2026-08-29
 
 ## Summary
 
@@ -117,14 +117,14 @@ Replace the hand-built email HTML with a React Email template. Render the report
 
 ## Acceptance criteria
 
-1. A report containing the supported Markdown structures arrives as structured HTML without visible Markdown markers.
-2. Raw HTML and unsafe links in a report cannot become active email content.
-3. The message remains readable in representative light and dark clients, including a client that honors custom dark styles and a client that applies forced color inversion.
-4. The primary action remains visible and understandable in each tested mode even when button background styling is changed by the client.
-5. The layout fits a narrow mobile reader without horizontal page scrolling.
-6. Empty and long reports render without broken markup.
-7. The existing Fastmail sender, owner signup-email recipient, subject purpose, report URL, and SMTP behavior remain intact.
-8. A production Lookout run sends one real message to the approved test recipient, and the delivered message passes the content, link, light-mode, dark-mode, and mobile-width checks.
+- [ ] A report containing the supported Markdown structures arrives as structured HTML without visible Markdown markers.
+- [ ] Raw HTML and unsafe links in a report cannot become active email content.
+- [ ] The message remains readable in representative light and dark clients, including a client that honors custom dark styles and a client that applies forced color inversion.
+- [ ] The primary action remains visible and understandable in each tested mode even when button background styling is changed by the client.
+- [ ] The layout fits a narrow mobile reader without horizontal page scrolling.
+- [ ] Empty and long reports render without broken markup.
+- [ ] The existing Fastmail sender, owner signup-email recipient, subject purpose, report URL, and SMTP behavior remain intact.
+- [ ] A production Lookout run sends one real message to the approved test recipient, and the delivered message passes the content, link, light-mode, dark-mode, and mobile-width checks.
 
 ## Test plan
 
@@ -202,7 +202,7 @@ Live Eve evals are not required because the agent output contract does not chang
 
 ## Approval gate
 
-This PRD is a draft. Do not install dependencies, implement the template, change delivery, send a test message, or deploy until Soham explicitly approves it.
+Soham approved implementation on 2026-08-29.
 
 ## Implementation handoff
 
