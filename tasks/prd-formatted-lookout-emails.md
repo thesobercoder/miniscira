@@ -117,13 +117,13 @@ Replace the hand-built email HTML with a React Email template. Render the report
 
 ## Acceptance criteria
 
-- [ ] A report containing the supported Markdown structures arrives as structured HTML without visible Markdown markers.
-- [ ] Raw HTML and unsafe links in a report cannot become active email content.
+- [x] A report containing the supported Markdown structures arrives as structured HTML without visible Markdown markers.
+- [x] Raw HTML and unsafe links in a report cannot become active email content.
 - [ ] The message remains readable in representative light and dark clients, including a client that honors custom dark styles and a client that applies forced color inversion.
 - [ ] The primary action remains visible and understandable in each tested mode even when button background styling is changed by the client.
 - [ ] The layout fits a narrow mobile reader without horizontal page scrolling.
-- [ ] Empty and long reports render without broken markup.
-- [ ] The existing Fastmail sender, owner signup-email recipient, subject purpose, report URL, and SMTP behavior remain intact.
+- [x] Empty and long reports render without broken markup.
+- [x] The existing Fastmail sender, owner signup-email recipient, subject purpose, report URL, and SMTP behavior remain intact.
 - [ ] A production Lookout run sends one real message to the approved test recipient, and the delivered message passes the content, link, light-mode, dark-mode, and mobile-width checks.
 
 ## Test plan
@@ -177,6 +177,13 @@ After approval, implementation, tests, and deployment:
 7. Verify scheduling and later Lookout delivery still operate normally.
 
 Live Eve evals are not required because the agent output contract does not change. The real production Lookout run and delivered-message inspection are required and cannot be replaced by unit tests, generated HTML, SMTP acceptance, or a health check.
+
+### Acceptance record
+
+- Production delivered the first formatted message on 2026-08-29. Its generic green card did not match MiniScira, so visual acceptance failed.
+- Commit `998ed45` replaced the generic palette with MiniScira's canonical light and dark colors, added the lowercase wordmark and email-safe icon mark, restored the report-title hierarchy, and changed the action to the canonical lime treatment.
+- Production delivered the corrected message to the owner's signup inbox on 2026-08-29. The delivered HTML showed the MiniScira header before the Lookout title, safe report links, and the visible `Open in MiniScira` action with the correct report URL.
+- Fastmail light-mode and desktop-width inspection passed. Dark-mode, forced-inversion, narrow mobile, Apple Mail, Gmail, and Outlook checks remain open.
 
 ## Deployment
 
