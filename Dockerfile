@@ -92,7 +92,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # carries both the Docker CLI (which talks only to the private socket proxy) and
 # the offline Python analysis stack used inside sibling sandbox containers.
 # Baking pandas/numpy/matplotlib here avoids network access during bootstrap.
- && apt-get update \
+RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl python3 python3-pip unzip \
  && docker_arch="$(dpkg --print-architecture)" \
  && case "$docker_arch" in amd64) docker_arch=x86_64 ;; arm64) docker_arch=aarch64 ;; esac \
