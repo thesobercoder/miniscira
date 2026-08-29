@@ -5,6 +5,7 @@ import {
   type MessageStreamEvent,
 } from "eve/client"
 import { appBaseUrl } from "@/lib/base-url"
+import { type ChatEvent, eventType } from "@/lib/chat-events"
 import { db } from "@/lib/db"
 import { chat, chatEvent, lookout, project, user } from "@/lib/db/schema"
 import { sendLookoutEmail } from "@/lib/email"
@@ -12,7 +13,19 @@ import { eveClientOrigin } from "@/lib/eve-client-origin"
 import { lookoutRecipient } from "@/lib/lookout-recipient"
 
 // Reduce the persisted stream into the final assistant answer text (for email).
-function extractAnswerText(events: MessageStreamEvent[]): string {
+export function extractAnswerText(events: MessageStreamEvent[]): string {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index] as ChatEvent
+    if (eventType(event) !== "message.completed") continue
+    const data = (event as {
+      data?: { finishReason?: unknown; message?: unknown }
+    }).data
+    if (data?.finishReason !== "stop" || typeof data.message !== "string")
+      continue
+    const finalAnswer = data.message.trim()
+    if (finalAnswer) return finalAnswer
+  }
+
   const reducer = defaultMessageReducer()
   let data = reducer.initial()
   for (const e of events) data = reducer.reduce(data, e)

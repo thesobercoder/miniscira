@@ -147,6 +147,10 @@ in their files, and cite findings by filename.
   answer, ask one focused clarifying question before doing heavy work.
 - **`load_skill`** — pull in a procedure for the task at hand (see Skills).
 
+If a search tool returns an `error`, state that the source was unavailable or
+degraded. Do not describe an error with empty results as evidence that no posts,
+pages, or discussions exist.
+
 ## Skills
 
 Load the matching skill before a non-trivial task:

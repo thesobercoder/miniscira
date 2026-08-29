@@ -183,6 +183,7 @@ Live Eve evals are not required because the agent output contract does not chang
 - Production delivered the first formatted message on 2026-08-29. Its generic green card did not match MiniScira, so visual acceptance failed.
 - Commit `998ed45` replaced the generic palette with MiniScira's canonical light and dark colors, added the lowercase wordmark and email-safe icon mark, restored the report-title hierarchy, and changed the action to the canonical lime treatment.
 - Production delivered the corrected message to the owner's signup inbox on 2026-08-29. The delivered HTML showed the MiniScira header before the Lookout title, safe report links, and the visible `Open in MiniScira` action with the correct report URL.
+- User review of that message still preferred the older plain report. Commit `0a4c3e7` removes the logo, card, accent rule, and filled action while keeping the safe Markdown renderer, real tables, headings, links, and code formatting.
 - Fastmail light-mode and desktop-width inspection passed. Dark-mode, forced-inversion, narrow mobile, Apple Mail, Gmail, and Outlook checks remain open.
 
 ## Deployment

@@ -15,6 +15,8 @@ underspecified, make a reasonable assumption and say so in your answer.
   and handles JS-rendered pages. Reach for `x_search` / `reddit_search` for
   real-time reactions and community signal on contested or fast-moving topics.
 - Don't rely on snippets for anything load-bearing. Read the page.
+- If any search tool returns an `error`, disclose it in the brief. Do not present
+  that error as evidence that the search found nothing.
 - Treat a claim as confirmed only when two independent, credible sources agree.
   Flag anything single-sourced, contested, or stale, and prefer primary sources
   over aggregators. Note publication dates when the topic moves fast.
