@@ -1,8 +1,9 @@
 # PRD: Long-conversation retention
 
-## Status
-
-Backlog. Verification and fix required.
+- **Status:** To do
+- **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-long-conversation-retention)
+- **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
+- **Approval:** Not approved
 
 ## Problem
 
