@@ -6,17 +6,38 @@
 - **Approval:** Approved by Soham on 2026-08-24
 - **Scope:** PDF, DOCX, PPTX, and XLSX creation and editing
 
-## Problem
+## Goal
+
+### Problem
 
 The agent can already write document files in its Sandbox. The current `run_code` result only publishes generated images, so an office document created successfully can remain trapped in the Sandbox. MiniScira also does not accept every supported office format as an input for editing.
 
 MiniScira does not need a separate document platform. The agent needs four original MiniScira document skills, the tools those skills expect in the Sandbox image, and a small extension to the existing file path so supported documents can be uploaded and downloaded.
 
-## Goal
-
 A user can ask the agent to create or edit a PDF, DOCX, PPTX, or XLSX file. The agent loads the matching skill, uses the existing Sandbox, and returns the finished file as a download in the chat.
 
-## Product behavior
+## User stories
+
+No separate user stories were recorded.
+
+## Scope
+
+No separate scope notes were recorded.
+
+## Non-goals
+
+- A new generated-artifact database table or API family.
+- A dedicated `generate_document` tool or repository-owned document DSL.
+- Built-in templates or a template registry.
+- Browser previews, thumbnails, or Office rendering in MiniScira.
+- A cross-chat artifact library.
+- Collaborative editing or an Office-style editor.
+- Formal document certification, exhaustive OOXML inspection, or a second validation framework beyond the skills' normal checks.
+- Runtime package installation or arbitrary changes to Sandbox networking.
+
+## Functional requirements
+
+### Product behavior
 
 1. The agent loads the matching PDF, DOCX, PPTX, or XLSX skill when the user asks for that format.
 2. The skill tells the agent which installed tools to use and how to inspect the result.
@@ -27,7 +48,9 @@ A user can ask the agent to create or edit a PDF, DOCX, PPTX, or XLSX file. The 
 7. Supported office files can be uploaded and staged into the Sandbox when the user asks the agent to edit them.
 8. The file link remains usable after the chat reloads because it is part of the persisted tool result and the bytes live in `/data/uploads`.
 
-## Required changes
+## Technical requirements
+
+### Required changes
 
 ### Skills
 
@@ -69,56 +92,7 @@ Extend `run_code` rather than adding a new document-generation tool.
 
 Extend the existing `run_code` timeline node with a small file-download list. Do not add an artifact library, preview system, detail panel, template picker, or document state machine.
 
-## Acceptance criteria
-
-- [x] The four clean-room MiniScira skills are discoverable and load on demand.
-- [x] The production Sandbox contains the tools required by each skill.
-- [x] The agent creates one valid PDF, DOCX, PPTX, and XLSX fixture through the real chat flow.
-- [x] Each file appears in the originating `run_code` result and downloads with the correct filename and MIME type.
-- [x] Each download still works after reloading the chat and recreating the app container.
-- [x] A user can upload a DOCX, PPTX, or XLSX file, ask for a small edit, and download the edited result.
-- [x] Existing image generation and image rendering still work.
-- [x] Unsupported Sandbox files are not published.
-- [x] Output filenames cannot escape storage or inject response headers.
-- [x] Sandbox isolation, egress restrictions, and cleanup checks still pass.
-- [x] Focused tests, the full test suite, lint, typecheck, repository checks, build, and real browser verification pass.
-
-## Completion evidence
-
-- Implementation: `aa765ff` (`feat: add sandbox document files`).
-- Production routing eval: `python3 scripts/run-production-evals.py document-generation-routing` passed 32/32 gates on 2026-08-26.
-- Partial production file acceptance: `python3 scripts/run-production-evals.py document-files-production-acceptance` passed 30/30 gates on 2026-08-26. It created and downloaded PDF, DOCX, PPTX, and XLSX outputs through deployed Eve, verified their MIME types and non-empty bytes, then uploaded and downloaded a returned DOCX. The eval does not yet inspect each document with a format-aware reader or prove that the requested edit changed the DOCX contents.
-- Partial durability evidence: all five saved file URLs returned HTTP 200 with the expected MIME types and non-empty bytes after restarting the production app container. Chat reload and persisted timeline-link behavior still need browser verification.
-- Regression checks: the focused document, file-route, attachment, timeline, and chat tests passed 26/26. The current full suite passed 333/333, and the production build completed successfully.
-- Deployment and security: the production image includes the pinned document libraries. Existing Docker Sandbox isolation, egress, cleanup, image output, header safety, and unsupported-file behavior remained covered by the delivery validation and focused regressions.
-
-## Remaining completion work — CLOSED 2026-08-27
-
-All items below are now resolved:
-
-| Pending item | Kind | How it was resolved | Completion evidence |
-|---|---|---|---|
-| Prove that generated PDF, DOCX, PPTX, and XLSX files are valid and contain the requested fixture content. | Automated content checks | `scripts/verify-document-outputs.ts` downloads each production file and asserts real text: PDF via unpdf text layer; DOCX/PPTX/XLSX via OOXML zip members. | `OK: all content assertions passed for 5 files` against production bytes. |
-| Prove that an uploaded office document is edited rather than returned unchanged. | Browser + content assertions | Uploaded the fixture DOCX through the real composer file input in production, requested the edit, downloaded `miniscira-browser-edited.docx`. | The edited DOCX contains "Edited by MiniScira production" and no longer contains "Original production edit fixture". |
-| Prove that generated links survive the user-visible persistence path. | Production browser acceptance | Reloaded the chat: links persisted. Restarted the production app container via Portainer and reloaded again. | Links render after both reload and container restart; post-restart download returned HTTP 200 with intact verified DOCX content. |
-| Prove the complete upload, edit, and download experience in the deployed UI. | Production browser acceptance | Real composer upload through CDP file-input staging, real chat turn, real download link. | Recorded flow completed on production chat `e56e47e5`; download inspected byte-level. |
-| Close the repository quality gates against the final acceptance-eval changes. | Automated repository checks | Focused tests, full suite (333/333 at implementation), lint, typecheck, build already passed on the accepted revision; fixture/checker changes since are script-only and revalidated. | 2026-08-27 validation run plus prior recorded gates. |
-
-Soham's manual test remains useful product confirmation. With the evidence above
-recorded, the PRD is Done.
-
-## Non-goals
-
-- A new generated-artifact database table or API family.
-- A dedicated `generate_document` tool or repository-owned document DSL.
-- Built-in templates or a template registry.
-- Browser previews, thumbnails, or Office rendering in MiniScira.
-- A cross-chat artifact library.
-- Collaborative editing or an Office-style editor.
-- Formal document certification, exhaustive OOXML inspection, or a second validation framework beyond the skills' normal checks.
-- Runtime package installation or arbitrary changes to Sandbox networking.
-
-## Test and eval plan
+### Test and eval plan
 
 ### Automated tests
 
@@ -139,7 +113,7 @@ Use one direct request per format. Verify that the agent loads the matching skil
 
 Create and download one small file per format through the real browser. Open each file with an appropriate reader. Reload the chat and download it again. Edit one uploaded office file. Confirm existing image output, service health, Sandbox isolation, logs, and container restarts.
 
-## Implementation order after approval
+### Implementation order after approval
 
 1. Add the four clean-room skills and their required Sandbox packages.
 2. Add office upload and MIME support.
@@ -149,7 +123,59 @@ Create and download one small file per format through the real browser. Open eac
 6. Exercise all four create flows and one edit flow in the real browser.
 7. Back up, deploy, and verify production.
 
-## Approval gate
+## Acceptance criteria
+
+- [x] The four clean-room MiniScira skills are discoverable and load on demand.
+- [x] The production Sandbox contains the tools required by each skill.
+- [x] The agent creates one valid PDF, DOCX, PPTX, and XLSX fixture through the real chat flow.
+- [x] Each file appears in the originating `run_code` result and downloads with the correct filename and MIME type.
+- [x] Each download still works after reloading the chat and recreating the app container.
+- [x] A user can upload a DOCX, PPTX, or XLSX file, ask for a small edit, and download the edited result.
+- [x] Existing image generation and image rendering still work.
+- [x] Unsupported Sandbox files are not published.
+- [x] Output filenames cannot escape storage or inject response headers.
+- [x] Sandbox isolation, egress restrictions, and cleanup checks still pass.
+- [x] Focused tests, the full test suite, lint, typecheck, repository checks, build, and real browser verification pass.
+
+### Completion evidence
+
+- Implementation: `aa765ff` (`feat: add sandbox document files`).
+- Production routing eval: `python3 scripts/run-production-evals.py document-generation-routing` passed 32/32 gates on 2026-08-26.
+- Partial production file acceptance: `python3 scripts/run-production-evals.py document-files-production-acceptance` passed 30/30 gates on 2026-08-26. It created and downloaded PDF, DOCX, PPTX, and XLSX outputs through deployed Eve, verified their MIME types and non-empty bytes, then uploaded and downloaded a returned DOCX. The eval does not yet inspect each document with a format-aware reader or prove that the requested edit changed the DOCX contents.
+- Partial durability evidence: all five saved file URLs returned HTTP 200 with the expected MIME types and non-empty bytes after restarting the production app container. Chat reload and persisted timeline-link behavior still need browser verification.
+- Regression checks: the focused document, file-route, attachment, timeline, and chat tests passed 26/26. The current full suite passed 333/333, and the production build completed successfully.
+- Deployment and security: the production image includes the pinned document libraries. Existing Docker Sandbox isolation, egress, cleanup, image output, header safety, and unsupported-file behavior remained covered by the delivery validation and focused regressions.
+
+### Remaining completion work — CLOSED 2026-08-27
+
+All items below are now resolved:
+
+| Pending item | Kind | How it was resolved | Completion evidence |
+|---|---|---|---|
+| Prove that generated PDF, DOCX, PPTX, and XLSX files are valid and contain the requested fixture content. | Automated content checks | `scripts/verify-document-outputs.ts` downloads each production file and asserts real text: PDF via unpdf text layer; DOCX/PPTX/XLSX via OOXML zip members. | `OK: all content assertions passed for 5 files` against production bytes. |
+| Prove that an uploaded office document is edited rather than returned unchanged. | Browser + content assertions | Uploaded the fixture DOCX through the real composer file input in production, requested the edit, downloaded `miniscira-browser-edited.docx`. | The edited DOCX contains "Edited by MiniScira production" and no longer contains "Original production edit fixture". |
+| Prove that generated links survive the user-visible persistence path. | Production browser acceptance | Reloaded the chat: links persisted. Restarted the production app container via Portainer and reloaded again. | Links render after both reload and container restart; post-restart download returned HTTP 200 with intact verified DOCX content. |
+| Prove the complete upload, edit, and download experience in the deployed UI. | Production browser acceptance | Real composer upload through CDP file-input staging, real chat turn, real download link. | Recorded flow completed on production chat `e56e47e5`; download inspected byte-level. |
+| Close the repository quality gates against the final acceptance-eval changes. | Automated repository checks | Focused tests, full suite (333/333 at implementation), lint, typecheck, build already passed on the accepted revision; fixture/checker changes since are script-only and revalidated. | 2026-08-27 validation run plus prior recorded gates. |
+
+Soham's manual test remains useful product confirmation. With the evidence above
+recorded, the PRD is Done.
+
+## Deployment
+
+No separate deployment requirements were recorded.
+
+## Observability
+
+No separate observability requirements were recorded.
+
+## Rollback
+
+No separate rollback requirements were recorded.
+
+## Open questions
+
+### Approval gate
 
 Implementation begins only after Soham explicitly approves this revised PRD. After approval, create a short TODO mapped to the seven steps above. If a skill requires a tool that cannot run in the current Sandbox image, resolve that package gap without adding a new product architecture.
 

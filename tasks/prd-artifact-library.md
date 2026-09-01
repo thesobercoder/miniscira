@@ -8,7 +8,9 @@
 - **Canonical engineering constraints:** [Development principles](../docs/DEVELOPMENT_PRINCIPLES.md), [Engineering invariants](../docs/ENGINEERING_INVARIANTS.md), and [Deployment guide](../docs/DEPLOYMENT.md)
 - **Scope:** Planning only. This document does not allow implementation. The user must approve this PRD before implementation TODOs are created or executed.
 
-## 1. Problem
+## Goal
+
+### Problem
 
 MiniScira already creates and receives several artifact forms, but they are discoverable only inside the chat where they appeared:
 
@@ -21,7 +23,7 @@ Users cannot browse all of these across chats. Some stored files are served by a
 
 Add a signed-in, per-user **Library** that inventories every supported artifact created or received across the user's chats. It supplies previews and metadata, useful filters and supported content search, source-chat and source-turn provenance, authorized downloads, and safe lifecycle actions that never delete a source chat implicitly.
 
-## 2. goals
+### goals
 
 1. Add **Library** to the main sidebar immediately below **Lookouts** and above **MCP Servers**.
 2. Give each signed-in user one complete, paginated inventory of their uploaded files, generated images, tool-created code/text artifacts, research exports, and future durable PDF/DOCX/PPTX/XLSX outputs.
@@ -32,32 +34,9 @@ Add a signed-in, per-user **Library** that inventories every supported artifact 
 7. Discover and register existing uploaded and generated artifacts through an additive, idempotent migration/backfill path without changing the schema during normal startup.
 8. Establish an extensible artifact contract that future PDF, DOCX, PPTX, and XLSX generators can write without redesigning the Library.
 
-## 3. Success criteria and metrics
+## User stories
 
-### 3.1 Release acceptance metrics
-
-- 100% of supported pre-release artifact fixtures are discoverable after backfill, with no duplicate records after a second backfill run.
-- 100% of cross-user metadata, preview, download, and lifecycle requests in the authorization suite are denied without exposing whether the artifact exists.
-- 100% of artifacts with missing or deleted backing files render an explicit unavailable/tombstone state rather than a broken preview.
-- A user can reach the Library in one sidebar action and reach an artifact's source chat/turn in one action when provenance is available.
-- All list/filter/search combinations in the test matrix return only matching artifacts and retain stable pagination without duplicate or skipped rows.
-- Removing an artifact from the Library or deleting its backing file never deletes or mutates the source `chat` row.
-
-### 3.2 Operational metrics after release
-
-Record these metrics without logging filenames, extracted content, prompts, storage keys, signed URLs, or user secrets:
-
-- Library list request count, latency, result count, and error rate;
-- preview/download request count, bytes streamed, latency, unavailable count, and error rate;
-- artifact registration count by `sourceKind`, `mediaClass`, and outcome;
-- backfill scanned/discovered/inserted/skipped/conflict/unavailable counts;
-- lifecycle mutation count by action and outcome;
-- authorization rejection count by endpoint and status class;
-- orphan/missing-backing detection count.
-
-No usage-growth target is imposed for the first release; correctness, completeness, and authorization are the launch gates.
-
-## 4. Users and main use cases
+### Users and main use cases
 
 ### 4.1 Signed-in researcher
 
@@ -71,7 +50,9 @@ Wants to narrow the Library to artifacts associated with one project or one chat
 
 Wants migrations and backfills to be explicit, observable, restartable, compatible with durable database/upload backups, and safe to roll back.
 
-## 5. Scope and fixed decisions
+## Scope
+
+### Scope and fixed decisions
 
 These decisions are part of this draft and should not be improvised during implementation. Open questions in Section 20 require explicit resolution before approval if they would change these decisions.
 
@@ -128,7 +109,27 @@ Filters and search are represented in URL query parameters so navigation, refres
 - The initial page size is 30, with a server-enforced maximum of 100.
 - Applying or changing a search/filter resets the cursor.
 
-## 6. User experience
+## Non-goals
+
+This PRD does not include:
+
+1. Implementing PDF, DOCX, PPTX, or XLSX generation; it only makes the Library data model ready to inventory those future outputs.
+2. Natural-language image editing or artifact editing/version history.
+3. Semantic/vector search, OCR, image recognition, or model-generated tagging of Library items.
+4. Giving the research agent a tool to search/read the Library; existing document retrieval does not change.
+5. Sharing artifacts between users, public links, anonymous downloads, team workspaces, or ACLs beyond strict owner access.
+6. Bulk export/download, folders, tags, favorites, pinning, manual renaming, or drag-and-drop organization.
+7. Automatic retention/expiry policy configuration or storage quotas.
+8. Permanent redaction of inline artifact content from historical chat events.
+9. Deleting a source chat as an artifact lifecycle side effect.
+10. Recovering physically deleted bytes without a backup.
+11. Parsing or rendering DOCX/PPTX/XLSX content in the Library request path; safe metadata fallback is sufficient until a validated preview rendition exists.
+12. Replacing the existing `document` ingestion/RAG model with the artifact table.
+13. Changing the canonical agent search, model routing, auth chain, durable stream, scheduling, or Sandbox architecture.
+
+## Functional requirements
+
+### User experience
 
 ### 6.1 Sidebar
 
@@ -203,7 +204,429 @@ When the source chat exists and belongs to the user, “Open source” navigates
 
 For uploaded files, use the bound user `messageIndex` as legacy provenance and add a stable source locator during registration/backfill. For tool outputs, use the persisted Eve event identity/tool call identity rather than a UI array index alone.
 
-## 7. user stories and acceptance criteria
+### Inventory and query
+
+- **FR-001:** The system must expose an authenticated `/library` page and Library API surface.
+- **FR-002:** Every Library list query must include `artifact.userId = session.user.id` in SQL.
+- **FR-003:** The list API must return metadata only and must not return full inline content, extracted text, storage keys, or raw chat events.
+- **FR-004:** The list API must support the search, filters, sorting, and cursor rules in Section 5.
+- **FR-005:** The list API must return current source chat/project display metadata only through user-scoped joins.
+- **FR-006:** The list API must expose a stable availability/status enum and preview capability metadata so the UI does not infer state from a URL.
+- **FR-007:** The query must remain deterministic when multiple artifacts share a timestamp by using the artifact UUID as a tie-breaker.
+
+### Registration and discovery
+
+- **FR-008:** A shared server-side registration service must accept trusted execution context and normalized artifact metadata. It must perform an idempotent insert or update.
+- **FR-009:** Stable source identities must be unique per user/source: uploaded document ID; tool-producing chat plus tool call/event identity; future generator job/output identity.
+- **FR-010:** Upload flows must associate the existing `document` row with one artifact record without duplicating file bytes or extracted content.
+- **FR-011:** Generated images must be stored under a user-owned artifact record at generation time, with source chat/turn resolved from authenticated Eve session context.
+- **FR-012:** Code/text artifact tool outputs must be registered with normalized title, language, complete inline content reference, source identity, and searchable text.
+- **FR-013:** Research exports implemented through the existing artifact tool or a future file generator must use the same artifact registration path.
+- **FR-014:** Future PDF/DOCX/PPTX/XLSX outputs must be representable as blob-backed artifacts without schema changes.
+- **FR-015:** Registration must not accept ownership or storage authority from model-controlled input.
+
+### Preview and download
+
+- **FR-016:** Metadata, preview, content, and download endpoints must be authenticated and ownership-scoped.
+- **FR-017:** Blob-backed responses must resolve a server-held storage key/reference, never an arbitrary request path or caller-supplied URL.
+- **FR-018:** Download responses must sanitize filenames, set `Content-Disposition: attachment`, preserve/normalize MIME type, set `X-Content-Type-Options: nosniff`, and use private/no-store or appropriately private caching.
+- **FR-019:** Inline artifacts must be downloadable through the authorized artifact endpoint.
+- **FR-020:** Preview rendering must follow Section 6.4 and must not execute untrusted content in the MiniScira origin.
+- **FR-021:** Preview payload limits must be enforced on the server; the initial text/code preview limit is 512 KiB, with explicit truncation metadata.
+- **FR-022:** Blob response code should support HTTP range requests for PDF/media preview where practical and must stream rather than buffer large files.
+- **FR-023:** Old `/api/files/*` links retained in historical events must no longer rely on unguessability alone; they must resolve to a registered, owned artifact or return unavailable/not found.
+
+### Provenance and source links
+
+- **FR-024:** Artifact rows must preserve source chat, project, source kind, source event/tool identity, and source turn locator when available.
+- **FR-025:** Chat/project deletion must not cascade-delete artifacts; provenance becomes unavailable through `SET NULL` or equivalent explicit state.
+- **FR-026:** The source link must verify ownership at navigation/read time and must not reveal inaccessible IDs or titles.
+- **FR-027:** Chat rendering must consult artifact availability for registered generated/uploaded artifacts so deleted/missing backing is explicit even if a historical event contains a stale URL.
+
+### Lifecycle
+
+- **FR-028:** Hide, restore, and delete-backing mutations must be idempotent and ownership-scoped.
+- **FR-029:** Hide/restore must not modify chat, chat events, `document.content`, document retrieval eligibility, or file storage.
+- **FR-030:** Delete-backing must preserve the artifact tombstone and source chat; it must not be implemented as chat deletion.
+- **FR-031:** Delete-backing must be rejected for inline-only artifacts in this release.
+- **FR-032:** Missing backing discovered during preview/download/backfill must be represented in artifact state and surfaced to the user.
+- **FR-033:** Storage deletion errors must not falsely report success; the response and telemetry must distinguish database tombstoning from failed physical deletion.
+
+### Migration and operations
+
+- **FR-034:** Schema changes must use committed Drizzle migration files and must not be applied implicitly during normal startup.
+- **FR-035:** Backfill must be an explicit, bounded, restartable operation with batch size and dry-run/report modes.
+- **FR-036:** Backfill must scan only supported event shapes through centralized event/tool-output parsers; arbitrary `.type` inspection outside `lib/chat-events.ts` remains prohibited.
+- **FR-037:** Backfill must not download remote/foreign URLs. It may register them as unsupported/unavailable only if the backlog scope requires their record; this release's usable backing is local storage or inline content.
+- **FR-038:** Deployment must preserve both database and uploads volumes and require backups of both before migration/backfill.
+
+### non-functional requirements
+
+- **NFR-001 — Authorization:** Every artifact operation is denied by default and scoped to the authenticated user in SQL. UUIDs, random blob names, and source links are not authorization controls.
+- **NFR-002 — Privacy:** Logs and metrics must exclude filenames, titles, prompts, content, extracted text, storage paths/keys, event JSON, and query text.
+- **NFR-003 — Performance:** For a user with 10,000 artifacts, p95 metadata list requests should complete within 500 ms on the reference self-hosted Postgres deployment, excluding network latency, with indexes used for ownership/order and supported filters/search.
+- **NFR-004 — Payload size:** The first Library list response should remain below 250 KiB for 30 normal metadata rows; preview content is fetched separately.
+- **NFR-005 — Scalability:** Queries use keyset pagination and indexed predicates; the UI does not fetch all chats, projects, or artifacts only to render the first page.
+- **NFR-006 — Reliability:** Registration and backfill are idempotent. A partial storage or database failure produces a recoverable state, not an orphan silently reported as success.
+- **NFR-007 — Accessibility:** Library controls meet keyboard, focus, label, contrast, and screen-reader requirements; status is conveyed by text/icon, not color alone.
+- **NFR-008 — Responsive UX:** All core actions work at narrow mobile widths without hover-only controls.
+- **NFR-009 — Security isolation:** Untrusted HTML/SVG/GenUI previews cannot access the authenticated parent origin or navigate it without explicit user action.
+- **NFR-010 — Compatibility:** Existing chats, event replay, attachment rendering, document search, image generation, and browser artifact panels continue to work during rollout.
+- **NFR-011 — Data integrity:** No action in this feature implicitly deletes source chats. Chat deletion does not implicitly delete Library artifacts.
+- **NFR-012 — Operability:** Backfill progress, failures, missing backing, and registration failures are observable without sensitive payloads.
+
+## Technical requirements
+
+### Success criteria and metrics
+
+### 3.1 Release acceptance metrics
+
+- 100% of supported pre-release artifact fixtures are discoverable after backfill, with no duplicate records after a second backfill run.
+- 100% of cross-user metadata, preview, download, and lifecycle requests in the authorization suite are denied without exposing whether the artifact exists.
+- 100% of artifacts with missing or deleted backing files render an explicit unavailable/tombstone state rather than a broken preview.
+- A user can reach the Library in one sidebar action and reach an artifact's source chat/turn in one action when provenance is available.
+- All list/filter/search combinations in the test matrix return only matching artifacts and retain stable pagination without duplicate or skipped rows.
+- Removing an artifact from the Library or deleting its backing file never deletes or mutates the source `chat` row.
+
+### 3.2 Operational metrics after release
+
+Record these metrics without logging filenames, extracted content, prompts, storage keys, signed URLs, or user secrets:
+
+- Library list request count, latency, result count, and error rate;
+- preview/download request count, bytes streamed, latency, unavailable count, and error rate;
+- artifact registration count by `sourceKind`, `mediaClass`, and outcome;
+- backfill scanned/discovered/inserted/skipped/conflict/unavailable counts;
+- lifecycle mutation count by action and outcome;
+- authorization rejection count by endpoint and status class;
+- orphan/missing-backing detection count.
+
+No usage-growth target is imposed for the first release; correctness, completeness, and authorization are the launch gates.
+
+### proposed data model
+
+### 10.1 New `artifact` table
+
+Proposed fields (exact SQL types/names may be adjusted during approved implementation only if behavior does not change):
+
+| Field | Purpose |
+|---|---|
+| `id uuid primary key` | Stable Library identity. |
+| `userId text not null` | Owner; FK to `user` with `ON DELETE CASCADE`. |
+| `chatId uuid null` | Origin chat; FK to `chat` with `ON DELETE SET NULL`. |
+| `projectId uuid null` | Origin project snapshot/link; FK to `project` with `ON DELETE SET NULL`. |
+| `documentId uuid null` | Existing upload/document row; FK to `document` with `ON DELETE SET NULL`, unique when non-null. |
+| `sourceKind text not null` | `upload`, `artifact_tool`, `generated_image`, `research_export`, `generated_file`. |
+| `sourceKey text not null` | Deterministic trusted identity such as `document:<id>` or `chat:<id>:tool:<callId>`; never shown to clients. |
+| `sourceEventId text null` | Eve server event ULID when available. |
+| `sourceToolCallId text null` | Tool call identity when available. |
+| `sourceTurnId text null` | Durable Eve turn identity when available. |
+| `sourceMessageIndex integer null` | Legacy uploaded user-turn locator and fallback provenance. |
+| `title text not null` | Human display title. |
+| `filename text not null` | Sanitized download filename (display may retain original separately only if needed). |
+| `mediaClass text not null` | `image`, `document`, `code_text`, `export`, `other`. |
+| `mimeType text not null` | Normalized MIME type. |
+| `language text null` | Artifact-tool language/format where applicable. |
+| `storageKind text not null` | `local_blob` or `inline`. Future values require review. |
+| `storageKey text null` | Server-only local blob leaf/key, not a URL. Required for `local_blob`. |
+| `inlineContent text null` | Complete text artifact content. Required for `inline`; absent from list responses. |
+| `searchText text null` | Normalized extracted/searchable text. May reference/copy `document.content` during registration; see open question OQ-003. |
+| `sizeBytes integer not null default 0` | Byte size when known. |
+| `availability text not null` | `processing`, `available`, `error`, `missing`, `expired`, `deleted`. |
+| `errorCode text null` | Non-sensitive typed failure code, not raw provider/path error text. |
+| `libraryHiddenAt timestamp null` | Reversible removal from default Library. |
+| `deletedAt timestamp null` | Backing deletion/tombstone time. |
+| `createdAt timestamp not null` | Artifact creation/receipt time, sourced from document/event time. |
+| `updatedAt timestamp not null` | Metadata/state update time. |
+
+Constraints:
+
+- unique `(userId, sourceKey)` for idempotent registration/backfill;
+- `storageKind=local_blob` requires `storageKey` and forbids `inlineContent`;
+- `storageKind=inline` requires `inlineContent` and forbids `storageKey`;
+- `availability=deleted` requires `deletedAt`;
+- only trusted server code creates `sourceKey`, ownership, provenance, and storage references.
+
+Recommended indexes:
+
+- `(userId, libraryHiddenAt, createdAt DESC, id DESC)` for default/hidden inventory;
+- `(userId, mediaClass, createdAt DESC, id DESC)`;
+- `(userId, chatId, createdAt DESC, id DESC)`;
+- `(userId, projectId, createdAt DESC, id DESC)`;
+- unique `(userId, sourceKey)`;
+- unique partial `documentId` where non-null;
+- PostgreSQL GIN full-text index over a normalized `tsvector` derived from title/filename/search text, or a generated/stored `searchVector` if Drizzle/migration support is verified during implementation.
+
+### 10.2 Existing `document` table
+
+Keep `document` as the source of truth for document ingestion and retrieval-augmented generation (RAG). Add a nullable unique `artifactId` only if it clearly simplifies joins. Otherwise, `artifact.documentId` is the canonical one-way association. Do not duplicate blob bytes. Library hide and restore actions must not change document search behavior or `document.content`.
+
+### 10.3 Existing `chat_event` table
+
+Persisted events remain the transcript/event source. New tool-created artifacts must write a first-class artifact row and include/derive a stable artifact ID in rendering. Historical event JSON is not destructively rewritten by the schema migration. The backfill parses supported tool output shapes and associates the resulting artifact row through stable event/tool identities.
+
+### 10.4 Availability and source status
+
+`availability` describes whether artifact content can be previewed/downloaded. Upload processing status may originate in `document.status`; registration/reconciliation maps it to the artifact enum. Source provenance availability (chat/project exists) is derived separately so a deleted chat does not mark an otherwise downloadable file as missing.
+
+### API and server design
+
+Proposed authenticated API surface:
+
+- `GET /api/artifacts` — metadata list, cursor, filters/search.
+- `GET /api/artifacts/facets` — user-scoped chat/project/filter options and counts where economical.
+- `GET /api/artifacts/:id` — metadata/detail and preview capabilities.
+- `GET /api/artifacts/:id/preview` — bounded authorized preview/rendition.
+- `GET /api/artifacts/:id/download` — authorized attachment download/stream.
+- `PATCH /api/artifacts/:id` — hide or restore through a narrow action schema.
+- `DELETE /api/artifacts/:id/backing` — confirmed byte-backed deletion only.
+
+All handlers use `authed`/`authedWithParams` and a centralized `ownedArtifact`/`requireOwnedArtifact` SQL helper. For object probing resistance, inaccessible IDs should use the repository's canonical not-found behavior consistently; tests must lock the chosen 404/403 semantics.
+
+Shared server modules should separate:
+
+1. artifact normalization and registration;
+2. ownership-scoped artifact queries;
+3. storage-key parsing/resolution and streaming;
+4. supported event-to-artifact extraction;
+5. search/filter/cursor validation;
+6. preview capability selection;
+7. availability reconciliation.
+
+Likely affected areas during implementation (not an authorization to edit):
+
+- `lib/db/schema.ts`, `lib/db/migrations/*`;
+- new `lib/artifacts*.ts` modules and focused unit tests;
+- `lib/api-ownership.ts`;
+- `lib/local-blob.ts` and `app/api/files/[...path]/route.ts`;
+- new `app/api/artifacts/**` routes;
+- `app/api/documents/**` and `hooks/use-chat-attachments.ts`;
+- `agent/tools/artifact.ts`, `agent/tools/generate_image.ts`, and authenticated Eve-session-to-chat resolution;
+- `lib/chat-events.ts` plus supported parsers;
+- `components/sidebar-nav.tsx`, new Library page/components, existing artifact/image/attachment rendering, and source-turn navigation;
+- explicit backfill command/script and deployment documentation.
+
+### security and privacy requirements
+
+### 13.1 Authorization boundaries
+
+- Authentication is required for page and API access.
+- Ownership is enforced in SQL for list/detail/mutations.
+- Parent `chatId`, `projectId`, and `documentId` are validated as belonging to the same user before registration/linking.
+- Eve tools derive `userId` from `ctx.session.auth.current` and resolve the root session to a user-owned chat; model input cannot select an owner.
+- A foreign artifact UUID, source key, chat ID, project ID, old blob URL, or storage leaf must not reveal metadata, timing-significant detail, preview bytes, or existence.
+
+### 13.2 Storage safety
+
+- Store a normalized server-only storage key, never accept an arbitrary path/URL on preview/delete requests.
+- Resolve paths under `LOCAL_STORAGE_DIR` and reject traversal, encoding tricks, symlinks escaping the root, and non-local/foreign URLs.
+- Deletion operates on exactly one owned artifact's key and is idempotent.
+- If historical duplicate references share a backing key, physical deletion must require a reference check and produce consistent tombstones for all same-owner references; it must never affect a different owner silently. Prefer deduplicating identity during backfill rather than shared untracked keys.
+
+### 13.3 Content safety
+
+- Set `nosniff` and safe disposition/cache headers.
+- Sanitize filenames for headers and downloads.
+- Keep HTML/SVG previews in sandboxed opaque-origin iframes. Do not use unsandboxed `dangerouslySetInnerHTML` for user/model HTML or SVG.
+- Bound preview sizes and protect against decompression bombs or automatic parsing of untrusted Office archives in the request path.
+- PDF/Office generation and validation are separate backlog features; the Library does not claim such binaries are safe only because they are indexed.
+
+### 13.4 Privacy and logging
+
+- Search input, filenames, content, prompts, URLs, local paths, storage keys, event bodies, and extracted text are sensitive.
+- Structured logs use artifact/source-kind/media-class IDs only where necessary and should hash or omit user/artifact identifiers according to existing logging conventions.
+- Error messages returned to users must not expose filesystem paths, SQL detail, provider secrets, or another user's existence.
+
+### Test matrix
+
+All test identifiers are referenced by traceability in Section 19.
+
+### 16.1 Unit tests
+
+| ID | Area | Cases |
+|---|---|---|
+| UT-001 | Artifact normalization | filename sanitation, MIME/language normalization, media-class mapping, missing fields, size bounds. |
+| UT-002 | Source identity | deterministic document/tool/generated-file keys; distinct chats/tool calls do not collide. |
+| UT-003 | Cursor codec | encode/decode, malformed/tampered cursor, timestamp/UUID tie-break, filter change reset. |
+| UT-004 | Filter validation | valid/invalid type/chat/project/date/visibility/page-size parameters. |
+| UT-005 | Search normalization | case folding, whitespace, special characters, max length, empty query. |
+| UT-006 | Preview capability | image/text/Markdown/HTML/SVG/GenUI/PDF/Office/unsupported/error/missing/deleted mapping. |
+| UT-007 | Event extraction | complete `artifact` and `generate_image` outputs; streaming input fallback excluded from backfill until delivered; failed/malformed/duplicate events. |
+| UT-008 | Availability transitions | processing/available/error/missing/expired/deleted; legal and idempotent transitions. |
+| UT-009 | Storage resolution | local key extraction, traversal/encoding/symlink escape rejection, foreign URL rejection. |
+| UT-010 | Download headers | filename quoting/UTF-8, MIME, disposition, nosniff, private cache. |
+| UT-011 | Source locator | uploaded message index and tool event/call locator generation/fallback. |
+| UT-012 | Lifecycle policy | hide/restore all types; delete-backing only blob-backed; repeated actions. |
+
+### 16.2 Database/integration tests
+
+| ID | Area | Cases |
+|---|---|---|
+| IT-001 | Ownership queries | two users with same-looking titles/files; every list/facet/detail query returns only owner rows. |
+| IT-002 | Pagination | equal timestamps, insert between pages, next cursor, no duplicate/skip in defined snapshot semantics. |
+| IT-003 | Filters/search | each filter alone and all combinations; title, filename, extracted text, prompt, inline content; unsupported binary. |
+| IT-004 | Registration | upload, generated image, inline artifact, future generated file fixture; idempotent retries. |
+| IT-005 | Parent validation | foreign chat/project/document IDs rejected and not linked. |
+| IT-006 | Source deletion | deleting chat/project sets provenance unavailable and preserves artifact/content. |
+| IT-007 | Document behavior | hide/delete Library state does not alter document retrieval content; backing deletion produces explicit retrieval behavior. |
+| IT-008 | Missing backing | file removed out of band; preview/download response and state reconciliation. |
+| IT-009 | Shared/duplicate key safety | deletion affects only intended owned references and never another user's file. |
+| IT-010 | Range/streaming | PDF/media range response, large file streamed, bounded memory behavior. |
+| IT-011 | Legacy file route | authenticated owner succeeds after registration; anonymous/foreign/unregistered requests fail safely. |
+| IT-012 | Chat rendering state | stale event URL plus deleted/missing artifact renders tombstone, not working media. |
+
+### 16.3 Migration/backfill tests
+
+| ID | Area | Cases |
+|---|---|---|
+| MT-001 | Empty migration | new database applies all migrations successfully. |
+| MT-002 | Upgrade migration | current schema/data upgrades without destructive changes. |
+| MT-003 | Document backfill | ready/processing/error image and document rows, staged/no-chat rows, project/no-project rows. |
+| MT-004 | Event backfill | code/text/Markdown/HTML/SVG/GenUI artifacts and generated images across multiple sessions/chats. |
+| MT-005 | Bad historical data | malformed tool output, absent event ID, duplicate replay, foreign URL, missing local blob. |
+| MT-006 | Interruption/rerun | terminate mid-batch, resume, rerun twice, no duplicates, stable counts. |
+| MT-007 | Rollback restore | restore coordinated DB/uploads backup and previous image; pre-feature chats/files still work. |
+| MT-008 | Performance | representative large dataset completes within operator-approved maintenance window with bounded memory/concurrency. |
+
+### 16.4 Authorization/security tests
+
+| ID | Area | Cases |
+|---|---|---|
+| ST-001 | Anonymous | list/facets/detail/preview/download/mutations denied. |
+| ST-002 | IDOR | User B tries User A UUID/source chat/project/document/tool-call references on every endpoint. |
+| ST-003 | Old URL | guessed/known `/api/files/<leaf>` cannot bypass ownership. |
+| ST-004 | Path handling | `..`, encoded separators, absolute paths, null bytes, symlink escape, foreign URLs. |
+| ST-005 | Header injection | CR/LF, quotes, Unicode, very long filenames in `Content-Disposition`. |
+| ST-006 | Preview isolation | hostile HTML/SVG attempts cookie/storage/API access, parent navigation, popups, and script escape. |
+| ST-007 | Search injection | SQL/FTS operators, wildcards, oversized input; parameterized behavior and no log leakage. |
+| ST-008 | Registration trust | model/tool input attempts to claim another user/chat/storage key. |
+| ST-009 | Deletion race | concurrent download/delete/hide/restore and repeated requests remain safe. |
+| ST-010 | Sensitive telemetry | automated assertion/review that logs omit filenames, queries, prompts, content, storage keys, and event JSON. |
+
+### 16.5 Browser/end-to-end tests
+
+| ID | Flow | Cases |
+|---|---|---|
+| E2E-001 | Sidebar/page | placement, active state, collapsed tooltip, auth redirect. |
+| E2E-002 | Browse | mixed artifact grid, metadata, load more, stable history/navigation. |
+| E2E-003 | Search/filter | all selectors, combined filters, URL persistence, custom dates, clear all. |
+| E2E-004 | Preview | image, text/code, Markdown, HTML, SVG, GenUI, PDF, Office fallback, unsupported binary. |
+| E2E-005 | Download | inline and blob artifacts preserve filename/content/MIME. |
+| E2E-006 | Provenance | open uploaded user turn and generated assistant tool call; deleted-source fallback. |
+| E2E-007 | Lifecycle | hide, Hidden view, restore, delete backing confirmation/tombstone, source chat unchanged. |
+| E2E-008 | Failures | API error/retry, processing, source error, missing, expired, deleted. |
+| E2E-009 | Accessibility | keyboard-only filter/preview/actions, focus return, screen-reader labels/status, reduced motion. |
+| E2E-010 | Responsive | representative narrow mobile and desktop widths; no hover-only action. |
+| E2E-011 | Cross-user | two browser contexts prove no cross-account list/detail/download/source leakage. |
+| E2E-012 | Existing chat regression | attachment chips, image timeline, artifact panel, document search, chat reload continue to work. |
+
+### 16.6 Performance/reliability tests
+
+| ID | Area | Cases |
+|---|---|---|
+| PT-001 | List scale | 10,000 artifacts/user, indexed plan, p95 goal, payload bound. |
+| PT-002 | Concurrent registration | replay/retry of same tool event and parallel distinct outputs. |
+| PT-003 | Large content | max upload, large inline artifact guard, 512 KiB preview cap, streaming download. |
+| PT-004 | Storage outage | list stays usable; preview/download/lifecycle fail explicitly and recover. |
+| PT-005 | Database outage | no false success for registration/lifecycle; existing error conventions used. |
+
+### 16.7 Repository checks
+
+Run focused tests first, then the canonical quality gates from [Development principles](../docs/DEVELOPMENT_PRINCIPLES.md): typecheck, lint, unit tests, check, and `git diff --check`. Inspect any changes made by the formatter/check command.
+
+### 16.8 Production acceptance
+
+On a production-like or approved production account containing non-sensitive fixtures:
+
+1. Upload one image, one PDF/text document, and create one code/text artifact and one generated image in different chats/projects.
+2. Confirm all four appear in Library with correct owner, type, date, chat, project, and source-turn links.
+3. Search filename and supported content; apply combined type/project/date filters.
+4. Preview and download each supported artifact; compare downloaded bytes/content to the source fixture.
+5. Hide and restore one artifact.
+6. Delete one disposable blob backing; verify the Library and source chat show a tombstone and the chat itself still exists.
+7. Remove a backing file out of band in a disposable environment; verify missing reconciliation.
+8. Attempt a cross-user artifact URL/ID from a second account and confirm denial/no metadata leak.
+9. Re-run backfill and confirm zero duplicates.
+10. Check structured logs/metrics for expected success/failure counters and absence of sensitive content.
+
+Health 200 responses alone do not satisfy production acceptance.
+
+### When model evals apply
+
+**Model-level evals are applicable only to the changed artifact-producing tool contract, not to Library browsing/search/filtering itself.**
+
+Rationale:
+
+- Library inventory, authorization, migration, filtering, previews, downloads, and lifecycle behavior are deterministic application/database/storage concerns and are better covered by unit, integration, security, migration, browser, and production tests.
+- If implementation changes `agent/tools/artifact.ts`, `agent/tools/generate_image.ts`, tool descriptions, agent instructions, or the model-visible output schema to register/return artifact IDs, existing tool-selection behavior could regress. Those changes require focused Eve evals.
+- Adding only the Library page and API does not require an eval if model-visible behavior and artifact-producing tool contracts remain unchanged.
+
+Required eval plan if tool/model-visible contracts change:
+
+| Eval ID | Fixture/prompt | Expected outcome | Pass threshold |
+|---|---|---|---|
+| EV-001 | “Create a complete downloadable Markdown report…” | Calls `artifact`; output/registration contains complete content, normalized format, and a usable artifact identity; final answer presents it. | 100% across 3 deterministic/retried runs, with no fenced-code-only substitution. |
+| EV-002 | “Generate an image of a lighthouse…” | Calls `generate_image`; successful output is registered and returned/rendered as an artifact. | 100% across 3 runs when the configured image backend succeeds. |
+| EV-003 | Quarterly revenue chart request | Does not route to `generate_image`; preserves existing chart/tool boundary. | 100% across 3 runs. |
+| EV-004 | Ordinary prose answer with no requested deliverable | Does not create a spurious artifact record/tool call. | At least 95% across a 20-prompt negative fixture set; zero cross-user/ownership fields in tool input. |
+| EV-005 | Tool registration/storage failure fixture | Model/user-visible response reports the failure and does not claim a downloadable Library artifact exists. | 100% across injected failure cases. |
+
+Reuse and extend `evals/image-generation.eval.ts` when useful. Add artifact-tool eval coverage only if its model-visible contract changes. Eval fixtures must not use production secrets or personal files.
+
+### Ordered implementation tasks (planning only)
+
+These are proposed implementation tasks to derive into the agent TODO list **only after explicit PRD approval**.
+
+1. **Resolve approval-blocking open questions.** Lock data duplication/search-vector policy, legacy route behavior, and source-turn locator format.
+2. **Add test fixtures and schema migration tests.** Create representative documents/events/users/projects/storage files before implementation logic.
+3. **Define artifact domain types and normalization.** Implement source kinds, media classes, availability, storage kinds, filename/MIME/language normalization, cursor/filter schemas, and unit tests (UT-001–UT-006, UT-008, UT-010, UT-012).
+4. **Add additive artifact schema/migration.** Create table, constraints, indexes, relations, and migration verification (MT-001–MT-002).
+5. **Implement ownership-scoped artifact repository.** Add registration/upsert, owned-artifact lookup, list/facets, search/filter/cursor logic, and integration/security tests (IT-001–IT-005, ST-001–ST-002, ST-007).
+6. **Refactor local storage access behind artifact identity.** Add safe key extraction/resolution, streaming/range reads, availability checks, and deletion primitives (UT-009, IT-008–IT-011, ST-003–ST-005, ST-009).
+7. **Implement artifact API routes.** Metadata/list/facets/detail/preview/download/hide/restore/delete-backing with typed errors and headers (FR-001–FR-007, FR-016–FR-023, FR-028–FR-033).
+8. **Register uploads.** Integrate document creation/binding with artifact upsert while preserving attachment and RAG behavior (IT-004, IT-007, E2E-012).
+9. **Register generated images and inline artifact-tool outputs.** Resolve authenticated Eve root session to owned chat/project, register stable source identity, and surface registration failures. Add required evals if model-visible contracts change (IT-004–IT-005, ST-008, EV-001–EV-005 as applicable).
+10. **Implement centralized historical event extraction and backfill command.** Use `lib/chat-events.ts` predicates/parsers, deterministic batching/upsert, dry-run/report/recheck modes (UT-007, MT-003–MT-006, MT-008).
+11. **Secure the legacy file route.** Replace unguessability-only access with authenticated artifact ownership resolution while preserving registered historical links (IT-011, ST-003).
+12. **Build Library navigation/page/query UI.** Sidebar placement, server page, URL-backed filters/search, cards, pagination, states, responsive/accessibility behavior (E2E-001–E2E-003, E2E-008–E2E-010).
+13. **Build detail previews and downloads.** Reuse safe existing artifact renderers, add PDF/unsupported fallbacks, bounded content fetch, focus management (E2E-004–E2E-005, ST-006).
+14. **Add source-turn navigation.** Stable query/fragment locator, chat scroll/highlight/fallback, ownership checks (UT-011, E2E-006).
+15. **Update chat artifact/attachment/image rendering for availability.** Ensure stale URLs defer to registered artifact state and show tombstones (IT-012, E2E-007, E2E-012).
+16. **Add lifecycle UI.** Hide/restore/delete-backing confirmations and explicit results; verify no source-chat deletion (IT-006–IT-009, E2E-007).
+17. **Add observability and operator documentation.** Structured counters, backfill runbook, migration/backup/rollback instructions, sensitive-log tests (ST-010, PT-004–PT-005).
+18. **Run focused and full verification.** Complete the entire test/eval matrix, standard repository gates, migration restore/rollback, and browser checks.
+19. **Deploy in the approved order and run production acceptance.** Preserve previous image and coordinated backups; validate real flows and backfill idempotency before declaring completion.
+
+### requirement-to-test traceability
+
+| Requirement group | Primary tests/evals |
+|---|---|
+| FR-001–FR-007 (inventory/query) | UT-003–UT-005, IT-001–IT-003, E2E-001–E2E-003, PT-001 |
+| FR-008–FR-015 (registration/discovery) | UT-001–UT-002, UT-007, IT-004–IT-005, MT-003–MT-006, ST-008, PT-002, EV-001–EV-005 when applicable |
+| FR-016–FR-023 (preview/download/file route) | UT-006, UT-009–UT-010, IT-008–IT-011, ST-003–ST-006, E2E-004–E2E-005, PT-003–PT-004 |
+| FR-024–FR-027 (provenance/chat rendering) | UT-011, IT-006, IT-012, E2E-006, E2E-012 |
+| FR-028–FR-033 (lifecycle/availability) | UT-008, UT-012, IT-006–IT-009, ST-009, E2E-007–E2E-008 |
+| FR-034–FR-038 (migration/operations) | MT-001–MT-008, PT-004–PT-005, production acceptance 8–10 |
+| NFR-001, NFR-009 (authorization/isolation) | ST-001–ST-009, E2E-011 |
+| NFR-002, NFR-012 (privacy/operability) | ST-010, backfill reports, production acceptance 10 |
+| NFR-003–NFR-005 (performance/payload/scale) | IT-002, IT-010, MT-008, PT-001, PT-003 |
+| NFR-006, NFR-010–NFR-011 (reliability/compatibility/integrity) | IT-004, IT-006–IT-012, MT-006–MT-007, E2E-007, E2E-012, PT-002–PT-005 |
+| NFR-007–NFR-008 (accessibility/responsive) | E2E-009–E2E-010 |
+| US-001 | E2E-001 |
+| US-002 | IT-002, MT-003–MT-006, E2E-002, E2E-008 |
+| US-003 | UT-005, IT-003, ST-007, E2E-003 |
+| US-004 | UT-004, IT-003, E2E-003 |
+| US-005 | UT-006, ST-006, E2E-004, E2E-009–E2E-010 |
+| US-006 | UT-010, IT-010, ST-002–ST-005, E2E-005 |
+| US-007 | UT-011, IT-006, E2E-006 |
+| US-008 | UT-012, IT-007, E2E-007 |
+| US-009 | UT-008–UT-009, IT-006, IT-009, ST-009, E2E-007 |
+| US-010 | UT-008, IT-008, E2E-008, PT-004 |
+| US-011 | UT-002, IT-004–IT-005, ST-008, PT-002, EV-001–EV-005 if applicable |
+| US-012 | MT-001–MT-008 |
+
+## Acceptance criteria
+
+### user stories and acceptance criteria
 
 ### US-001: navigate to the library
 
@@ -366,146 +789,9 @@ For uploaded files, use the bound user `messageIndex` as legacy provenance and a
 - [ ] Running the backfill twice produces no duplicate artifact rows.
 - [ ] Rollback steps and pre-migration database/uploads backup are documented and exercised.
 
-## 8. functional requirements
+## Deployment
 
-### Inventory and query
-
-- **FR-001:** The system must expose an authenticated `/library` page and Library API surface.
-- **FR-002:** Every Library list query must include `artifact.userId = session.user.id` in SQL.
-- **FR-003:** The list API must return metadata only and must not return full inline content, extracted text, storage keys, or raw chat events.
-- **FR-004:** The list API must support the search, filters, sorting, and cursor rules in Section 5.
-- **FR-005:** The list API must return current source chat/project display metadata only through user-scoped joins.
-- **FR-006:** The list API must expose a stable availability/status enum and preview capability metadata so the UI does not infer state from a URL.
-- **FR-007:** The query must remain deterministic when multiple artifacts share a timestamp by using the artifact UUID as a tie-breaker.
-
-### Registration and discovery
-
-- **FR-008:** A shared server-side registration service must accept trusted execution context and normalized artifact metadata. It must perform an idempotent insert or update.
-- **FR-009:** Stable source identities must be unique per user/source: uploaded document ID; tool-producing chat plus tool call/event identity; future generator job/output identity.
-- **FR-010:** Upload flows must associate the existing `document` row with one artifact record without duplicating file bytes or extracted content.
-- **FR-011:** Generated images must be stored under a user-owned artifact record at generation time, with source chat/turn resolved from authenticated Eve session context.
-- **FR-012:** Code/text artifact tool outputs must be registered with normalized title, language, complete inline content reference, source identity, and searchable text.
-- **FR-013:** Research exports implemented through the existing artifact tool or a future file generator must use the same artifact registration path.
-- **FR-014:** Future PDF/DOCX/PPTX/XLSX outputs must be representable as blob-backed artifacts without schema changes.
-- **FR-015:** Registration must not accept ownership or storage authority from model-controlled input.
-
-### Preview and download
-
-- **FR-016:** Metadata, preview, content, and download endpoints must be authenticated and ownership-scoped.
-- **FR-017:** Blob-backed responses must resolve a server-held storage key/reference, never an arbitrary request path or caller-supplied URL.
-- **FR-018:** Download responses must sanitize filenames, set `Content-Disposition: attachment`, preserve/normalize MIME type, set `X-Content-Type-Options: nosniff`, and use private/no-store or appropriately private caching.
-- **FR-019:** Inline artifacts must be downloadable through the authorized artifact endpoint.
-- **FR-020:** Preview rendering must follow Section 6.4 and must not execute untrusted content in the MiniScira origin.
-- **FR-021:** Preview payload limits must be enforced on the server; the initial text/code preview limit is 512 KiB, with explicit truncation metadata.
-- **FR-022:** Blob response code should support HTTP range requests for PDF/media preview where practical and must stream rather than buffer large files.
-- **FR-023:** Old `/api/files/*` links retained in historical events must no longer rely on unguessability alone; they must resolve to a registered, owned artifact or return unavailable/not found.
-
-### Provenance and source links
-
-- **FR-024:** Artifact rows must preserve source chat, project, source kind, source event/tool identity, and source turn locator when available.
-- **FR-025:** Chat/project deletion must not cascade-delete artifacts; provenance becomes unavailable through `SET NULL` or equivalent explicit state.
-- **FR-026:** The source link must verify ownership at navigation/read time and must not reveal inaccessible IDs or titles.
-- **FR-027:** Chat rendering must consult artifact availability for registered generated/uploaded artifacts so deleted/missing backing is explicit even if a historical event contains a stale URL.
-
-### Lifecycle
-
-- **FR-028:** Hide, restore, and delete-backing mutations must be idempotent and ownership-scoped.
-- **FR-029:** Hide/restore must not modify chat, chat events, `document.content`, document retrieval eligibility, or file storage.
-- **FR-030:** Delete-backing must preserve the artifact tombstone and source chat; it must not be implemented as chat deletion.
-- **FR-031:** Delete-backing must be rejected for inline-only artifacts in this release.
-- **FR-032:** Missing backing discovered during preview/download/backfill must be represented in artifact state and surfaced to the user.
-- **FR-033:** Storage deletion errors must not falsely report success; the response and telemetry must distinguish database tombstoning from failed physical deletion.
-
-### Migration and operations
-
-- **FR-034:** Schema changes must use committed Drizzle migration files and must not be applied implicitly during normal startup.
-- **FR-035:** Backfill must be an explicit, bounded, restartable operation with batch size and dry-run/report modes.
-- **FR-036:** Backfill must scan only supported event shapes through centralized event/tool-output parsers; arbitrary `.type` inspection outside `lib/chat-events.ts` remains prohibited.
-- **FR-037:** Backfill must not download remote/foreign URLs. It may register them as unsupported/unavailable only if the backlog scope requires their record; this release's usable backing is local storage or inline content.
-- **FR-038:** Deployment must preserve both database and uploads volumes and require backups of both before migration/backfill.
-
-## 9. non-functional requirements
-
-- **NFR-001 — Authorization:** Every artifact operation is denied by default and scoped to the authenticated user in SQL. UUIDs, random blob names, and source links are not authorization controls.
-- **NFR-002 — Privacy:** Logs and metrics must exclude filenames, titles, prompts, content, extracted text, storage paths/keys, event JSON, and query text.
-- **NFR-003 — Performance:** For a user with 10,000 artifacts, p95 metadata list requests should complete within 500 ms on the reference self-hosted Postgres deployment, excluding network latency, with indexes used for ownership/order and supported filters/search.
-- **NFR-004 — Payload size:** The first Library list response should remain below 250 KiB for 30 normal metadata rows; preview content is fetched separately.
-- **NFR-005 — Scalability:** Queries use keyset pagination and indexed predicates; the UI does not fetch all chats, projects, or artifacts only to render the first page.
-- **NFR-006 — Reliability:** Registration and backfill are idempotent. A partial storage or database failure produces a recoverable state, not an orphan silently reported as success.
-- **NFR-007 — Accessibility:** Library controls meet keyboard, focus, label, contrast, and screen-reader requirements; status is conveyed by text/icon, not color alone.
-- **NFR-008 — Responsive UX:** All core actions work at narrow mobile widths without hover-only controls.
-- **NFR-009 — Security isolation:** Untrusted HTML/SVG/GenUI previews cannot access the authenticated parent origin or navigate it without explicit user action.
-- **NFR-010 — Compatibility:** Existing chats, event replay, attachment rendering, document search, image generation, and browser artifact panels continue to work during rollout.
-- **NFR-011 — Data integrity:** No action in this feature implicitly deletes source chats. Chat deletion does not implicitly delete Library artifacts.
-- **NFR-012 — Operability:** Backfill progress, failures, missing backing, and registration failures are observable without sensitive payloads.
-
-## 10. proposed data model
-
-### 10.1 New `artifact` table
-
-Proposed fields (exact SQL types/names may be adjusted during approved implementation only if behavior does not change):
-
-| Field | Purpose |
-|---|---|
-| `id uuid primary key` | Stable Library identity. |
-| `userId text not null` | Owner; FK to `user` with `ON DELETE CASCADE`. |
-| `chatId uuid null` | Origin chat; FK to `chat` with `ON DELETE SET NULL`. |
-| `projectId uuid null` | Origin project snapshot/link; FK to `project` with `ON DELETE SET NULL`. |
-| `documentId uuid null` | Existing upload/document row; FK to `document` with `ON DELETE SET NULL`, unique when non-null. |
-| `sourceKind text not null` | `upload`, `artifact_tool`, `generated_image`, `research_export`, `generated_file`. |
-| `sourceKey text not null` | Deterministic trusted identity such as `document:<id>` or `chat:<id>:tool:<callId>`; never shown to clients. |
-| `sourceEventId text null` | Eve server event ULID when available. |
-| `sourceToolCallId text null` | Tool call identity when available. |
-| `sourceTurnId text null` | Durable Eve turn identity when available. |
-| `sourceMessageIndex integer null` | Legacy uploaded user-turn locator and fallback provenance. |
-| `title text not null` | Human display title. |
-| `filename text not null` | Sanitized download filename (display may retain original separately only if needed). |
-| `mediaClass text not null` | `image`, `document`, `code_text`, `export`, `other`. |
-| `mimeType text not null` | Normalized MIME type. |
-| `language text null` | Artifact-tool language/format where applicable. |
-| `storageKind text not null` | `local_blob` or `inline`. Future values require review. |
-| `storageKey text null` | Server-only local blob leaf/key, not a URL. Required for `local_blob`. |
-| `inlineContent text null` | Complete text artifact content. Required for `inline`; absent from list responses. |
-| `searchText text null` | Normalized extracted/searchable text. May reference/copy `document.content` during registration; see open question OQ-003. |
-| `sizeBytes integer not null default 0` | Byte size when known. |
-| `availability text not null` | `processing`, `available`, `error`, `missing`, `expired`, `deleted`. |
-| `errorCode text null` | Non-sensitive typed failure code, not raw provider/path error text. |
-| `libraryHiddenAt timestamp null` | Reversible removal from default Library. |
-| `deletedAt timestamp null` | Backing deletion/tombstone time. |
-| `createdAt timestamp not null` | Artifact creation/receipt time, sourced from document/event time. |
-| `updatedAt timestamp not null` | Metadata/state update time. |
-
-Constraints:
-
-- unique `(userId, sourceKey)` for idempotent registration/backfill;
-- `storageKind=local_blob` requires `storageKey` and forbids `inlineContent`;
-- `storageKind=inline` requires `inlineContent` and forbids `storageKey`;
-- `availability=deleted` requires `deletedAt`;
-- only trusted server code creates `sourceKey`, ownership, provenance, and storage references.
-
-Recommended indexes:
-
-- `(userId, libraryHiddenAt, createdAt DESC, id DESC)` for default/hidden inventory;
-- `(userId, mediaClass, createdAt DESC, id DESC)`;
-- `(userId, chatId, createdAt DESC, id DESC)`;
-- `(userId, projectId, createdAt DESC, id DESC)`;
-- unique `(userId, sourceKey)`;
-- unique partial `documentId` where non-null;
-- PostgreSQL GIN full-text index over a normalized `tsvector` derived from title/filename/search text, or a generated/stored `searchVector` if Drizzle/migration support is verified during implementation.
-
-### 10.2 Existing `document` table
-
-Keep `document` as the source of truth for document ingestion and retrieval-augmented generation (RAG). Add a nullable unique `artifactId` only if it clearly simplifies joins. Otherwise, `artifact.documentId` is the canonical one-way association. Do not duplicate blob bytes. Library hide and restore actions must not change document search behavior or `document.content`.
-
-### 10.3 Existing `chat_event` table
-
-Persisted events remain the transcript/event source. New tool-created artifacts must write a first-class artifact row and include/derive a stable artifact ID in rendering. Historical event JSON is not destructively rewritten by the schema migration. The backfill parses supported tool output shapes and associates the resulting artifact row through stable event/tool identities.
-
-### 10.4 Availability and source status
-
-`availability` describes whether artifact content can be previewed/downloaded. Upload processing status may originate in `document.status`; registration/reconciliation maps it to the artifact enum. Source provenance availability (chat/project exists) is derived separately so a deleted chat does not mark an otherwise downloadable file as missing.
-
-## 11. Migration and backfill
+### Migration and backfill
 
 ### Phase A: additive schema migration
 
@@ -548,103 +834,7 @@ After backfill verification:
 - Verify missing blobs produce tombstones, not backfill failure.
 - Verify rollback on a database/uploads backup and preserve the previous application image.
 
-## 12. API and server design
-
-Proposed authenticated API surface:
-
-- `GET /api/artifacts` — metadata list, cursor, filters/search.
-- `GET /api/artifacts/facets` — user-scoped chat/project/filter options and counts where economical.
-- `GET /api/artifacts/:id` — metadata/detail and preview capabilities.
-- `GET /api/artifacts/:id/preview` — bounded authorized preview/rendition.
-- `GET /api/artifacts/:id/download` — authorized attachment download/stream.
-- `PATCH /api/artifacts/:id` — hide or restore through a narrow action schema.
-- `DELETE /api/artifacts/:id/backing` — confirmed byte-backed deletion only.
-
-All handlers use `authed`/`authedWithParams` and a centralized `ownedArtifact`/`requireOwnedArtifact` SQL helper. For object probing resistance, inaccessible IDs should use the repository's canonical not-found behavior consistently; tests must lock the chosen 404/403 semantics.
-
-Shared server modules should separate:
-
-1. artifact normalization and registration;
-2. ownership-scoped artifact queries;
-3. storage-key parsing/resolution and streaming;
-4. supported event-to-artifact extraction;
-5. search/filter/cursor validation;
-6. preview capability selection;
-7. availability reconciliation.
-
-Likely affected areas during implementation (not an authorization to edit):
-
-- `lib/db/schema.ts`, `lib/db/migrations/*`;
-- new `lib/artifacts*.ts` modules and focused unit tests;
-- `lib/api-ownership.ts`;
-- `lib/local-blob.ts` and `app/api/files/[...path]/route.ts`;
-- new `app/api/artifacts/**` routes;
-- `app/api/documents/**` and `hooks/use-chat-attachments.ts`;
-- `agent/tools/artifact.ts`, `agent/tools/generate_image.ts`, and authenticated Eve-session-to-chat resolution;
-- `lib/chat-events.ts` plus supported parsers;
-- `components/sidebar-nav.tsx`, new Library page/components, existing artifact/image/attachment rendering, and source-turn navigation;
-- explicit backfill command/script and deployment documentation.
-
-## 13. security and privacy requirements
-
-### 13.1 Authorization boundaries
-
-- Authentication is required for page and API access.
-- Ownership is enforced in SQL for list/detail/mutations.
-- Parent `chatId`, `projectId`, and `documentId` are validated as belonging to the same user before registration/linking.
-- Eve tools derive `userId` from `ctx.session.auth.current` and resolve the root session to a user-owned chat; model input cannot select an owner.
-- A foreign artifact UUID, source key, chat ID, project ID, old blob URL, or storage leaf must not reveal metadata, timing-significant detail, preview bytes, or existence.
-
-### 13.2 Storage safety
-
-- Store a normalized server-only storage key, never accept an arbitrary path/URL on preview/delete requests.
-- Resolve paths under `LOCAL_STORAGE_DIR` and reject traversal, encoding tricks, symlinks escaping the root, and non-local/foreign URLs.
-- Deletion operates on exactly one owned artifact's key and is idempotent.
-- If historical duplicate references share a backing key, physical deletion must require a reference check and produce consistent tombstones for all same-owner references; it must never affect a different owner silently. Prefer deduplicating identity during backfill rather than shared untracked keys.
-
-### 13.3 Content safety
-
-- Set `nosniff` and safe disposition/cache headers.
-- Sanitize filenames for headers and downloads.
-- Keep HTML/SVG previews in sandboxed opaque-origin iframes. Do not use unsandboxed `dangerouslySetInnerHTML` for user/model HTML or SVG.
-- Bound preview sizes and protect against decompression bombs or automatic parsing of untrusted Office archives in the request path.
-- PDF/Office generation and validation are separate backlog features; the Library does not claim such binaries are safe only because they are indexed.
-
-### 13.4 Privacy and logging
-
-- Search input, filenames, content, prompts, URLs, local paths, storage keys, event bodies, and extracted text are sensitive.
-- Structured logs use artifact/source-kind/media-class IDs only where necessary and should hash or omit user/artifact identifiers according to existing logging conventions.
-- Error messages returned to users must not expose filesystem paths, SQL detail, provider secrets, or another user's existence.
-
-## 14. observability
-
-### 14.1 Structured events and counters
-
-Emit structured, non-sensitive telemetry for:
-
-- `artifact.register` — source kind, media class, result (`inserted|existing|failed`), duration;
-- `artifact.list` — filter classes used, result bucket, duration, status;
-- `artifact.preview` and `artifact.download` — media class, availability, byte bucket, duration, status;
-- `artifact.lifecycle` — action (`hide|restore|delete_backing`), result, duration;
-- `artifact.reconcile` — transition (`available->missing`, etc.);
-- `artifact.backfill.batch` and final summary — scanned/inserted/existing/malformed/unavailable/conflict counts;
-- authorization rejection counts by route/action.
-
-### 14.2 Operator checks and alerts
-
-Document operator investigation thresholds rather than adding a new monitoring vendor:
-
-- sustained registration failures;
-- a backfill conflict/malformed rate above an agreed threshold;
-- sudden missing-backing growth;
-- elevated download/preview 5xx rate;
-- migration failure or backfill interruption.
-
-### 14.3 What health checks prove
-
-Existing health endpoints prove process/database availability only. They do not prove Library authorization, backfill completeness, preview, download, storage, or source navigation. Production acceptance must exercise those real flows.
-
-## 15. deployment and rollback
+### deployment and rollback
 
 Follow the canonical [Deployment guide](../docs/DEPLOYMENT.md); this section records feature-specific gates only.
 
@@ -675,213 +865,41 @@ The exact ordering must be tested for the final implementation. Do not create a 
 - If migration/backfill corrupts associations or content, stop lifecycle mutations, restore the database and uploads backup together, redeploy the previous image, and retain failure logs without sensitive payloads.
 - Do not drop the artifact table as an automated rollback step.
 
-## 16. Test matrix
+## Observability
 
-All test identifiers are referenced by traceability in Section 19.
+### 14.1 Structured events and counters
 
-### 16.1 Unit tests
+Emit structured, non-sensitive telemetry for:
 
-| ID | Area | Cases |
-|---|---|---|
-| UT-001 | Artifact normalization | filename sanitation, MIME/language normalization, media-class mapping, missing fields, size bounds. |
-| UT-002 | Source identity | deterministic document/tool/generated-file keys; distinct chats/tool calls do not collide. |
-| UT-003 | Cursor codec | encode/decode, malformed/tampered cursor, timestamp/UUID tie-break, filter change reset. |
-| UT-004 | Filter validation | valid/invalid type/chat/project/date/visibility/page-size parameters. |
-| UT-005 | Search normalization | case folding, whitespace, special characters, max length, empty query. |
-| UT-006 | Preview capability | image/text/Markdown/HTML/SVG/GenUI/PDF/Office/unsupported/error/missing/deleted mapping. |
-| UT-007 | Event extraction | complete `artifact` and `generate_image` outputs; streaming input fallback excluded from backfill until delivered; failed/malformed/duplicate events. |
-| UT-008 | Availability transitions | processing/available/error/missing/expired/deleted; legal and idempotent transitions. |
-| UT-009 | Storage resolution | local key extraction, traversal/encoding/symlink escape rejection, foreign URL rejection. |
-| UT-010 | Download headers | filename quoting/UTF-8, MIME, disposition, nosniff, private cache. |
-| UT-011 | Source locator | uploaded message index and tool event/call locator generation/fallback. |
-| UT-012 | Lifecycle policy | hide/restore all types; delete-backing only blob-backed; repeated actions. |
+- `artifact.register` — source kind, media class, result (`inserted|existing|failed`), duration;
+- `artifact.list` — filter classes used, result bucket, duration, status;
+- `artifact.preview` and `artifact.download` — media class, availability, byte bucket, duration, status;
+- `artifact.lifecycle` — action (`hide|restore|delete_backing`), result, duration;
+- `artifact.reconcile` — transition (`available->missing`, etc.);
+- `artifact.backfill.batch` and final summary — scanned/inserted/existing/malformed/unavailable/conflict counts;
+- authorization rejection counts by route/action.
 
-### 16.2 Database/integration tests
+### 14.2 Operator checks and alerts
 
-| ID | Area | Cases |
-|---|---|---|
-| IT-001 | Ownership queries | two users with same-looking titles/files; every list/facet/detail query returns only owner rows. |
-| IT-002 | Pagination | equal timestamps, insert between pages, next cursor, no duplicate/skip in defined snapshot semantics. |
-| IT-003 | Filters/search | each filter alone and all combinations; title, filename, extracted text, prompt, inline content; unsupported binary. |
-| IT-004 | Registration | upload, generated image, inline artifact, future generated file fixture; idempotent retries. |
-| IT-005 | Parent validation | foreign chat/project/document IDs rejected and not linked. |
-| IT-006 | Source deletion | deleting chat/project sets provenance unavailable and preserves artifact/content. |
-| IT-007 | Document behavior | hide/delete Library state does not alter document retrieval content; backing deletion produces explicit retrieval behavior. |
-| IT-008 | Missing backing | file removed out of band; preview/download response and state reconciliation. |
-| IT-009 | Shared/duplicate key safety | deletion affects only intended owned references and never another user's file. |
-| IT-010 | Range/streaming | PDF/media range response, large file streamed, bounded memory behavior. |
-| IT-011 | Legacy file route | authenticated owner succeeds after registration; anonymous/foreign/unregistered requests fail safely. |
-| IT-012 | Chat rendering state | stale event URL plus deleted/missing artifact renders tombstone, not working media. |
+Document operator investigation thresholds rather than adding a new monitoring vendor:
 
-### 16.3 Migration/backfill tests
+- sustained registration failures;
+- a backfill conflict/malformed rate above an agreed threshold;
+- sudden missing-backing growth;
+- elevated download/preview 5xx rate;
+- migration failure or backfill interruption.
 
-| ID | Area | Cases |
-|---|---|---|
-| MT-001 | Empty migration | new database applies all migrations successfully. |
-| MT-002 | Upgrade migration | current schema/data upgrades without destructive changes. |
-| MT-003 | Document backfill | ready/processing/error image and document rows, staged/no-chat rows, project/no-project rows. |
-| MT-004 | Event backfill | code/text/Markdown/HTML/SVG/GenUI artifacts and generated images across multiple sessions/chats. |
-| MT-005 | Bad historical data | malformed tool output, absent event ID, duplicate replay, foreign URL, missing local blob. |
-| MT-006 | Interruption/rerun | terminate mid-batch, resume, rerun twice, no duplicates, stable counts. |
-| MT-007 | Rollback restore | restore coordinated DB/uploads backup and previous image; pre-feature chats/files still work. |
-| MT-008 | Performance | representative large dataset completes within operator-approved maintenance window with bounded memory/concurrency. |
+### 14.3 What health checks prove
 
-### 16.4 Authorization/security tests
+Existing health endpoints prove process/database availability only. They do not prove Library authorization, backfill completeness, preview, download, storage, or source navigation. Production acceptance must exercise those real flows.
 
-| ID | Area | Cases |
-|---|---|---|
-| ST-001 | Anonymous | list/facets/detail/preview/download/mutations denied. |
-| ST-002 | IDOR | User B tries User A UUID/source chat/project/document/tool-call references on every endpoint. |
-| ST-003 | Old URL | guessed/known `/api/files/<leaf>` cannot bypass ownership. |
-| ST-004 | Path handling | `..`, encoded separators, absolute paths, null bytes, symlink escape, foreign URLs. |
-| ST-005 | Header injection | CR/LF, quotes, Unicode, very long filenames in `Content-Disposition`. |
-| ST-006 | Preview isolation | hostile HTML/SVG attempts cookie/storage/API access, parent navigation, popups, and script escape. |
-| ST-007 | Search injection | SQL/FTS operators, wildcards, oversized input; parameterized behavior and no log leakage. |
-| ST-008 | Registration trust | model/tool input attempts to claim another user/chat/storage key. |
-| ST-009 | Deletion race | concurrent download/delete/hide/restore and repeated requests remain safe. |
-| ST-010 | Sensitive telemetry | automated assertion/review that logs omit filenames, queries, prompts, content, storage keys, and event JSON. |
+## Rollback
 
-### 16.5 Browser/end-to-end tests
+No separate rollback requirements were recorded.
 
-| ID | Flow | Cases |
-|---|---|---|
-| E2E-001 | Sidebar/page | placement, active state, collapsed tooltip, auth redirect. |
-| E2E-002 | Browse | mixed artifact grid, metadata, load more, stable history/navigation. |
-| E2E-003 | Search/filter | all selectors, combined filters, URL persistence, custom dates, clear all. |
-| E2E-004 | Preview | image, text/code, Markdown, HTML, SVG, GenUI, PDF, Office fallback, unsupported binary. |
-| E2E-005 | Download | inline and blob artifacts preserve filename/content/MIME. |
-| E2E-006 | Provenance | open uploaded user turn and generated assistant tool call; deleted-source fallback. |
-| E2E-007 | Lifecycle | hide, Hidden view, restore, delete backing confirmation/tombstone, source chat unchanged. |
-| E2E-008 | Failures | API error/retry, processing, source error, missing, expired, deleted. |
-| E2E-009 | Accessibility | keyboard-only filter/preview/actions, focus return, screen-reader labels/status, reduced motion. |
-| E2E-010 | Responsive | representative narrow mobile and desktop widths; no hover-only action. |
-| E2E-011 | Cross-user | two browser contexts prove no cross-account list/detail/download/source leakage. |
-| E2E-012 | Existing chat regression | attachment chips, image timeline, artifact panel, document search, chat reload continue to work. |
+## Open questions
 
-### 16.6 Performance/reliability tests
-
-| ID | Area | Cases |
-|---|---|---|
-| PT-001 | List scale | 10,000 artifacts/user, indexed plan, p95 goal, payload bound. |
-| PT-002 | Concurrent registration | replay/retry of same tool event and parallel distinct outputs. |
-| PT-003 | Large content | max upload, large inline artifact guard, 512 KiB preview cap, streaming download. |
-| PT-004 | Storage outage | list stays usable; preview/download/lifecycle fail explicitly and recover. |
-| PT-005 | Database outage | no false success for registration/lifecycle; existing error conventions used. |
-
-### 16.7 Repository checks
-
-Run focused tests first, then the canonical quality gates from [Development principles](../docs/DEVELOPMENT_PRINCIPLES.md): typecheck, lint, unit tests, check, and `git diff --check`. Inspect any changes made by the formatter/check command.
-
-### 16.8 Production acceptance
-
-On a production-like or approved production account containing non-sensitive fixtures:
-
-1. Upload one image, one PDF/text document, and create one code/text artifact and one generated image in different chats/projects.
-2. Confirm all four appear in Library with correct owner, type, date, chat, project, and source-turn links.
-3. Search filename and supported content; apply combined type/project/date filters.
-4. Preview and download each supported artifact; compare downloaded bytes/content to the source fixture.
-5. Hide and restore one artifact.
-6. Delete one disposable blob backing; verify the Library and source chat show a tombstone and the chat itself still exists.
-7. Remove a backing file out of band in a disposable environment; verify missing reconciliation.
-8. Attempt a cross-user artifact URL/ID from a second account and confirm denial/no metadata leak.
-9. Re-run backfill and confirm zero duplicates.
-10. Check structured logs/metrics for expected success/failure counters and absence of sensitive content.
-
-Health 200 responses alone do not satisfy production acceptance.
-
-## 17. When model evals apply
-
-**Model-level evals are applicable only to the changed artifact-producing tool contract, not to Library browsing/search/filtering itself.**
-
-Rationale:
-
-- Library inventory, authorization, migration, filtering, previews, downloads, and lifecycle behavior are deterministic application/database/storage concerns and are better covered by unit, integration, security, migration, browser, and production tests.
-- If implementation changes `agent/tools/artifact.ts`, `agent/tools/generate_image.ts`, tool descriptions, agent instructions, or the model-visible output schema to register/return artifact IDs, existing tool-selection behavior could regress. Those changes require focused Eve evals.
-- Adding only the Library page and API does not require an eval if model-visible behavior and artifact-producing tool contracts remain unchanged.
-
-Required eval plan if tool/model-visible contracts change:
-
-| Eval ID | Fixture/prompt | Expected outcome | Pass threshold |
-|---|---|---|---|
-| EV-001 | “Create a complete downloadable Markdown report…” | Calls `artifact`; output/registration contains complete content, normalized format, and a usable artifact identity; final answer presents it. | 100% across 3 deterministic/retried runs, with no fenced-code-only substitution. |
-| EV-002 | “Generate an image of a lighthouse…” | Calls `generate_image`; successful output is registered and returned/rendered as an artifact. | 100% across 3 runs when the configured image backend succeeds. |
-| EV-003 | Quarterly revenue chart request | Does not route to `generate_image`; preserves existing chart/tool boundary. | 100% across 3 runs. |
-| EV-004 | Ordinary prose answer with no requested deliverable | Does not create a spurious artifact record/tool call. | At least 95% across a 20-prompt negative fixture set; zero cross-user/ownership fields in tool input. |
-| EV-005 | Tool registration/storage failure fixture | Model/user-visible response reports the failure and does not claim a downloadable Library artifact exists. | 100% across injected failure cases. |
-
-Reuse and extend `evals/image-generation.eval.ts` when useful. Add artifact-tool eval coverage only if its model-visible contract changes. Eval fixtures must not use production secrets or personal files.
-
-## 18. Ordered implementation tasks (planning only)
-
-These are proposed implementation tasks to derive into the agent TODO list **only after explicit PRD approval**.
-
-1. **Resolve approval-blocking open questions.** Lock data duplication/search-vector policy, legacy route behavior, and source-turn locator format.
-2. **Add test fixtures and schema migration tests.** Create representative documents/events/users/projects/storage files before implementation logic.
-3. **Define artifact domain types and normalization.** Implement source kinds, media classes, availability, storage kinds, filename/MIME/language normalization, cursor/filter schemas, and unit tests (UT-001–UT-006, UT-008, UT-010, UT-012).
-4. **Add additive artifact schema/migration.** Create table, constraints, indexes, relations, and migration verification (MT-001–MT-002).
-5. **Implement ownership-scoped artifact repository.** Add registration/upsert, owned-artifact lookup, list/facets, search/filter/cursor logic, and integration/security tests (IT-001–IT-005, ST-001–ST-002, ST-007).
-6. **Refactor local storage access behind artifact identity.** Add safe key extraction/resolution, streaming/range reads, availability checks, and deletion primitives (UT-009, IT-008–IT-011, ST-003–ST-005, ST-009).
-7. **Implement artifact API routes.** Metadata/list/facets/detail/preview/download/hide/restore/delete-backing with typed errors and headers (FR-001–FR-007, FR-016–FR-023, FR-028–FR-033).
-8. **Register uploads.** Integrate document creation/binding with artifact upsert while preserving attachment and RAG behavior (IT-004, IT-007, E2E-012).
-9. **Register generated images and inline artifact-tool outputs.** Resolve authenticated Eve root session to owned chat/project, register stable source identity, and surface registration failures. Add required evals if model-visible contracts change (IT-004–IT-005, ST-008, EV-001–EV-005 as applicable).
-10. **Implement centralized historical event extraction and backfill command.** Use `lib/chat-events.ts` predicates/parsers, deterministic batching/upsert, dry-run/report/recheck modes (UT-007, MT-003–MT-006, MT-008).
-11. **Secure the legacy file route.** Replace unguessability-only access with authenticated artifact ownership resolution while preserving registered historical links (IT-011, ST-003).
-12. **Build Library navigation/page/query UI.** Sidebar placement, server page, URL-backed filters/search, cards, pagination, states, responsive/accessibility behavior (E2E-001–E2E-003, E2E-008–E2E-010).
-13. **Build detail previews and downloads.** Reuse safe existing artifact renderers, add PDF/unsupported fallbacks, bounded content fetch, focus management (E2E-004–E2E-005, ST-006).
-14. **Add source-turn navigation.** Stable query/fragment locator, chat scroll/highlight/fallback, ownership checks (UT-011, E2E-006).
-15. **Update chat artifact/attachment/image rendering for availability.** Ensure stale URLs defer to registered artifact state and show tombstones (IT-012, E2E-007, E2E-012).
-16. **Add lifecycle UI.** Hide/restore/delete-backing confirmations and explicit results; verify no source-chat deletion (IT-006–IT-009, E2E-007).
-17. **Add observability and operator documentation.** Structured counters, backfill runbook, migration/backup/rollback instructions, sensitive-log tests (ST-010, PT-004–PT-005).
-18. **Run focused and full verification.** Complete the entire test/eval matrix, standard repository gates, migration restore/rollback, and browser checks.
-19. **Deploy in the approved order and run production acceptance.** Preserve previous image and coordinated backups; validate real flows and backfill idempotency before declaring completion.
-
-## 19. requirement-to-test traceability
-
-| Requirement group | Primary tests/evals |
-|---|---|
-| FR-001–FR-007 (inventory/query) | UT-003–UT-005, IT-001–IT-003, E2E-001–E2E-003, PT-001 |
-| FR-008–FR-015 (registration/discovery) | UT-001–UT-002, UT-007, IT-004–IT-005, MT-003–MT-006, ST-008, PT-002, EV-001–EV-005 when applicable |
-| FR-016–FR-023 (preview/download/file route) | UT-006, UT-009–UT-010, IT-008–IT-011, ST-003–ST-006, E2E-004–E2E-005, PT-003–PT-004 |
-| FR-024–FR-027 (provenance/chat rendering) | UT-011, IT-006, IT-012, E2E-006, E2E-012 |
-| FR-028–FR-033 (lifecycle/availability) | UT-008, UT-012, IT-006–IT-009, ST-009, E2E-007–E2E-008 |
-| FR-034–FR-038 (migration/operations) | MT-001–MT-008, PT-004–PT-005, production acceptance 8–10 |
-| NFR-001, NFR-009 (authorization/isolation) | ST-001–ST-009, E2E-011 |
-| NFR-002, NFR-012 (privacy/operability) | ST-010, backfill reports, production acceptance 10 |
-| NFR-003–NFR-005 (performance/payload/scale) | IT-002, IT-010, MT-008, PT-001, PT-003 |
-| NFR-006, NFR-010–NFR-011 (reliability/compatibility/integrity) | IT-004, IT-006–IT-012, MT-006–MT-007, E2E-007, E2E-012, PT-002–PT-005 |
-| NFR-007–NFR-008 (accessibility/responsive) | E2E-009–E2E-010 |
-| US-001 | E2E-001 |
-| US-002 | IT-002, MT-003–MT-006, E2E-002, E2E-008 |
-| US-003 | UT-005, IT-003, ST-007, E2E-003 |
-| US-004 | UT-004, IT-003, E2E-003 |
-| US-005 | UT-006, ST-006, E2E-004, E2E-009–E2E-010 |
-| US-006 | UT-010, IT-010, ST-002–ST-005, E2E-005 |
-| US-007 | UT-011, IT-006, E2E-006 |
-| US-008 | UT-012, IT-007, E2E-007 |
-| US-009 | UT-008–UT-009, IT-006, IT-009, ST-009, E2E-007 |
-| US-010 | UT-008, IT-008, E2E-008, PT-004 |
-| US-011 | UT-002, IT-004–IT-005, ST-008, PT-002, EV-001–EV-005 if applicable |
-| US-012 | MT-001–MT-008 |
-
-## 20. non-goals
-
-This PRD does not include:
-
-1. Implementing PDF, DOCX, PPTX, or XLSX generation; it only makes the Library data model ready to inventory those future outputs.
-2. Natural-language image editing or artifact editing/version history.
-3. Semantic/vector search, OCR, image recognition, or model-generated tagging of Library items.
-4. Giving the research agent a tool to search/read the Library; existing document retrieval does not change.
-5. Sharing artifacts between users, public links, anonymous downloads, team workspaces, or ACLs beyond strict owner access.
-6. Bulk export/download, folders, tags, favorites, pinning, manual renaming, or drag-and-drop organization.
-7. Automatic retention/expiry policy configuration or storage quotas.
-8. Permanent redaction of inline artifact content from historical chat events.
-9. Deleting a source chat as an artifact lifecycle side effect.
-10. Recovering physically deleted bytes without a backup.
-11. Parsing or rendering DOCX/PPTX/XLSX content in the Library request path; safe metadata fallback is sufficient until a validated preview rendition exists.
-12. Replacing the existing `document` ingestion/RAG model with the artifact table.
-13. Changing the canonical agent search, model routing, auth chain, durable stream, scheduling, or Sandbox architecture.
-
-## 21. Open questions that need review
+### Open questions that need review
 
 - **OQ-001 — Inline content source of truth:** Should new `artifact` tool content be stored only in `artifact.inlineContent` with events carrying an artifact ID, or duplicated in both event JSON and the artifact row for replay compatibility? Recommendation: during compatibility rollout, keep event output plus artifact row; establish artifact row as Library/download authority and revisit event payload compaction separately.
 - **OQ-002 — Historical text deletion:** Is reversible “Remove from Library” sufficient for inline artifacts, or is permanent redaction required soon? Permanent redaction would need a separate transcript-retention PRD and is a non-goal here.
@@ -893,7 +911,7 @@ This PRD does not include:
 - **OQ-008 — Backfill execution packaging:** Choose the repository-standard explicit Bun command versus a Compose profile one-shot service. Either must be restartable, documented, and never run during normal startup.
 - **OQ-009 — Result counts:** Should the UI show exact total counts, which can make filtered queries more expensive, or only “showing N” plus Load more? Recommendation: avoid mandatory exact totals in the first release; facets/counts may be approximate or omitted if query plans regress.
 
-## 22. approval gate
+### approval gate
 
 This PRD remains **Draft — not approved**. Before implementation:
 

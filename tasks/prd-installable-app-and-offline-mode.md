@@ -5,22 +5,17 @@
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Approval:** Not approved
 
-## Summary
+## Goal
+
+### Summary
 
 Make the application installable through standard browser and mobile operating-system flows, and provide a minimal, privacy-safe offline shell with explicit reconnect and update behavior.
 
-## Problem
+### Problem
 
 The application does not yet define a complete installable web-app contract across browsers and mobile platforms. Users need correct manifest and platform metadata, production-ready icons, predictable standalone launch behavior, and a minimal offline experience that never exposes or persistently caches private authenticated data.
 
-## Product decisions
-
-- Defer this work until after the higher-priority [Responsive app layout PRD](prd-responsive-app-layout.md).
-- Use browser and operating-system installation flows. Do not add a custom install prompt in the first release.
-- Keep offline support to a minimal public shell. Do not add offline access to private product data.
-- Keep service-worker scope and caching rules as narrow as possible.
-
-## Goals
+### Goals
 
 - Support standard browser installation and supported mobile add-to-home-screen flows.
 - Launch cleanly in standalone display mode with appropriate identity and metadata.
@@ -29,14 +24,6 @@ The application does not yet define a complete installable web-app contract acro
 - Communicate offline, reconnecting, reconnected, and update-required states clearly.
 - Define cache versioning, service-worker update, deployment, and rollback behavior.
 - Verify the complete install and offline experience on physical iOS and Android devices.
-
-## Non-goals
-
-- Authenticated desktop/mobile layout, sidebar behavior, route overflow, touch layout, safe areas, or software-keyboard behavior. Those belong to [Responsive App Layout](./prd-responsive-app-layout.md).
-- Full offline access to authenticated data or offline mutation queues.
-- Background synchronization, push notifications, or native-app distribution.
-- Custom install marketing banners and onboarding tours in the first release.
-- Persistently caching private API responses, conversations, attachments, credentials, or personalized route documents.
 
 ## User stories
 
@@ -47,6 +34,23 @@ Users must be able to:
 - Launch an installed instance in standalone mode with recognizable name, icon, colors, and start location.
 - Understand when the application cannot reach the network and retry or reconnect safely.
 - Receive a new application shell after deployment without remaining indefinitely on stale assets.
+
+## Scope
+
+### Product decisions
+
+- Defer this work until after the higher-priority [Responsive app layout PRD](prd-responsive-app-layout.md).
+- Use browser and operating-system installation flows. Do not add a custom install prompt in the first release.
+- Keep offline support to a minimal public shell. Do not add offline access to private product data.
+- Keep service-worker scope and caching rules as narrow as possible.
+
+## Non-goals
+
+- Authenticated desktop/mobile layout, sidebar behavior, route overflow, touch layout, safe areas, or software-keyboard behavior. Those belong to [Responsive App Layout](./prd-responsive-app-layout.md).
+- Full offline access to authenticated data or offline mutation queues.
+- Background synchronization, push notifications, or native-app distribution.
+- Custom install marketing banners and onboarding tours in the first release.
+- Persistently caching private API responses, conversations, attachments, credentials, or personalized route documents.
 
 ## Functional requirements
 
@@ -107,6 +111,12 @@ Users must be able to:
 - Surface a recoverable refresh action when a new shell requires reload.
 - Keep the previous deployable application version available long enough to support rollback while avoiding incompatible shell/API combinations.
 
+### UX notes
+
+- Prefer native browser/platform installation affordances. Any in-app educational affordance must be dismissible, platform-aware, and must not claim installation is available when it is not.
+- Offline messaging must distinguish unavailable network content from an empty account or an application error.
+- Update messaging should interrupt users only when required for correctness or security.
+
 ## Technical requirements
 
 - Use the installed Next.js version's supported metadata and manifest conventions.
@@ -119,7 +129,7 @@ Users must be able to:
 - Serve the service-worker script with headers that permit timely update checks and prevent an indefinitely stale worker.
 - Ensure manifest, icon, and worker paths function through the production proxy/base path.
 
-## Security and privacy requirements
+### Security and privacy requirements
 
 - Do not put secrets, user identifiers, thread titles, prompts, or account details in the manifest or offline shell.
 - Do not cache session endpoints, authenticated pages, API JSON, Eve events, uploads, artifacts, transcripts, or generated output.
@@ -127,28 +137,7 @@ Users must be able to:
 - Prove that an offline shell cannot display private content from another account.
 - Inspect Cache Storage and require that it contains only approved public shell assets.
 
-## UX notes
-
-- Prefer native browser/platform installation affordances. Any in-app educational affordance must be dismissible, platform-aware, and must not claim installation is available when it is not.
-- Offline messaging must distinguish unavailable network content from an empty account or an application error.
-- Update messaging should interrupt users only when required for correctness or security.
-
-## Acceptance criteria
-
-- The production manifest passes browser validation and contains complete identity, scope, display, color, and icon metadata.
-- The manifest uses `MiniScira` as the product name, and the deployed metadata keeps and verifies `apple-icon.png`.
-- Standard and maskable 192×192 and 512×512 icons render correctly; Apple metadata and touch icon are recognized on supported iOS devices.
-- The app can be installed through standard supported desktop and Android browser flows and added to the home screen on physical iOS.
-- Installed launches use standalone mode where supported, remain in scope, and preserve normal authentication behavior.
-- The HTTPS requirement and support status for every deployment target are documented and verified before enabling the service worker in production.
-- With the network unavailable, the minimal offline shell loads and no private authenticated response or user content is read from a service-worker cache.
-- Reconnect and retry return the user to normally authenticated, freshly fetched content; failed operations are not falsely reported as successful.
-- A new deployment updates cache versions without loops or uncontrolled mid-task reloads.
-- A faulty worker can be rolled back or neutralized without asking users to manually clear browser storage.
-- Installation, standalone launch, offline, reconnect, update, and rollback are checked on physical iOS and Android devices.
-- The deployed feature works without a Vercel-only dependency.
-
-## Validation plan
+### Validation plan
 
 ### Unit and component checks
 
@@ -181,19 +170,33 @@ Users must be able to:
 - Install and launch MiniScira from the deployed system on physical iOS and Android devices.
 - Test online launch, offline launch after shell caching, reconnect, authentication, icon appearance, standalone display, update, privacy, and rollback.
 
-## Dependencies and risks
+### Dependencies and risks
 
 - Depends on approved production brand assets and metadata.
 - Depends on secure HTTPS delivery and correct proxy handling for every supported production origin.
 - Service-worker mistakes can persist across deployments, intercept sensitive requests, or strand users on stale assets; scope and caching rules must remain minimal.
 - iOS and Android installation and lifecycle behavior differ and cannot be fully validated through desktop emulation alone.
 
-## Open questions
+### Implementation handoff
 
-- Do all supported production, custom-domain, and self-hosted deployment paths terminate HTTPS at the public application origin?
-- What exact short name, description, theme color, background color, and icon artwork are approved?
-- Should an available update activate on the next clean navigation, after explicit user confirmation, or under another safe policy?
-- Which desktop and mobile browser versions define the supported installability matrix?
+The implementation agent must receive this PRD, `AGENTS.md`, and the mapped TODO and test plan. The agent must keep responsive layout and sidebar navigation out of scope and preserve the private-data cache restrictions.
+
+Model evals do not apply because this work does not change agent behavior, prompts, tools, retrieval, memory, or model routing.
+
+## Acceptance criteria
+
+- [ ] The production manifest passes browser validation and contains complete identity, scope, display, color, and icon metadata.
+- [ ] The manifest uses `MiniScira` as the product name, and the deployed metadata keeps and verifies `apple-icon.png`.
+- [ ] Standard and maskable 192×192 and 512×512 icons render correctly; Apple metadata and touch icon are recognized on supported iOS devices.
+- [ ] The app can be installed through standard supported desktop and Android browser flows and added to the home screen on physical iOS.
+- [ ] Installed launches use standalone mode where supported, remain in scope, and preserve normal authentication behavior.
+- [ ] The HTTPS requirement and support status for every deployment target are documented and verified before enabling the service worker in production.
+- [ ] With the network unavailable, the minimal offline shell loads and no private authenticated response or user content is read from a service-worker cache.
+- [ ] Reconnect and retry return the user to normally authenticated, freshly fetched content; failed operations are not falsely reported as successful.
+- [ ] A new deployment updates cache versions without loops or uncontrolled mid-task reloads.
+- [ ] A faulty worker can be rolled back or neutralized without asking users to manually clear browser storage.
+- [ ] Installation, standalone launch, offline, reconnect, update, and rollback are checked on physical iOS and Android devices.
+- [ ] The deployed feature works without a Vercel-only dependency.
 
 ## Deployment
 
@@ -223,16 +226,17 @@ Users must be able to:
 - Verify online launch, offline behavior, sign-out, Cache Storage, and installation after rollback.
 - No database rollback is required.
 
-## Approval gate
+## Open questions
+
+- Do all supported production, custom-domain, and self-hosted deployment paths terminate HTTPS at the public application origin?
+- What exact short name, description, theme color, background color, and icon artwork are approved?
+- Should an available update activate on the next clean navigation, after explicit user confirmation, or under another safe policy?
+- Which desktop and mobile browser versions define the supported installability matrix?
+
+### Approval gate
 
 - [ ] The user reviews and approves this exact PRD.
 - [ ] The responsive app layout remains separate and higher priority.
 - [ ] The supported HTTPS origin, start URL, scope, and offline-shell content are resolved.
 - [ ] Implementation TODOs map every acceptance criterion to a check.
 - [ ] Physical-device, privacy, update, deployment, and rollback checks are recorded.
-
-## Implementation handoff
-
-The implementation agent must receive this PRD, `AGENTS.md`, and the mapped TODO and test plan. The agent must keep responsive layout and sidebar navigation out of scope and preserve the private-data cache restrictions.
-
-Model evals do not apply because this work does not change agent behavior, prompts, tools, retrieval, memory, or model routing.

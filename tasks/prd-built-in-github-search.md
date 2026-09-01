@@ -11,6 +11,17 @@ Let MiniScira find public GitHub repositories without requiring a GitHub OAuth a
 
 Keep DeepWiki as an optional MCP server. MiniScira already lists its official public server in the MCP catalog, and users can add it without authentication.
 
+### Evidence reviewed
+
+- Upstream Scira `lib/tools/github-search.ts`.
+- Firecrawl Search documentation and API reference.
+- Firecrawl Developer Index documentation.
+- GitHub REST search and rate-limit documentation.
+- Official DeepWiki MCP documentation.
+- A live Firecrawl GitHub-category request from the MiniScira environment.
+- A live DeepWiki MCP initialization request.
+- MiniScira's current Firecrawl tools, MCP dynamic tools, MCP catalog, timeline classification, and eval helpers.
+
 ## User stories
 
 - As a user, I can ask MiniScira to find public GitHub repositories for a topic without configuring GitHub.
@@ -30,6 +41,18 @@ Keep DeepWiki as an optional MCP server. MiniScira already lists its official pu
 - Teach the agent when to choose `github_search` instead of general web search or a user-enabled GitHub MCP server.
 - Keep DeepWiki in the existing curated MCP catalog. Do not add a built-in DeepWiki wrapper.
 
+### Product decision
+
+The recommended first release searches public GitHub results through Firecrawl and keeps DeepWiki at MCP.
+
+This split removes the highest-friction GitHub setup for the common read-only discovery job. It does not copy GitHub's large authenticated tool set into every turn. DeepWiki already has a free official remote MCP server, requires no login, exposes only three public read tools, and appears in MiniScira's one-click catalog. A built-in DeepWiki wrapper would duplicate transport, schema discovery, timeouts, UI, and routing without removing meaningful user friction.
+
+DeepWiki remains an optional generated knowledge source, not the source of truth for current code. Its public documentation does not state rate limits, output limits, freshness guarantees, or an availability commitment. The public MCP has no indexing tool, and `read_wiki_contents` can return a very large response. MiniScira must fall back to GitHub search and direct reads when DeepWiki is absent, unindexed, slow, or unavailable.
+
+The upstream Scira tool proves the GitHub category, but its orchestration, scraping, and metadata extraction exceed this release. The narrow tool keeps one model-facing contract and uses separate reads for important claims.
+
+Direct GitHub REST search does not meet the same contract. Public code search requires authentication, and unauthenticated requests share an IP-based limit. Firecrawl keyless search was also unavailable from the production network in a live probe. MiniScira therefore reuses its existing explicit Firecrawl configuration.
+
 ## Non-goals
 
 - No GitHub OAuth app.
@@ -45,7 +68,28 @@ Keep DeepWiki as an optional MCP server. MiniScira already lists its official pu
 - No automatic DeepWiki call after GitHub search.
 - No built-in wrapper around DeepWiki's three MCP tools.
 
-## Data shapes
+## Functional requirements
+
+1. `github_search` accepts one query and an optional result limit.
+2. The tool uses the existing `FIRECRAWL_API_KEY` or `FIRECRAWL_API_URL` configuration path.
+3. The raw Firecrawl `/v2/search` request sets `categories: [{ "type": "github" }]`, disables result-page scraping, and uses a bounded result limit.
+4. The tool returns only canonical repository-shaped URLs with the form `https://github.com/<owner>/<repository>`. The GitHub category targets public results, but the tool does not independently prove repository visibility.
+5. The tool returns normalized results without exposing the provider's full response.
+6. The tool keeps the stable `{ query, results, error? }` output shape for missing configuration, network failure, malformed JSON, non-2xx status, `success: false`, missing `data.web`, and provider warnings that invalidate or reduce the result set.
+7. The agent prefers `github_search` for public repository discovery and comparisons.
+8. The agent keeps using general search for broader developer documentation and uses a user-enabled GitHub MCP server for authenticated GitHub work.
+9. The researcher subagent can use `github_search` for delegated repository discovery.
+10. GitHub search calls render through the existing search timeline node and expose source links. An error-only result must show a visible failure or configuration message instead of looking like a valid empty search.
+11. DeepWiki stays available as a one-click, no-auth MCP catalog entry.
+12. MiniScira does not call DeepWiki unless the user enables that MCP server.
+13. GitHub search and direct source reads remain available when DeepWiki is disabled, unindexed, slow, rate-limited, or unavailable.
+14. DeepWiki repository-not-found responses do not imply that indexing started.
+15. MiniScira never sends a private repository name, private code, uploaded files, secrets, or unrelated chat context to the public DeepWiki endpoint.
+16. `github_search` remains registered when Firecrawl is absent and returns the same safe configuration-error shape as the existing Firecrawl tools.
+
+## Technical requirements
+
+### Data shapes
 
 The tool input is one search request:
 
@@ -71,27 +115,6 @@ GitHubSearchResult
 
 The tool must parse each URL and accept only `https:` URLs whose hostname is exactly `github.com`, with no embedded credentials or nonstandard port. `www.github.com` is rejected. The path must contain exactly an owner and repository after normalization. Reserved first segments such as `orgs`, `topics`, `search`, `settings`, `issues`, and `pulls` are rejected. The tool removes query strings and fragments, strips a trailing `.git`, removes trailing slashes, preserves owner and repository letter case, canonicalizes the hostname to lowercase, and deduplicates results. Retrieved titles and descriptions are untrusted source data, not instructions.
 
-## Functional requirements
-
-1. `github_search` accepts one query and an optional result limit.
-2. The tool uses the existing `FIRECRAWL_API_KEY` or `FIRECRAWL_API_URL` configuration path.
-3. The raw Firecrawl `/v2/search` request sets `categories: [{ "type": "github" }]`, disables result-page scraping, and uses a bounded result limit.
-4. The tool returns only canonical repository-shaped URLs with the form `https://github.com/<owner>/<repository>`. The GitHub category targets public results, but the tool does not independently prove repository visibility.
-5. The tool returns normalized results without exposing the provider's full response.
-6. The tool keeps the stable `{ query, results, error? }` output shape for missing configuration, network failure, malformed JSON, non-2xx status, `success: false`, missing `data.web`, and provider warnings that invalidate or reduce the result set.
-7. The agent prefers `github_search` for public repository discovery and comparisons.
-8. The agent keeps using general search for broader developer documentation and uses a user-enabled GitHub MCP server for authenticated GitHub work.
-9. The researcher subagent can use `github_search` for delegated repository discovery.
-10. GitHub search calls render through the existing search timeline node and expose source links. An error-only result must show a visible failure or configuration message instead of looking like a valid empty search.
-11. DeepWiki stays available as a one-click, no-auth MCP catalog entry.
-12. MiniScira does not call DeepWiki unless the user enables that MCP server.
-13. GitHub search and direct source reads remain available when DeepWiki is disabled, unindexed, slow, rate-limited, or unavailable.
-14. DeepWiki repository-not-found responses do not imply that indexing started.
-15. MiniScira never sends a private repository name, private code, uploaded files, secrets, or unrelated chat context to the public DeepWiki endpoint.
-16. `github_search` remains registered when Firecrawl is absent and returns the same safe configuration-error shape as the existing Firecrawl tools.
-
-## Technical requirements
-
 - Follow the existing `defineTool` pattern under `agent/tools/`.
 - Reuse the Firecrawl request and configuration conventions already used by `firecrawl_search`.
 - Do not add the Firecrawl SDK or another provider dependency.
@@ -107,7 +130,7 @@ The tool must parse each URL and accept only `https:` URLs whose hostname is exa
 - Prefer `read_wiki_structure` for orientation and `ask_question` for bounded architecture questions. Do not call `read_wiki_contents` by default because one repository wiki can consume substantial model context.
 - Treat DeepWiki freshness, rate limits, output limits, and availability as undocumented external-service behavior.
 
-## Eval plan
+### Eval plan
 
 Use deterministic tool tests for provider behavior. Use Eve evals for model routing.
 
@@ -196,7 +219,7 @@ Record routing accuracy, valid repository-root precision, source-read behavior, 
 - The baseline gate justifies adding a second built-in search tool instead of changing routing guidance only.
 - The full discovered production Eve eval suite has no regressions.
 
-## Test plan
+### Test plan
 
 ### Unit checks
 
@@ -275,19 +298,19 @@ Record routing accuracy, valid repository-root precision, source-read behavior, 
 
 ## Acceptance criteria
 
-- A user can discover public GitHub repositories without configuring GitHub OAuth, a personal access token, or GitHub MCP.
-- `github_search` uses the existing Firecrawl configuration and sends the GitHub category.
-- Results contain only valid `github.com` links and use the existing search timeline.
-- The tool does not claim access to private repositories, authenticated code search, or write actions.
-- The root agent and researcher subagent can use the tool.
-- Missing Firecrawl configuration produces a clear error and does not break other tools.
-- `github_search` remains registered when Firecrawl is absent.
-- DeepWiki remains optional through its current no-auth MCP catalog entry.
-- No built-in DeepWiki tool or automatic GitHub-to-DeepWiki chain is added.
-- DeepWiki failures, missing indexes, and large wiki responses do not block GitHub-only research.
-- The public DeepWiki endpoint never receives private repository data or unrelated user context.
-- Important source-level claims use current GitHub evidence instead of DeepWiki-generated prose alone.
-- The deterministic tests, repository checks, focused Eve evals, full production eval suite, browser checks, and security checks pass.
+- [ ] A user can discover public GitHub repositories without configuring GitHub OAuth, a personal access token, or GitHub MCP.
+- [ ] `github_search` uses the existing Firecrawl configuration and sends the GitHub category.
+- [ ] Results contain only valid `github.com` links and use the existing search timeline.
+- [ ] The tool does not claim access to private repositories, authenticated code search, or write actions.
+- [ ] The root agent and researcher subagent can use the tool.
+- [ ] Missing Firecrawl configuration produces a clear error and does not break other tools.
+- [ ] `github_search` remains registered when Firecrawl is absent.
+- [ ] DeepWiki remains optional through its current no-auth MCP catalog entry.
+- [ ] No built-in DeepWiki tool or automatic GitHub-to-DeepWiki chain is added.
+- [ ] DeepWiki failures, missing indexes, and large wiki responses do not block GitHub-only research.
+- [ ] The public DeepWiki endpoint never receives private repository data or unrelated user context.
+- [ ] Important source-level claims use current GitHub evidence instead of DeepWiki-generated prose alone.
+- [ ] The deterministic tests, repository checks, focused Eve evals, full production eval suite, browser checks, and security checks pass.
 
 ## Deployment
 
@@ -304,26 +327,3 @@ Restore the previous MiniScira image and Stack Compose backup. No database or us
 ## Open questions
 
 None. The recommended first release returns repository search descriptions only, keeps Firecrawl optional, and limits the tool to public repository discovery.
-
-## Product decision
-
-The recommended first release searches public GitHub results through Firecrawl and keeps DeepWiki at MCP.
-
-This split removes the highest-friction GitHub setup for the common read-only discovery job. It does not copy GitHub's large authenticated tool set into every turn. DeepWiki already has a free official remote MCP server, requires no login, exposes only three public read tools, and appears in MiniScira's one-click catalog. A built-in DeepWiki wrapper would duplicate transport, schema discovery, timeouts, UI, and routing without removing meaningful user friction.
-
-DeepWiki remains an optional generated knowledge source, not the source of truth for current code. Its public documentation does not state rate limits, output limits, freshness guarantees, or an availability commitment. The public MCP has no indexing tool, and `read_wiki_contents` can return a very large response. MiniScira must fall back to GitHub search and direct reads when DeepWiki is absent, unindexed, slow, or unavailable.
-
-The upstream Scira tool proves the GitHub category, but its orchestration, scraping, and metadata extraction exceed this release. The narrow tool keeps one model-facing contract and uses separate reads for important claims.
-
-Direct GitHub REST search does not meet the same contract. Public code search requires authentication, and unauthenticated requests share an IP-based limit. Firecrawl keyless search was also unavailable from the production network in a live probe. MiniScira therefore reuses its existing explicit Firecrawl configuration.
-
-## Evidence reviewed
-
-- Upstream Scira `lib/tools/github-search.ts`.
-- Firecrawl Search documentation and API reference.
-- Firecrawl Developer Index documentation.
-- GitHub REST search and rate-limit documentation.
-- Official DeepWiki MCP documentation.
-- A live Firecrawl GitHub-category request from the MiniScira environment.
-- A live DeepWiki MCP initialization request.
-- MiniScira's current Firecrawl tools, MCP dynamic tools, MCP catalog, timeline classification, and eval helpers.

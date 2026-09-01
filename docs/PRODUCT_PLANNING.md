@@ -53,10 +53,36 @@ Approval is a gate, not a lifecycle status. Record approval in the PRD. An appro
   ```
 
 - Point related PRDs, implementation plans, and implementation records to the same product-idea row. Do not create a second index of files.
-- Run `python3 scripts/check-task-docs.py` after you add, rename, or change task metadata. The check enforces the metadata block, product-idea backlinks, PRD coverage, and relative links.
-- Define the goals, user stories, scope, non-goals, functional requirements, technical requirements, acceptance criteria, deployment, observability, rollback, and open questions.
-- Write acceptance criteria as Markdown task-list items. Prefer one `## Acceptance criteria` section. A long PRD may keep criteria under individual user stories.
-- An `In progress` PRD must have at least one unchecked acceptance criterion. The unchecked items are the durable list of work or verification still required before `Done`.
+- Run `python3 scripts/check-task-docs.py` after you add, rename, or change a task document. The check enforces metadata, product-idea backlinks, PRD coverage, relative links, the canonical section order, and acceptance criteria.
+- Use these top-level sections exactly once and in this order. Put feature-specific detail under `###` subsections. Do not add other `##` sections.
+
+  ```markdown
+  ## Goal
+
+  ## User stories
+
+  ## Scope
+
+  ## Non-goals
+
+  ## Functional requirements
+
+  ## Technical requirements
+
+  ## Acceptance criteria
+
+  ## Deployment
+
+  ## Observability
+
+  ## Rollback
+
+  ## Open questions
+  ```
+
+- Write every acceptance criterion as a Markdown task-list item inside `## Acceptance criteria`.
+- A `To do` or `In progress` PRD must have at least one unchecked acceptance criterion.
+- A `Done` PRD must have only checked acceptance criteria.
 - List every required check. Include unit, integration, browser/end-to-end, authorization/security, migration/rollback, deployment, and production acceptance checks.
 - For changes to agent behavior, prompts, tools, retrieval, memory, or model routing, define eval cases, fixtures or datasets, expected outcomes, and pass thresholds.
 - If model evals do not apply, explain why.

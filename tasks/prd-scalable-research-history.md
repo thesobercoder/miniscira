@@ -5,15 +5,17 @@
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Approval:** Approved by Soham on 2026-08-24
 
-## Problem
+## Goal
+
+### Problem
 
 MiniScira loaded every research thread into the sidebar at once. The initial query, server render, client state, and rendered list grew with the user's full history.
 
-## Goal
-
 Load the 30 newest research threads first. Load the next 30 when the user scrolls near the bottom of the sidebar.
 
-## User story
+## User stories
+
+### User story
 
 As a user with more than 30 research threads, I want older threads to load as I scroll so the sidebar opens without loading my full history.
 
@@ -57,38 +59,27 @@ These items require separate product ideas and explicit approval if they are nee
 - Keep the page size fixed at 30.
 - Preserve the existing sidebar scroll container and date grouping.
 
-## Acceptance criteria
-
-- **AC-01:** A user with 31 or more research threads receives 30 rows in the first sidebar page.
-- **AC-02:** Scrolling near the bottom loads the next page and keeps the first page visible.
-- **AC-03:** Pages with tied timestamps contain no duplicate or missing rows while their ordering values stay unchanged.
-- **AC-04:** The sidebar makes no later request after `nextCursor` becomes null.
-- **AC-05:** A later-page failure keeps the loaded rows and the retry can load the page.
-- **AC-06:** The rendered production sidebar demonstrates the 30-row initial page and later loading.
-
-## Test plan
+### Test plan
 
 - History-query tests cover the 30-row limit, cursor ties, middle pages, final pages, malformed cursors, and ownership.
 - Sidebar state tests cover page joins, duplicate removal, failure, retry, and exhausted cursors.
 - Browser acceptance uses an authenticated account with more than 30 research threads. It verifies the initial page and scrolling behavior in the rendered sidebar.
 - Standard repository lint, typecheck, test, check, build, and diff checks apply.
 
-## Eval plan
+### Eval plan
 
 Model evals do not apply. This change affects deterministic list pagination and browser behavior. It does not change prompts, tools, retrieval, memory, or model routing.
 
-## Deployment, observability, and rollback
+## Acceptance criteria
 
-- Deploy through the normal MiniScira production process.
-- Check the chats API for bounded responses and invalid-cursor failures.
-- Check the rendered sidebar for later-page loading and retry behavior.
-- Roll back the application image if the API or sidebar fails. The pagination migration is additive and does not delete thread data.
+- [x] **AC-01:** A user with 31 or more research threads receives 30 rows in the first sidebar page.
+- [x] **AC-02:** Scrolling near the bottom loads the next page and keeps the first page visible.
+- [x] **AC-03:** Pages with tied timestamps contain no duplicate or missing rows while their ordering values stay unchanged.
+- [x] **AC-04:** The sidebar makes no later request after `nextCursor` becomes null.
+- [x] **AC-05:** A later-page failure keeps the loaded rows and the retry can load the page.
+- [x] **AC-06:** The rendered production sidebar demonstrates the 30-row initial page and later loading.
 
-## Open questions
-
-None. The page size and loading behavior are fixed by the approved request.
-
-## Completion evidence
+### Completion evidence
 
 - The bounded history query and cursor contract shipped in `48208d3`.
 - Sidebar and project pagination shipped in `29cb6de`.
@@ -96,3 +87,24 @@ None. The page size and loading behavior are fixed by the approved request.
 - Unified sidebar scrolling shipped in `40695fc`.
 - Focused automated checks cover the page limit, page joining, failure, retry, and cursor exhaustion.
 - Production acceptance used an authenticated account with 37 eligible research threads. The initial rendered sidebar contained 30 threads and the next-page control. Activating it loaded the remaining seven threads. The rendered total matched the database count, and the next-page control disappeared after the final page.
+
+## Deployment
+
+### Deployment, observability, and rollback
+
+- Deploy through the normal MiniScira production process.
+- Check the chats API for bounded responses and invalid-cursor failures.
+- Check the rendered sidebar for later-page loading and retry behavior.
+- Roll back the application image if the API or sidebar fails. The pagination migration is additive and does not delete thread data.
+
+## Observability
+
+No separate observability requirements were recorded.
+
+## Rollback
+
+No separate rollback requirements were recorded.
+
+## Open questions
+
+None. The page size and loading behavior are fixed by the approved request.

@@ -48,13 +48,13 @@ Make image generation predictable by using a square image when the user does not
 
 ## Acceptance criteria
 
-- A request such as “Generate an image of a red apple” calls image generation with `1:1`.
-- A request that explicitly asks for a supported landscape or portrait ratio passes that ratio.
-- Tool tests verify the default and explicit override.
-- The image-generation eval verifies that ordinary image requests use the tool and that explicit shape wording reaches the tool correctly.
-- Typecheck, lint, tests, and `git diff --check` pass.
-- A live production Eve eval passes after deployment.
-- A real production image request returns a downloadable image with square pixel dimensions for the default case.
+- [ ] A request such as “Generate an image of a red apple” calls image generation with `1:1`.
+- [ ] A request that explicitly asks for a supported landscape or portrait ratio passes that ratio.
+- [ ] Tool tests verify the default and explicit override.
+- [ ] The image-generation eval verifies that ordinary image requests use the tool and that explicit shape wording reaches the tool correctly.
+- [ ] Typecheck, lint, tests, and `git diff --check` pass.
+- [ ] A live production Eve eval passes after deployment.
+- [ ] A real production image request returns a downloadable image with square pixel dimensions for the default case.
 
 ## Deployment
 

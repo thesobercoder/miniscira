@@ -108,6 +108,10 @@ Keep OAuth client ID and secret settings under the MCP server's Advanced panel.
 - Supporting non-HTTP MCP transports.
 - Automatically guessing a provider's required callback URL.
 
+## Functional requirements
+
+No separate functional requirements were recorded.
+
 ## Technical requirements
 
 - Store callback mode and configured callback URL per MCP server.
@@ -119,25 +123,7 @@ Keep OAuth client ID and secret settings under the MCP server's Advanced panel.
 - Do not expose authorization codes, secrets, tokens, or full pasted callback URLs in logs or API error messages.
 - Use public browser and Next.js APIs. Do not use private framework state.
 
-## Acceptance criteria
-
-- [ ] A normal OAuth MCP opens authorization in a new tab and completes without replacing the MCP settings page.
-- [ ] The original MCP page shows the connected state after automatic OAuth completes.
-- [ ] A manual-mode MCP uses the exact configured callback URL in client registration, authorization, and token exchange.
-- [ ] Pasting a valid final callback URL completes OAuth and marks the correct MCP as connected.
-- [ ] A callback with a missing, malformed, mismatched, replayed, expired, or foreign-user state is rejected.
-- [ ] A pasted URL whose origin or path differs from the frozen callback URL is rejected.
-- [ ] MiniScira never logs or returns OAuth tokens, client secrets, PKCE verifiers, authorization codes, or the complete pasted callback URL.
-- [ ] Changing callback settings clears credentials and pending OAuth material that were bound to the previous callback.
-- [ ] HTTP and HTTPS MCP endpoint URLs can be added when otherwise valid.
-- [ ] Unsupported schemes, credentials in URLs, fragments, and malformed endpoint URLs are rejected by the API.
-- [ ] The UI clearly warns before saving or using an HTTP MCP endpoint.
-- [ ] Existing MCP servers continue to use automatic callback mode after migration.
-- [ ] Existing encrypted OAuth credentials and tokens remain readable when callback settings are unchanged.
-- [ ] The real automatic and manual user flows are exercised in a browser.
-- [ ] Production deployment preserves existing users, chats, uploads, MCP records, encrypted credentials, database volume, and uploads volume.
-
-## Test plan
+### Test plan
 
 ### Unit tests
 
@@ -192,6 +178,24 @@ git diff --check
 ```
 
 Model evals do not apply. This work changes browser, API, database, and OAuth behavior. It does not change prompts, tools, retrieval, memory, models, or agent decisions.
+
+## Acceptance criteria
+
+- [ ] A normal OAuth MCP opens authorization in a new tab and completes without replacing the MCP settings page.
+- [ ] The original MCP page shows the connected state after automatic OAuth completes.
+- [ ] A manual-mode MCP uses the exact configured callback URL in client registration, authorization, and token exchange.
+- [ ] Pasting a valid final callback URL completes OAuth and marks the correct MCP as connected.
+- [ ] A callback with a missing, malformed, mismatched, replayed, expired, or foreign-user state is rejected.
+- [ ] A pasted URL whose origin or path differs from the frozen callback URL is rejected.
+- [ ] MiniScira never logs or returns OAuth tokens, client secrets, PKCE verifiers, authorization codes, or the complete pasted callback URL.
+- [ ] Changing callback settings clears credentials and pending OAuth material that were bound to the previous callback.
+- [ ] HTTP and HTTPS MCP endpoint URLs can be added when otherwise valid.
+- [ ] Unsupported schemes, credentials in URLs, fragments, and malformed endpoint URLs are rejected by the API.
+- [ ] The UI clearly warns before saving or using an HTTP MCP endpoint.
+- [ ] Existing MCP servers continue to use automatic callback mode after migration.
+- [ ] Existing encrypted OAuth credentials and tokens remain readable when callback settings are unchanged.
+- [ ] The real automatic and manual user flows are exercised in a browser.
+- [ ] Production deployment preserves existing users, chats, uploads, MCP records, encrypted credentials, database volume, and uploads volume.
 
 ## Deployment
 

@@ -7,7 +7,9 @@
 - **Repository:** `/opt/data/miniscira-src`
 - **Last updated:** 2026-08-23
 
-## 1. Introduction
+## Goal
+
+### Introduction
 
 MiniScira currently stores durable per-user memories only when the live agent calls the `remember` tool. Those memories are simple `memory` rows, are injected into each later authenticated user session, can be listed, and can be deleted. Useful facts are therefore missed when the live agent does not call the tool, while automatic extraction without strict limits would create serious risks: saving secrets, transient work, unsupported conclusions, duplicates, or contradictory facts.
 
@@ -15,7 +17,7 @@ This feature adds an optional nightly, per-user process that examines chats with
 
 The feature must use MiniScira's existing self-hosted architecture: Postgres is the durable source of truth, Eve supplies a minute tick, due work is claimed through in-database leases, and no external scheduler or queue is introduced.
 
-## 2. Context and existing constraints
+### Context and existing constraints
 
 ### 2.1 Existing memory behavior
 
@@ -41,27 +43,7 @@ The feature must use MiniScira's existing self-hosted architecture: Postgres is 
 - No QStash or other external queue is used.
 - Nightly extraction must reuse this dynamic-scheduling pattern without making memory processing depend on Lookout rows or Lookout cron semantics.
 
-## 3. Product principles and locked decisions
-
-These decisions apply to the first implementation. Development must not change them without revising and approving the PRD:
-
-1. **Opt-in:** nightly extraction is disabled by default for existing and new users.
-2. **Review first:** all model-extracted memories initially enter `pending_review`; none affect answers until the user accepts them.
-3. **Explicit manual memory remains immediate:** a user's direct "remember this" request and the existing `remember` tool continue to create an active memory immediately, subject to the same secret/sensitive-data validation used by the new pipeline.
-4. **Closed local day:** each normal run processes the immediately preceding completed calendar day in the user's configured IANA timezone, represented as an exact half-open UTC interval `[local midnight, next local midnight)`.
-5. **Nightly target time:** due time is 02:00 local time. This avoids running at the day boundary and gives event persistence time to settle. DST conversion uses the IANA timezone database; local-day windows may contain 23, 24, or 25 hours.
-6. **User activity, not chat timestamp:** eligibility requires at least one non-superseded `client.message.submitted` event whose event-level timestamp falls in the target interval.
-7. **User-authored evidence only:** a candidate must be grounded in a user-authored message. Assistant claims, tool output, fetched pages, project instructions, uploaded-document content, and generated Lookout chats cannot independently create a personal memory.
-8. **No secret storage:** raw candidate text, model explanations, logs, audit metadata, and provenance excerpts must not persist detected secrets. Rejected secret-like text is represented only by categorical reason codes and safe metadata.
-9. **Provenance is mandatory:** every extracted candidate and promoted memory records source chat and event/turn range. A candidate without valid owned-source provenance is rejected.
-10. **Active-memory retrieval only:** only `active` memories enter agent instructions or `list_memories`; pending, rejected, superseded, deleted, and quarantined records never influence answers.
-11. **One canonical memory record:** manually saved and promoted extracted memories use the same active-memory table and retrieval contract.
-12. **No embeddings in v1:** candidate-to-memory deduplication uses normalized exact keys plus a bounded model comparison against a shortlist. Do not add a vector index solely for this feature until measured need justifies it.
-13. **Auto-promotion off in initial release:** schema and audit contracts may support it, but the UI/API must not expose an enabled auto-promotion setting until all auto-promotion gates in Section 12 pass and a later explicit product approval enables it.
-14. **Hard deletion is user-visible behavior:** deleting a memory removes it from retrieval immediately. Minimal tombstone/audit metadata may remain to prevent silent re-creation, but must not retain the deleted content.
-15. **No external scheduler or queue:** scheduling, leases, checkpoints, retries, and run state are stored in Postgres and driven by Eve's existing minute-tick process.
-
-## 4. Goals
+### Goals
 
 - Recover durable, useful user context that was clearly stated in chats but not explicitly stored.
 - Keep false memories, secrets, transient details, and unsupported inferences out of active memory.
@@ -71,35 +53,7 @@ These decisions apply to the first implementation. Development must not change t
 - Bound model cost, transcript size, database load, concurrency, and retained data.
 - Establish measurable quality gates for candidate extraction and any future auto-promotion.
 
-## 5. Non-goals
-
-- Building a general search engine over prior chats.
-- Summarizing each day or producing a daily digest.
-- Saving temporary TODO state, current task progress, deadlines that have passed, one-off requests, ephemeral moods, or conversational small talk.
-- Treating assistant output, web sources, tool output, uploaded documents, or Lookout output as evidence about the user without explicit user confirmation.
-- Inferring protected or highly sensitive attributes, diagnoses, finances, precise location, credentials, authentication data, or legal status.
-- Automatically merging project documents into personal memory.
-- Creating organization-shared or cross-user memories.
-- Introducing a new external worker, queue, cron provider, or vector database.
-- Redesigning the overall Settings information architecture.
-- Raising the existing 100-active-memory limit without separate evidence and approval.
-- Enabling auto-promotion in the first release.
-- Reconstructing or retaining source chat content after the user deletes the source chat.
-
-## 6. Definitions
-
-- **Active memory:** a canonical, user-visible memory that is eligible for retrieval and prompt injection.
-- **Candidate:** a proposed memory extracted from chat evidence but not yet active.
-- **Durable:** expected to remain useful beyond the current task/day, normally for weeks or longer, until changed by the user.
-- **Source span:** the smallest ordered range of persisted chat events needed to identify the user-authored evidence, including chat ID and start/end event sequence.
-- **Local day:** a calendar date in an IANA timezone, mapped to an exact UTC interval.
-- **Promotion:** transition of a reviewed candidate into an active canonical memory.
-- **Contradiction:** a candidate and an existing active memory cannot both be true in their current form or represent a newer value for the same subject/attribute.
-- **Duplicate:** a candidate adds no material durable information beyond an existing memory or candidate.
-- **Sensitive/secret:** credentials, tokens, private keys, session data, payment identifiers, government identifiers, raw authentication or recovery data, or other content barred by Section 11.
-- **Checkpoint:** persisted progress that permits a run to continue without reprocessing completed chat slices.
-
-## 7. Eligible users, days, chats, and evidence
+### Eligible users, days, chats, and evidence
 
 ### 7.1 Eligible users
 
@@ -142,7 +96,113 @@ A chat created by a Lookout is not eligible merely because the Lookout generated
 - Skip failed submissions and user turns with no recoverable user text.
 - Snapshot `max(seq)` per chat at checkpoint creation. Events arriving later are handled by the next run or explicit replay; the current run never moves its high-water mark.
 
-## 8. What may and may not become memory
+## User stories
+
+### User stories and experience
+
+### US-001: opt in to nightly suggestions
+
+**Description:** As a user, I want to enable nightly memory suggestions in my timezone so that MiniScira can identify durable context without silently saving it.
+
+### US-002: review extracted candidates
+
+**Description:** As a user, I want to review each suggested memory with its source and confidence so that I control what becomes durable context.
+
+### US-003: avoid unsafe or transient memories
+
+**Description:** As a user, I want secrets, identifiers, speculation, and temporary task state rejected so that nightly extraction does not create unsafe or noisy memories.
+
+### US-004: handle duplicates and contradictions safely
+
+**Description:** As a user, I want duplicate and conflicting suggestions handled explicitly so that my active memory remains coherent.
+
+### US-005: inspect, correct, and delete learned memory
+
+**Description:** As a user, I want to inspect provenance and edit or delete accepted memories so that durable context remains accurate and under my control.
+
+### US-006: operate reliably and within limits
+
+**Description:** As an operator, I want scheduled extraction to be leased, checkpointed, observable, and cost-bounded so that failures and retries are safe.
+
+### 13.1 Settings controls
+
+Extend the existing memory section with:
+
+- "Suggest memories from my chats" toggle.
+- Timezone selector/detected suggestion with validation and next-run preview.
+- Brief privacy explanation: only user-authored chat text is examined; secrets and transient details are rejected; suggestions require review.
+- Status line for last completed run and safe failure/delay states.
+- Link/action to manually run the most recently completed local day only if no equivalent run is in progress; this action obeys the same idempotency and cost limits.
+
+### 13.2 Suggestions list
+
+- Pending count and list, newest evidence date first, then confidence band.
+- Candidate sentence, category, "High/Medium/Low confidence" band, source chat/date, and conflict badge.
+- Actions: Accept, Edit and accept, Dismiss, View source.
+- View source opens the owned chat at the relevant message/range when available. If deep-linking to an event is not yet supported, open the chat and display the source date/range without copying transcript text into the candidate record.
+- Loading, empty, error, stale source, memory-cap reached, and narrow-screen states are required.
+- All actions support keyboard navigation, visible focus, screen-reader labels, and confirmation for destructive replacement/deletion.
+
+### 13.3 Active memory list
+
+- Continue to show active content and learned date.
+- Add source badge (`You asked`, `Accepted suggestion`, later `Auto-added`) and source link where available.
+- Add Edit alongside Delete.
+- A corrected memory is shown once; superseded versions are not visible in the normal list.
+
+## Scope
+
+### Product principles and locked decisions
+
+These decisions apply to the first implementation. Development must not change them without revising and approving the PRD:
+
+1. **Opt-in:** nightly extraction is disabled by default for existing and new users.
+2. **Review first:** all model-extracted memories initially enter `pending_review`; none affect answers until the user accepts them.
+3. **Explicit manual memory remains immediate:** a user's direct "remember this" request and the existing `remember` tool continue to create an active memory immediately, subject to the same secret/sensitive-data validation used by the new pipeline.
+4. **Closed local day:** each normal run processes the immediately preceding completed calendar day in the user's configured IANA timezone, represented as an exact half-open UTC interval `[local midnight, next local midnight)`.
+5. **Nightly target time:** due time is 02:00 local time. This avoids running at the day boundary and gives event persistence time to settle. DST conversion uses the IANA timezone database; local-day windows may contain 23, 24, or 25 hours.
+6. **User activity, not chat timestamp:** eligibility requires at least one non-superseded `client.message.submitted` event whose event-level timestamp falls in the target interval.
+7. **User-authored evidence only:** a candidate must be grounded in a user-authored message. Assistant claims, tool output, fetched pages, project instructions, uploaded-document content, and generated Lookout chats cannot independently create a personal memory.
+8. **No secret storage:** raw candidate text, model explanations, logs, audit metadata, and provenance excerpts must not persist detected secrets. Rejected secret-like text is represented only by categorical reason codes and safe metadata.
+9. **Provenance is mandatory:** every extracted candidate and promoted memory records source chat and event/turn range. A candidate without valid owned-source provenance is rejected.
+10. **Active-memory retrieval only:** only `active` memories enter agent instructions or `list_memories`; pending, rejected, superseded, deleted, and quarantined records never influence answers.
+11. **One canonical memory record:** manually saved and promoted extracted memories use the same active-memory table and retrieval contract.
+12. **No embeddings in v1:** candidate-to-memory deduplication uses normalized exact keys plus a bounded model comparison against a shortlist. Do not add a vector index solely for this feature until measured need justifies it.
+13. **Auto-promotion off in initial release:** schema and audit contracts may support it, but the UI/API must not expose an enabled auto-promotion setting until all auto-promotion gates in Section 12 pass and a later explicit product approval enables it.
+14. **Hard deletion is user-visible behavior:** deleting a memory removes it from retrieval immediately. Minimal tombstone/audit metadata may remain to prevent silent re-creation, but must not retain the deleted content.
+15. **No external scheduler or queue:** scheduling, leases, checkpoints, retries, and run state are stored in Postgres and driven by Eve's existing minute-tick process.
+
+### Definitions
+
+- **Active memory:** a canonical, user-visible memory that is eligible for retrieval and prompt injection.
+- **Candidate:** a proposed memory extracted from chat evidence but not yet active.
+- **Durable:** expected to remain useful beyond the current task/day, normally for weeks or longer, until changed by the user.
+- **Source span:** the smallest ordered range of persisted chat events needed to identify the user-authored evidence, including chat ID and start/end event sequence.
+- **Local day:** a calendar date in an IANA timezone, mapped to an exact UTC interval.
+- **Promotion:** transition of a reviewed candidate into an active canonical memory.
+- **Contradiction:** a candidate and an existing active memory cannot both be true in their current form or represent a newer value for the same subject/attribute.
+- **Duplicate:** a candidate adds no material durable information beyond an existing memory or candidate.
+- **Sensitive/secret:** credentials, tokens, private keys, session data, payment identifiers, government identifiers, raw authentication or recovery data, or other content barred by Section 11.
+- **Checkpoint:** persisted progress that permits a run to continue without reprocessing completed chat slices.
+
+## Non-goals
+
+- Building a general search engine over prior chats.
+- Summarizing each day or producing a daily digest.
+- Saving temporary TODO state, current task progress, deadlines that have passed, one-off requests, ephemeral moods, or conversational small talk.
+- Treating assistant output, web sources, tool output, uploaded documents, or Lookout output as evidence about the user without explicit user confirmation.
+- Inferring protected or highly sensitive attributes, diagnoses, finances, precise location, credentials, authentication data, or legal status.
+- Automatically merging project documents into personal memory.
+- Creating organization-shared or cross-user memories.
+- Introducing a new external worker, queue, cron provider, or vector database.
+- Redesigning the overall Settings information architecture.
+- Raising the existing 100-active-memory limit without separate evidence and approval.
+- Enabling auto-promotion in the first release.
+- Reconstructing or retaining source chat content after the user deletes the source chat.
+
+## Functional requirements
+
+### What may and may not become memory
 
 ### 8.1 Allowed categories
 
@@ -179,8 +239,6 @@ A candidate must be:
 - Temporary progress ("I am on step 3"), one-time requests ("make this answer short"), present-session state, fleeting mood, unconfirmed plans, brainstorming options, speculative conclusions, assistant suggestions, and facts copied only from external content.
 - Dates/commitments that are already expired at extraction time, unless they encode a durable recurring preference or historical project decision.
 - Candidate text that includes unexplained raw UUIDs, hashes, tokens, internal IDs, IP addresses, ports, or file-system credentials. Necessary non-secret public identifiers require explicit allowlisting and review.
-
-## 9. Functional requirements
 
 ### 9.1 Settings and scheduling
 
@@ -246,7 +304,41 @@ A candidate must be:
 - **FR-048:** Cost estimates must use measured input/output token counts and configured per-model pricing when available; otherwise record tokens and `cost_unknown=true` rather than inventing a price.
 - **FR-049:** A deployment-wide daily token/cost circuit breaker must stop new claims while allowing in-flight runs to checkpoint safely. Users see "Delayed by operator cost limit," not a false success.
 
-## 10. Proposed data model
+### Review mode and future auto-promotion
+
+### 12.1 Initial release
+
+- All extracted candidates are `pending_review` or `conflict`.
+- Confidence influences ordering and display bands only; it does not activate memory.
+- The settings screen explains that suggestions do not affect answers until accepted.
+- Candidate review actions are explicit and individually auditable.
+
+### 12.2 Required gates before auto-promotion can be enabled
+
+Auto-promotion requires a later explicit product approval and all of the following:
+
+1. At least 30 days of review-mode production data or 1,000 reviewed candidates, whichever provides a statistically meaningful sample approved by the product owner.
+2. Offline eval thresholds in Section 15 pass on the locked dataset and on a blind holdout.
+3. Production precision among accepted/dismissed reviewed candidates is at least 98% for the proposed auto-eligible categories, with the lower bound of a 95% confidence interval at least 96%.
+4. Zero known secret/sensitive-memory promotions in evals, canary, or production review samples.
+5. Auto-promotion is limited initially to `preference`, `standing_instruction`, and `constraint`; project decisions and recurring entities remain review-only until separately approved.
+6. Candidate confidence `>= 0.97`, durability score `>= 0.90`, no risk flags, valid provenance, and at least one direct unambiguous user assertion.
+7. No exact/semantic duplicate, contradiction, correction cue, uncertainty cue, negation ambiguity, or time-bounded language.
+8. Full audit and one-click correction/deletion are deployed and tested first.
+9. A per-user opt-in separate from review-mode extraction exists; default remains off.
+10. A deployment-level kill switch can disable auto-promotion without disabling candidate extraction or requiring a rollback.
+
+### 12.3 Contradiction contract
+
+- Exact same durable fact: suppress candidate and link audit decision to existing memory.
+- Compatible refinement: show review candidate; do not auto-merge in v1.
+- Newer explicit replacement ("I no longer…", "use X instead of Y"): mark conflict and offer replacement in review.
+- Ambiguous tension: mark conflict and require user action.
+- Active memory is never silently overwritten by extraction confidence alone.
+
+## Technical requirements
+
+### Proposed data model
 
 Names may be adjusted to repository conventions during the approved implementation plan, but the semantics and uniqueness constraints are requirements.
 
@@ -384,7 +476,7 @@ Constraint: unique `(user_id, target_local_date, policy_version)` for ordinary r
 
 Audit must not retain old/deleted memory content, transcript excerpts, model chain-of-thought, secret matches, gateway credentials, or raw provider errors.
 
-## 11. Privacy and security requirements
+### Privacy and security requirements
 
 - Every discovery query, source fetch, candidate mutation, memory mutation, and audit read must enforce `user_id` ownership in the database query, not only in route code.
 - Authenticated APIs must return 404 for missing or foreign IDs where distinguishing them would disclose existence.
@@ -402,133 +494,7 @@ Audit must not retain old/deleted memory content, transcript excerpts, model cha
 - Deleting an account cascades schedules, runs, checkpoints, candidates, sources, audit rows where policy permits, and memories.
 - Content-security, CSRF/session, rate-limit, and Better Auth conventions used by adjacent settings APIs remain applicable.
 
-## 12. Review mode and future auto-promotion
-
-### 12.1 Initial release
-
-- All extracted candidates are `pending_review` or `conflict`.
-- Confidence influences ordering and display bands only; it does not activate memory.
-- The settings screen explains that suggestions do not affect answers until accepted.
-- Candidate review actions are explicit and individually auditable.
-
-### 12.2 Required gates before auto-promotion can be enabled
-
-Auto-promotion requires a later explicit product approval and all of the following:
-
-1. At least 30 days of review-mode production data or 1,000 reviewed candidates, whichever provides a statistically meaningful sample approved by the product owner.
-2. Offline eval thresholds in Section 15 pass on the locked dataset and on a blind holdout.
-3. Production precision among accepted/dismissed reviewed candidates is at least 98% for the proposed auto-eligible categories, with the lower bound of a 95% confidence interval at least 96%.
-4. Zero known secret/sensitive-memory promotions in evals, canary, or production review samples.
-5. Auto-promotion is limited initially to `preference`, `standing_instruction`, and `constraint`; project decisions and recurring entities remain review-only until separately approved.
-6. Candidate confidence `>= 0.97`, durability score `>= 0.90`, no risk flags, valid provenance, and at least one direct unambiguous user assertion.
-7. No exact/semantic duplicate, contradiction, correction cue, uncertainty cue, negation ambiguity, or time-bounded language.
-8. Full audit and one-click correction/deletion are deployed and tested first.
-9. A per-user opt-in separate from review-mode extraction exists; default remains off.
-10. A deployment-level kill switch can disable auto-promotion without disabling candidate extraction or requiring a rollback.
-
-### 12.3 Contradiction contract
-
-- Exact same durable fact: suppress candidate and link audit decision to existing memory.
-- Compatible refinement: show review candidate; do not auto-merge in v1.
-- Newer explicit replacement ("I no longer…", "use X instead of Y"): mark conflict and offer replacement in review.
-- Ambiguous tension: mark conflict and require user action.
-- Active memory is never silently overwritten by extraction confidence alone.
-
-## 13. User stories and experience
-
-### US-001: opt in to nightly suggestions
-
-**Description:** As a user, I want to enable nightly memory suggestions in my timezone so that MiniScira can identify durable context without silently saving it.
-
-**Acceptance Criteria:**
-
-- [ ] Extraction is disabled until the user explicitly opts in.
-- [ ] The settings UI shows the validated timezone and next eligible run.
-- [ ] Disabling extraction prevents new runs without deleting existing memories or review history.
-- [ ] Settings authorization, browser, keyboard, narrow-screen, and screen-reader checks pass.
-
-### US-002: review extracted candidates
-
-**Description:** As a user, I want to review each suggested memory with its source and confidence so that I control what becomes durable context.
-
-**Acceptance Criteria:**
-
-- [ ] Each suggestion shows content, category, confidence band, source chat/date, and conflict state.
-- [ ] The user can accept, edit and accept, dismiss, or inspect the source.
-- [ ] Accepting or dismissing the same candidate repeatedly remains idempotent.
-- [ ] Another user cannot read or mutate the candidate or its provenance.
-
-### US-003: avoid unsafe or transient memories
-
-**Description:** As a user, I want secrets, identifiers, speculation, and temporary task state rejected so that nightly extraction does not create unsafe or noisy memories.
-
-**Acceptance Criteria:**
-
-- [ ] Deterministic filters reject configured secret and identifier patterns before model output can be promoted.
-- [ ] Model evals meet the PRD thresholds for durable-memory recall, secret rejection, transient-state rejection, and unsupported inference.
-- [ ] Rejected content is recorded only as bounded audit metadata and does not preserve the sensitive plaintext.
-- [ ] Transcript instructions cannot override the extraction policy or output schema.
-
-### US-004: handle duplicates and contradictions safely
-
-**Description:** As a user, I want duplicate and conflicting suggestions handled explicitly so that my active memory remains coherent.
-
-**Acceptance Criteria:**
-
-- [ ] Exact duplicates are suppressed and associated with the existing memory in audit evidence.
-- [ ] Refinements and contradictions require review in the initial release.
-- [ ] No active memory is silently overwritten by model confidence alone.
-- [ ] Retry and concurrent-run tests prove that a source range cannot create duplicate active candidates.
-
-### US-005: inspect, correct, and delete learned memory
-
-**Description:** As a user, I want to inspect provenance and edit or delete accepted memories so that durable context remains accurate and under my control.
-
-**Acceptance Criteria:**
-
-- [ ] Accepted memories identify their source type and expose owned provenance when available.
-- [ ] Editing produces one current active value while retaining bounded audit history.
-- [ ] Deletion removes the memory from future prompt retrieval and follows the documented audit-retention policy.
-- [ ] Stale or deleted source chats are represented explicitly rather than as broken links.
-
-### US-006: operate reliably and within limits
-
-**Description:** As an operator, I want scheduled extraction to be leased, checkpointed, observable, and cost-bounded so that failures and retries are safe.
-
-**Acceptance Criteria:**
-
-- [ ] Timezone-aware runs use the in-database lease and checkpoint contract defined by this PRD.
-- [ ] Overlapping workers cannot process the same user-day concurrently.
-- [ ] Retries resume from checkpoints without duplicate candidates or active memories.
-- [ ] Per-run token, transcript, candidate, duration, and failure metrics are emitted without transcript plaintext or secrets.
-
-### 13.1 Settings controls
-
-Extend the existing memory section with:
-
-- "Suggest memories from my chats" toggle.
-- Timezone selector/detected suggestion with validation and next-run preview.
-- Brief privacy explanation: only user-authored chat text is examined; secrets and transient details are rejected; suggestions require review.
-- Status line for last completed run and safe failure/delay states.
-- Link/action to manually run the most recently completed local day only if no equivalent run is in progress; this action obeys the same idempotency and cost limits.
-
-### 13.2 Suggestions list
-
-- Pending count and list, newest evidence date first, then confidence band.
-- Candidate sentence, category, "High/Medium/Low confidence" band, source chat/date, and conflict badge.
-- Actions: Accept, Edit and accept, Dismiss, View source.
-- View source opens the owned chat at the relevant message/range when available. If deep-linking to an event is not yet supported, open the chat and display the source date/range without copying transcript text into the candidate record.
-- Loading, empty, error, stale source, memory-cap reached, and narrow-screen states are required.
-- All actions support keyboard navigation, visible focus, screen-reader labels, and confirmation for destructive replacement/deletion.
-
-### 13.3 Active memory list
-
-- Continue to show active content and learned date.
-- Add source badge (`You asked`, `Accepted suggestion`, later `Auto-added`) and source link where available.
-- Add Edit alongside Delete.
-- A corrected memory is shown once; superseded versions are not visible in the normal list.
-
-## 14. Model and extraction contract
+### Model and extraction contract
 
 ### 14.1 Input
 
@@ -564,7 +530,7 @@ Unknown keys are rejected. Output count is capped. The model is not asked for hi
 - Record the exact model ID and policy/prompt version with each run/candidate.
 - Model changes require rerunning the locked eval dataset before deployment.
 
-## 15. Test and evaluation plan
+### Test and evaluation plan
 
 ### 15.1 Unit tests
 
@@ -673,24 +639,7 @@ For future auto-promotion, apply the stricter Section 12 thresholds in addition 
 - Add focused nightly extraction evals and a deterministic dataset runner that can report per-group confusion matrices, source accuracy, forbidden-substring failures, token use, and model/policy version.
 - Run the focused memory evals for any change to extraction prompt, schema, filters, memory tools, retrieval, model, normalization, or contradiction logic.
 
-## 16. Acceptance criteria
-
-- **AC-001:** Feature is opt-in and a user can enable/disable it with a validated IANA timezone and correct next-run preview. (`FR-001–008`)
-- **AC-002:** A per-user run processes exactly the preceding completed local day, including tested 23- and 25-hour DST days. (`FR-003, FR-009–012`)
-- **AC-003:** Only chats with persisted, current user submissions in that interval are scanned; background updates and Lookout-only chats do not qualify. (`FR-010–012`)
-- **AC-004:** Extracted suggestions are durable, user-grounded, provenance-backed, schema-valid, and bounded by configured cost/size limits. (`FR-013–018, FR-044–049`)
-- **AC-005:** Secret, highly sensitive, transient, speculative, assistant-only, tool-only, and external-document-only content never becomes a persisted candidate or active memory. (`FR-012–016`; Section 11)
-- **AC-006:** Retries, overlapping ticks, lease expiry, restart, and same-version replay create no duplicate candidate or memory. (`FR-005–008, FR-020`)
-- **AC-007:** Pending candidates do not influence agent answers before acceptance. (`FR-021, FR-032–034`)
-- **AC-008:** User can inspect source, accept, edit-and-accept, dismiss, resolve conflicts, edit active memory, and delete memory with strict ownership checks. (`FR-021–031`)
-- **AC-009:** Existing explicit `remember`, `forget`, `list_memories`, API, and prompt-injection flows remain compatible while enforcing active-only retrieval and safer duplicate/secret handling. (`FR-032–040`)
-- **AC-010:** Every run/transition is auditable without transcript, candidate, secret, chain-of-thought, or raw provider-response leakage in logs/audit. (`FR-041–043`; Section 11)
-- **AC-011:** Migration preserves all existing memory rows as active/manual memories and documented restore/rollback tests pass. (Section 18)
-- **AC-012:** All unit, integration, browser/E2E, authorization/security, migration, and model eval gates in Section 15 pass.
-- **AC-013:** Auto-promotion remains unavailable in the initial release and cannot be enabled by editing an ordinary user setting or calling an undocumented route. (Section 12)
-- **AC-014:** Production canary proves scheduling, candidate review, active-memory retrieval, cost metrics, and kill switches on real infrastructure without relying on health checks alone. (Section 18)
-
-## 17. Ordered implementation tasks (for post-approval planning)
+### Ordered implementation tasks (for post-approval planning)
 
 Do not execute these tasks until this PRD is explicitly approved and converted into the session TODO list.
 
@@ -770,7 +719,116 @@ Do not execute these tasks until this PRD is explicitly approved and converted i
     - Auto-promotion remains disabled.
     - Covers: AC-010, AC-014.
 
-## 18. Deployment, migration, rollback, and operations
+### Traceability matrix
+
+| Acceptance criterion | Requirements | Primary tasks | Verification |
+|---|---|---|---|
+| AC-001 | FR-001–008 | T-004, T-007, T-009, T-010 | timezone/lease unit tests; settings E2E |
+| AC-002 | FR-003, FR-009–012 | T-003, T-004, T-006 | DST/day-boundary tests; integration run |
+| AC-003 | FR-010–012 | T-003, T-006 | event fixtures; Lookout/background-negative cases |
+| AC-004 | FR-013–018, FR-044–049 | T-001, T-005, T-006, T-011 | schema/dedupe/cost tests; model eval thresholds |
+| AC-005 | FR-012–016 | T-001, T-003, T-005, T-006, T-011 | security corpus; forbidden-substring eval |
+| AC-006 | FR-005–008, FR-020 | T-002, T-004–007 | concurrency/restart/unique-constraint integration tests |
+| AC-007 | FR-021, FR-032–034 | T-006, T-008–010 | active-only retrieval tests; review E2E |
+| AC-008 | FR-021–031 | T-008–010 | API ownership tests; full review lifecycle E2E |
+| AC-009 | FR-032–040 | T-008, T-011 | existing and extended memory evals; API/tool tests |
+| AC-010 | FR-041–043 | T-001, T-002, T-005–009, T-012 | audit allowlist tests; log inspection |
+| AC-011 | data model, Section 18 | T-002, T-013 | populated migration and backup/restore rehearsal |
+| AC-012 | Section 15 | T-011, T-012 | all named tests/evals and quality gates |
+| AC-013 | Section 12 | T-007, T-009, T-012 | configuration/API negative tests |
+| AC-014 | Section 18 | T-013, T-014 | canary schedule/review/retrieval/rollback evidence |
+
+### Verification commands for the future implementation
+
+Focused tests/evals must be named during implementation planning. The full repository gate is:
+
+```bash
+/opt/data/bin/bun run typecheck
+/opt/data/bin/bun run lint
+/opt/data/bin/bun test
+/opt/data/bin/bun run check
+git diff --check
+```
+
+Any memory prompt, extraction, tool, or retrieval change must also run the focused `evals/memory.eval.ts` and new nightly-memory dataset suite with recorded model/policy versions and threshold report. UI work must be verified in a real browser; migration/deployment work must exercise the real opted-in nightly run and review-to-fresh-session retrieval flow.
+
+### Codex/implementation handoff contract
+
+When this PRD is approved, any coding-agent prompt must:
+
+- name this file as the source of truth;
+- use `/opt/data/miniscira-src` and read `AGENTS.md` plus all linked applicable documents;
+- state that the task is review-mode nightly extraction only and auto-promotion must remain unavailable;
+- preserve the Eve event-type and in-database scheduling invariants;
+- list exact tasks/files/tests from the approved plan;
+- prohibit external queues, embeddings, unrelated refactors, UI redesign, secret logging, and scope expansion;
+- require the migration, security, browser, model-eval, deployment, and rollback evidence in this PRD;
+- instruct the agent to stop and ask if any unresolved choice would change privacy, billing, scheduling, retrieval, or user-visible behavior.
+
+No implementation should begin from this draft alone.
+
+## Acceptance criteria
+
+### US-001: opt in to nightly suggestions
+
+- [ ] Extraction is disabled until the user explicitly opts in.
+- [ ] The settings UI shows the validated timezone and next eligible run.
+- [ ] Disabling extraction prevents new runs without deleting existing memories or review history.
+- [ ] Settings authorization, browser, keyboard, narrow-screen, and screen-reader checks pass.
+
+### US-002: review extracted candidates
+
+- [ ] Each suggestion shows content, category, confidence band, source chat/date, and conflict state.
+- [ ] The user can accept, edit and accept, dismiss, or inspect the source.
+- [ ] Accepting or dismissing the same candidate repeatedly remains idempotent.
+- [ ] Another user cannot read or mutate the candidate or its provenance.
+
+### US-003: avoid unsafe or transient memories
+
+- [ ] Deterministic filters reject configured secret and identifier patterns before model output can be promoted.
+- [ ] Model evals meet the PRD thresholds for durable-memory recall, secret rejection, transient-state rejection, and unsupported inference.
+- [ ] Rejected content is recorded only as bounded audit metadata and does not preserve the sensitive plaintext.
+- [ ] Transcript instructions cannot override the extraction policy or output schema.
+
+### US-004: handle duplicates and contradictions safely
+
+- [ ] Exact duplicates are suppressed and associated with the existing memory in audit evidence.
+- [ ] Refinements and contradictions require review in the initial release.
+- [ ] No active memory is silently overwritten by model confidence alone.
+- [ ] Retry and concurrent-run tests prove that a source range cannot create duplicate active candidates.
+
+### US-005: inspect, correct, and delete learned memory
+
+- [ ] Accepted memories identify their source type and expose owned provenance when available.
+- [ ] Editing produces one current active value while retaining bounded audit history.
+- [ ] Deletion removes the memory from future prompt retrieval and follows the documented audit-retention policy.
+- [ ] Stale or deleted source chats are represented explicitly rather than as broken links.
+
+### US-006: operate reliably and within limits
+
+- [ ] Timezone-aware runs use the in-database lease and checkpoint contract defined by this PRD.
+- [ ] Overlapping workers cannot process the same user-day concurrently.
+- [ ] Retries resume from checkpoints without duplicate candidates or active memories.
+- [ ] Per-run token, transcript, candidate, duration, and failure metrics are emitted without transcript plaintext or secrets.
+
+- [ ] **AC-001:** Feature is opt-in and a user can enable/disable it with a validated IANA timezone and correct next-run preview. (`FR-001–008`)
+- [ ] **AC-002:** A per-user run processes exactly the preceding completed local day, including tested 23- and 25-hour DST days. (`FR-003, FR-009–012`)
+- [ ] **AC-003:** Only chats with persisted, current user submissions in that interval are scanned; background updates and Lookout-only chats do not qualify. (`FR-010–012`)
+- [ ] **AC-004:** Extracted suggestions are durable, user-grounded, provenance-backed, schema-valid, and bounded by configured cost/size limits. (`FR-013–018, FR-044–049`)
+- [ ] **AC-005:** Secret, highly sensitive, transient, speculative, assistant-only, tool-only, and external-document-only content never becomes a persisted candidate or active memory. (`FR-012–016`; Section 11)
+- [ ] **AC-006:** Retries, overlapping ticks, lease expiry, restart, and same-version replay create no duplicate candidate or memory. (`FR-005–008, FR-020`)
+- [ ] **AC-007:** Pending candidates do not influence agent answers before acceptance. (`FR-021, FR-032–034`)
+- [ ] **AC-008:** User can inspect source, accept, edit-and-accept, dismiss, resolve conflicts, edit active memory, and delete memory with strict ownership checks. (`FR-021–031`)
+- [ ] **AC-009:** Existing explicit `remember`, `forget`, `list_memories`, API, and prompt-injection flows remain compatible while enforcing active-only retrieval and safer duplicate/secret handling. (`FR-032–040`)
+- [ ] **AC-010:** Every run/transition is auditable without transcript, candidate, secret, chain-of-thought, or raw provider-response leakage in logs/audit. (`FR-041–043`; Section 11)
+- [ ] **AC-011:** Migration preserves all existing memory rows as active/manual memories and documented restore/rollback tests pass. (Section 18)
+- [ ] **AC-012:** All unit, integration, browser/E2E, authorization/security, migration, and model eval gates in Section 15 pass.
+- [ ] **AC-013:** Auto-promotion remains unavailable in the initial release and cannot be enabled by editing an ordinary user setting or calling an undocumented route. (Section 12)
+- [ ] **AC-014:** Production canary proves scheduling, candidate review, active-memory retrieval, cost metrics, and kill switches on real infrastructure without relying on health checks alone. (Section 18)
+
+## Deployment
+
+### Deployment, migration, rollback, and operations
 
 ### 18.1 Deployment sequence
 
@@ -817,7 +875,9 @@ Alert on:
 - duplicate-key conflicts above expected retry baseline;
 - candidates promoted without a valid audit event or provenance row (must be zero).
 
-## 19. Cost and performance budget
+## Observability
+
+### Cost and performance budget
 
 - No model call on empty eligible days.
 - Default per-user/day limits are locked in `FR-045`; operators may lower them.
@@ -829,26 +889,7 @@ Alert on:
 - Initial performance target: scheduler claim query p95 under 250 ms at 100,000 schedule rows on indexed Postgres similar to production; non-model processing p95 under 5 seconds per ordinary user/day fixture; model latency reported separately.
 - Initial cost target must be set after selecting the model and pricing source (OQ-003/OQ-004). The rollout must measure median and p95 tokens and cost per active user-day before broad enablement.
 
-## 20. Traceability matrix
-
-| Acceptance criterion | Requirements | Primary tasks | Verification |
-|---|---|---|---|
-| AC-001 | FR-001–008 | T-004, T-007, T-009, T-010 | timezone/lease unit tests; settings E2E |
-| AC-002 | FR-003, FR-009–012 | T-003, T-004, T-006 | DST/day-boundary tests; integration run |
-| AC-003 | FR-010–012 | T-003, T-006 | event fixtures; Lookout/background-negative cases |
-| AC-004 | FR-013–018, FR-044–049 | T-001, T-005, T-006, T-011 | schema/dedupe/cost tests; model eval thresholds |
-| AC-005 | FR-012–016 | T-001, T-003, T-005, T-006, T-011 | security corpus; forbidden-substring eval |
-| AC-006 | FR-005–008, FR-020 | T-002, T-004–007 | concurrency/restart/unique-constraint integration tests |
-| AC-007 | FR-021, FR-032–034 | T-006, T-008–010 | active-only retrieval tests; review E2E |
-| AC-008 | FR-021–031 | T-008–010 | API ownership tests; full review lifecycle E2E |
-| AC-009 | FR-032–040 | T-008, T-011 | existing and extended memory evals; API/tool tests |
-| AC-010 | FR-041–043 | T-001, T-002, T-005–009, T-012 | audit allowlist tests; log inspection |
-| AC-011 | data model, Section 18 | T-002, T-013 | populated migration and backup/restore rehearsal |
-| AC-012 | Section 15 | T-011, T-012 | all named tests/evals and quality gates |
-| AC-013 | Section 12 | T-007, T-009, T-012 | configuration/API negative tests |
-| AC-014 | Section 18 | T-013, T-014 | canary schedule/review/retrieval/rollback evidence |
-
-## 21. Success metrics
+### Success metrics
 
 Review-mode success is measured after opt-in rollout:
 
@@ -863,7 +904,13 @@ Review-mode success is measured after opt-in rollout:
 
 Metrics must not collect memory content or transcript text.
 
-## 22. Open questions requiring resolution before implementation
+## Rollback
+
+No separate rollback requirements were recorded.
+
+## Open questions
+
+### Open questions requiring resolution before implementation
 
 - **OQ-001: Timezone ownership:** Should timezone live in `user_settings` (general profile setting) or the dedicated extraction schedule row? Recommendation: canonical general timezone in `user_settings`, copied into each run; schedule row references the current value.
 - **OQ-002: Manual run UX:** Should users get "Run now for yesterday" in the first release, or should only the scheduler run? Recommendation: include it for testing/transparency, but enforce the same unique run and cost gates.
@@ -878,7 +925,7 @@ Metrics must not collect memory content or transcript text.
 - **OQ-011: User exclusion controls:** Is a per-chat "Don't learn from this chat" control required in v1? Recommendation: add it before broad rollout if product wants strong preventive control; at minimum, opt-out and candidate review are required by this PRD.
 - **OQ-012: Sensitive but useful facts:** V1 rejects broad sensitive categories even when directly stated. Any future consent-based sensitive memory requires a separate PRD, explicit consent semantics, encryption/access review, and dedicated evals.
 
-## 23. Approval gate
+### Approval gate
 
 This document is a **draft**, not implementation authorization. Before work starts:
 
@@ -887,32 +934,3 @@ This document is a **draft**, not implementation authorization. Before work star
 3. Record approval in this PRD. Keep the backlog status `To do` until implementation starts.
 4. Convert Section 17 into ordered session TODOs with exact files, dependencies, tests, and eval commands.
 5. Do not enable auto-promotion; it requires the separate gates and later approval in Section 12.
-
-## 24. Verification commands for the future implementation
-
-Focused tests/evals must be named during implementation planning. The full repository gate is:
-
-```bash
-/opt/data/bin/bun run typecheck
-/opt/data/bin/bun run lint
-/opt/data/bin/bun test
-/opt/data/bin/bun run check
-git diff --check
-```
-
-Any memory prompt, extraction, tool, or retrieval change must also run the focused `evals/memory.eval.ts` and new nightly-memory dataset suite with recorded model/policy versions and threshold report. UI work must be verified in a real browser; migration/deployment work must exercise the real opted-in nightly run and review-to-fresh-session retrieval flow.
-
-## 25. Codex/implementation handoff contract
-
-When this PRD is approved, any coding-agent prompt must:
-
-- name this file as the source of truth;
-- use `/opt/data/miniscira-src` and read `AGENTS.md` plus all linked applicable documents;
-- state that the task is review-mode nightly extraction only and auto-promotion must remain unavailable;
-- preserve the Eve event-type and in-database scheduling invariants;
-- list exact tasks/files/tests from the approved plan;
-- prohibit external queues, embeddings, unrelated refactors, UI redesign, secret logging, and scope expansion;
-- require the migration, security, browser, model-eval, deployment, and rollback evidence in this PRD;
-- instruct the agent to stop and ask if any unresolved choice would change privacy, billing, scheduling, retrieval, or user-visible behavior.
-
-No implementation should begin from this draft alone.

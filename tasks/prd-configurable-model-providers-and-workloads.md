@@ -7,7 +7,7 @@
 
 ## Goal
 
-Make provider freedom a working product feature. MiniScira uses OpenRouter as the first reference provider while retaining support for any compatible OpenAI-style API. An administrator controls the model catalog and workload defaults. Each user chooses an interactive chat default from a curated multimodal catalog.
+Make provider freedom a working product feature. MiniScira uses OpenRouter as the first reference provider while retaining support for any compatible OpenAI-style API. An administrator controls the model catalog and workload defaults. Each user chooses compatible models for user-facing features from that catalog.
 
 ## User stories
 
@@ -19,7 +19,9 @@ Make provider freedom a working product feature. MiniScira uses OpenRouter as th
 - As a user, I can choose compatible models for research, Lookouts, image generation, image editing, and video generation.
 - As a user, I never see text-only models or provider capability details in the chat picker.
 
-## Product decisions
+## Scope
+
+### Product decisions
 
 1. OpenRouter is the first reference provider and production migration target.
 2. MiniScira remains compatible with other OpenAI-style APIs. OpenRouter-specific metadata and headers live behind a provider adapter.
@@ -35,8 +37,6 @@ Make provider freedom a working product feature. MiniScira uses OpenRouter as th
 12. MiniScira never guesses missing capabilities. Generic providers may require administrator-supplied capability overrides.
 13. A workload runs only when its assigned model satisfies every required capability.
 14. Model IDs remain provider values. MiniScira does not silently substitute a different model when an ID is missing.
-
-## Scope
 
 ### Provider configuration
 
@@ -95,7 +95,7 @@ type AllowedModel = {
   displayName: string;
   enabled: boolean;
   capabilities: ModelCapabilities;
-  capabilitySource: "provider" | "operator_override" | "verified_probe";
+  capabilitySource: "provider" | "administrator_override" | "verified_probe";
 };
 ```
 
@@ -135,26 +135,15 @@ Each workload has one primary administrator model and an optional ordered fallba
 - A per-action override does not change the saved default unless the user explicitly saves it.
 - Title generation and other internal maintenance workloads do not appear in user settings or action-level model pickers.
 
-## Capability rules
+## Non-goals
 
-The initial workload requirements are:
-
-| Workload | Required capabilities |
-|---|---|
-| Text chat and chat with image attachment | Text and image input, text output, streaming |
-| Research root | Text input and output, streaming, tools |
-| Researcher subagent | Text input and output, tools |
-| Compaction | Text input and output, sufficient verified context window |
-| Lookout | Text input and output, tools |
-| Memory extraction | Text input and output, structured output |
-| Title generation | Text input and output, structured output |
-| Conversation summary | Text input and output, sufficient verified context window |
-| Evaluation | Capabilities required by the evaluation suite |
-| Image generation | Text input, image output, image-generation endpoint support |
-| Image editing | Text and image input, image output, image-edit endpoint support |
-| Video generation | Text input, video output, video-generation adapter support |
-
-A provider may use separate endpoints for chat, image, and video work. OpenAI compatibility for chat does not prove image or video compatibility.
+- Building a general-purpose multi-provider router inside MiniScira.
+- Automatically enabling every model returned by a provider.
+- Assuming that chat compatibility includes image or video generation.
+- Letting users select models outside the administrator catalog or bypass workload capability rules.
+- Letting users override internal maintenance models.
+- Changing models automatically based only on price or popularity.
+- Removing the existing rollback provider before production soak completes.
 
 ## Functional requirements
 
@@ -181,6 +170,27 @@ A provider may use separate endpoints for chat, image, and video work. OpenAI co
 
 ## Technical requirements
 
+### Capability rules
+
+The initial workload requirements are:
+
+| Workload | Required capabilities |
+|---|---|
+| Text chat and chat with image attachment | Text and image input, text output, streaming |
+| Research root | Text input and output, streaming, tools |
+| Researcher subagent | Text input and output, tools |
+| Compaction | Text input and output, sufficient verified context window |
+| Lookout | Text input and output, tools |
+| Memory extraction | Text input and output, structured output |
+| Title generation | Text input and output, structured output |
+| Conversation summary | Text input and output, sufficient verified context window |
+| Evaluation | Capabilities required by the evaluation suite |
+| Image generation | Text input, image output, image-generation endpoint support |
+| Image editing | Text and image input, image output, image-edit endpoint support |
+| Video generation | Text input, video output, video-generation adapter support |
+
+A provider may use separate endpoints for chat, image, and video work. OpenAI compatibility for chat does not prove image or video compatibility.
+
 - Keep one provider boundary in `lib/gateway.ts` and related model-catalog modules.
 - Separate provider discovery from administrator policy and workload resolution.
 - Store non-secret catalog policy and workload assignments in Postgres.
@@ -196,24 +206,7 @@ A provider may use separate endpoints for chat, image, and video work. OpenAI co
 - Do not make a provider outage rewrite saved user or workload settings.
 - Treat video generation as a provider adapter because no universal OpenAI-compatible video endpoint can be assumed.
 
-## Migration to OpenRouter
-
-1. Capture the current provider configuration, model catalog, workload defaults, and rollback image.
-2. Bootstrap the administrator identity and deployment encryption root through protected environment values.
-3. Save the OpenRouter provider profile and credential through the administrator settings area.
-4. Import OpenRouter model metadata through the provider adapter.
-5. Exclude every model that lacks text and image input or text output.
-6. Create an explicit administrator allowlist.
-7. Map every current workload to an allowed OpenRouter model.
-8. Verify text chat, image input, tool calls, structured output, compaction, image generation, image editing, and video generation where enabled.
-9. Run a scratch deployment before changing production.
-10. Update production only after every required workload has a passing model.
-11. Keep the previous provider configuration available during the soak period.
-12. Roll back by restoring the previous provider configuration. No user or chat data migration is required.
-
-OmniRoute and CLIProxyAPI are possible rollback or external-routing choices. Neither remains a mandatory MiniScira dependency.
-
-## Evals and tests
+### Evals and tests
 
 ### Unit tests
 
@@ -259,6 +252,11 @@ OmniRoute and CLIProxyAPI are possible rollback or external-routing choices. Nei
 - Video generation returns a stored artifact when the selected provider and model support it.
 - Provider request and cost records identify the workload and model without storing secrets or prompt bodies.
 
+### References
+
+- [OpenRouter Models API](https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties) documents `architecture.input_modalities`, `architecture.output_modalities`, `context_length`, and `supported_parameters`.
+- [OpenRouter image generation](https://openrouter.ai/docs/guides/overview/multimodal/image-generation) documents image-model discovery and per-endpoint capabilities.
+
 ## Acceptance criteria
 
 - [ ] An authenticated administrator controls the provider, allowed model catalog, and workload assignments.
@@ -279,17 +277,24 @@ OmniRoute and CLIProxyAPI are possible rollback or external-routing choices. Nei
 - [ ] Provider credentials remain server-side and secret.
 - [ ] Unit, integration, browser, eval, rollback, and production checks pass.
 
-## Non-goals
-
-- Building a general-purpose multi-provider router inside MiniScira.
-- Automatically enabling every model returned by a provider.
-- Assuming that chat compatibility includes image or video generation.
-- Letting users select models outside the administrator catalog or bypass workload capability rules.
-- Letting users override internal maintenance models.
-- Changing models automatically based only on price or popularity.
-- Removing the existing rollback provider before production soak completes.
-
 ## Deployment
+
+### Migration to OpenRouter
+
+1. Capture the current provider configuration, model catalog, workload defaults, and rollback image.
+2. Bootstrap the administrator identity and deployment encryption root through protected environment values.
+3. Save the OpenRouter provider profile and credential through the administrator settings area.
+4. Import OpenRouter model metadata through the provider adapter.
+5. Exclude every model that lacks text and image input or text output.
+6. Create an explicit administrator allowlist.
+7. Map every current workload to an allowed OpenRouter model.
+8. Verify text chat, image input, tool calls, structured output, compaction, image generation, image editing, and video generation where enabled.
+9. Run a scratch deployment before changing production.
+10. Update production only after every required workload has a passing model.
+11. Keep the previous provider configuration available during the soak period.
+12. Roll back by restoring the previous provider configuration. No user or chat data migration is required.
+
+OmniRoute and CLIProxyAPI are possible rollback or external-routing choices. Neither remains a mandatory MiniScira dependency.
 
 Use the existing immutable MiniScira image and Portainer stack workflow. Preserve the current stack environment, database, uploads, sandbox middleware, egress controls, and rollback image. Environment values bootstrap the administrator and encryption root. The administrator settings area stores provider configuration and seals the provider credential before database storage.
 
@@ -309,11 +314,6 @@ Expose safe operator checks for:
 ## Rollback
 
 Restore the previous provider base URL, credential, model catalog policy, and workload assignments from the protected pre-cutover snapshot. Restart only the MiniScira application services that consume those settings. Verify health, model listing, one chat turn, one tool call, and one background workload.
-
-## References
-
-- [OpenRouter Models API](https://openrouter.ai/docs/api/api-reference/models/list-all-models-and-their-properties) documents `architecture.input_modalities`, `architecture.output_modalities`, `context_length`, and `supported_parameters`.
-- [OpenRouter image generation](https://openrouter.ai/docs/guides/overview/multimodal/image-generation) documents image-model discovery and per-endpoint capabilities.
 
 ## Open questions
 

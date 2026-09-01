@@ -6,7 +6,9 @@
 - **Approval:** Approved by Soham on 2026-08-24
 - **Last updated:** 2026-08-27
 
-## Purpose
+## Goal
+
+### Purpose
 
 Let the MiniScira agent answer continuity questions such as:
 
@@ -16,13 +18,29 @@ Let the MiniScira agent answer continuity questions such as:
 
 This extends the existing PostgreSQL previous-thread search. It does not add embeddings or a separate search service.
 
-## Authorization requirement
+## User stories
 
-Every search and read must use the authenticated user ID from Eve session auth. The model and client cannot provide or override a user ID.
+No separate user stories were recorded.
 
-PostgreSQL must filter `chat.user_id` before ranking or limiting results. A read must join back to `chat` and verify the same owner. Threads owned by another user must return the same safe not-found behavior as missing threads.
+## Scope
 
-## Phase 1 behavior
+### Locked decisions
+
+1. The first release uses UTC only.
+2. Date filtering uses `chat.updated_at`.
+3. Date ranges are half-open and limited to 366 days.
+4. Date filtering requires both `from` and `to`.
+
+## Non-goals
+
+- Message-body search.
+- Embeddings or vector retrieval.
+- Guessing the user’s local time zone.
+- Searching another user’s threads, including shared or public threads.
+
+## Functional requirements
+
+### Phase 1 behavior
 
 1. Add optional absolute `from` and `to` timestamps to `search_previous_threads`.
 2. The agent converts relative phrases such as “yesterday” into an absolute range before calling the tool.
@@ -35,14 +53,15 @@ PostgreSQL must filter `chat.user_id` before ranking or limiting results. A read
 9. A search accepts at most 366 days. Both bounds are required when date filtering is used.
 10. The tool accepts ISO 8601 timestamps only. The agent resolves relative language such as “yesterday” from the current UTC date in its turn instructions.
 
-## Non-goals
+## Technical requirements
 
-- Message-body search.
-- Embeddings or vector retrieval.
-- Guessing the user’s local time zone.
-- Searching another user’s threads, including shared or public threads.
+### Authorization requirement
 
-## Required tests and evals
+Every search and read must use the authenticated user ID from Eve session auth. The model and client cannot provide or override a user ID.
+
+PostgreSQL must filter `chat.user_id` before ranking or limiting results. A read must join back to `chat` and verify the same owner. Threads owned by another user must return the same safe not-found behavior as missing threads.
+
+### Required tests and evals
 
 - Exact UTC day and date-range boundaries.
 - “Yesterday,” “last Friday,” and explicit-date routing fixtures.
@@ -54,46 +73,7 @@ PostgreSQL must filter `chat.user_id` before ranking or limiting results. A read
 - Invalid, reversed, and excessively wide ranges return safe errors.
 - Real signed-in browser continuity flow for “What did we talk about yesterday?”
 
-## Acceptance criteria
-
-- [x] `search_previous_threads` accepts valid absolute `from` and `to` timestamps and keeps title search optional.
-- [x] Date ranges use inclusive `from`, exclusive `to`, require both bounds, and reject invalid, reversed, or longer-than-366-day ranges.
-- [x] PostgreSQL filters by authenticated user, current project, current-thread exclusion, and `chat.updated_at` before ranking or limiting.
-- [x] Empty-title, title-only, date-only, and combined searches return deterministic owned results.
-- [x] Relative-date routing evals convert “yesterday,” “last Friday,” and explicit dates into correct absolute UTC ranges.
-- [x] Foreign-thread searches and reads return safe not-found behavior and never expose another user's thread IDs or contents.
-- [x] Focused tests, the full repository gates, and the PostgreSQL query-plan check pass.
-- [x] The signed-in production browser flow shows the search and read timeline and a final linked answer for “What did we talk about yesterday?”
-- [x] Production deployment, data preservation, health, source-control, and rollback checks pass.
-
-## Completion evidence
-
-- Implementation: `60ddc1d` (date-filtered previous-thread search).
-- Fixture stability fix: `f18cf6f` replaced hardcoded fixture dates with
-  run-relative stamps so "yesterday" stays correct on every run date; the
-  August 23 primary fixture is pinned to its canonical date.
-- Full production eval sweep on 2026-08-27: all 10 thread-search evals passed
-  36/36 gates against the deployed system via
-  `python3 scripts/run-production-evals.py` (includes `thread-search-yesterday`
-  5/5 and `thread-search-date-range` 5/5). One transient `thread-search-implicit`
-  model stall re-ran clean on repeat.
-- The signed-in browser continuity flow was exercised in production earlier in
-  this feature's lifecycle; the eval suite now covers it deterministically.
-
-## Locked decisions
-
-1. The first release uses UTC only.
-2. Date filtering uses `chat.updated_at`.
-3. Date ranges are half-open and limited to 366 days.
-4. Date filtering requires both `from` and `to`.
-
-## Approval gate
-
-- [x] Soham approved this PRD on 2026-08-24.
-- [x] The time-zone and date-boundary behavior is locked.
-- [x] Unit, PostgreSQL, authorization, eval, and browser checks are mapped below.
-
-## Implementation and verification plan
+### Implementation and verification plan
 
 1. Extend the shared PostgreSQL helper with a validated date range. Keep the authenticated `user_id` predicate in every query path. Test empty, title-only, date-only, and combined searches.
 2. Test inclusive `from`, exclusive `to`, reversed ranges, invalid timestamps, missing bounds, and the 366-day maximum.
@@ -103,7 +83,7 @@ PostgreSQL must filter `chat.user_id` before ranking or limiting results. A read
 6. Exercise “What did we talk about yesterday?” in the real signed-in production browser. Verify the visible search/read timeline and final linked answer.
 7. Back up production, deploy the verified image, confirm existing data and health, then commit and push with a clean tree matching `origin/main`.
 
-## Durable model eval environment
+### Durable model eval environment
 
 The production release gate uses one dedicated local account and deterministic
 owned fixtures. The account is not ephemeral. Its bearer credential and user ID
@@ -119,3 +99,49 @@ Prepare fixtures with `python3 scripts/prepare-thread-search-evals.py`. Then set
 `node scripts/eval-forward.mjs`, and run `/opt/data/bin/bun run
 eval:thread-search`. The loopback forward is required because Eve deliberately
 rejects plain HTTP remote targets. Never print or commit the token.
+
+## Acceptance criteria
+
+- [x] `search_previous_threads` accepts valid absolute `from` and `to` timestamps and keeps title search optional.
+- [x] Date ranges use inclusive `from`, exclusive `to`, require both bounds, and reject invalid, reversed, or longer-than-366-day ranges.
+- [x] PostgreSQL filters by authenticated user, current project, current-thread exclusion, and `chat.updated_at` before ranking or limiting.
+- [x] Empty-title, title-only, date-only, and combined searches return deterministic owned results.
+- [x] Relative-date routing evals convert “yesterday,” “last Friday,” and explicit dates into correct absolute UTC ranges.
+- [x] Foreign-thread searches and reads return safe not-found behavior and never expose another user's thread IDs or contents.
+- [x] Focused tests, the full repository gates, and the PostgreSQL query-plan check pass.
+- [x] The signed-in production browser flow shows the search and read timeline and a final linked answer for “What did we talk about yesterday?”
+- [x] Production deployment, data preservation, health, source-control, and rollback checks pass.
+
+### Completion evidence
+
+- Implementation: `60ddc1d` (date-filtered previous-thread search).
+- Fixture stability fix: `f18cf6f` replaced hardcoded fixture dates with
+  run-relative stamps so "yesterday" stays correct on every run date; the
+  August 23 primary fixture is pinned to its canonical date.
+- Full production eval sweep on 2026-08-27: all 10 thread-search evals passed
+  36/36 gates against the deployed system via
+  `python3 scripts/run-production-evals.py` (includes `thread-search-yesterday`
+  5/5 and `thread-search-date-range` 5/5). One transient `thread-search-implicit`
+  model stall re-ran clean on repeat.
+- The signed-in browser continuity flow was exercised in production earlier in
+  this feature's lifecycle; the eval suite now covers it deterministically.
+
+## Deployment
+
+No separate deployment requirements were recorded.
+
+## Observability
+
+No separate observability requirements were recorded.
+
+## Rollback
+
+No separate rollback requirements were recorded.
+
+## Open questions
+
+### Approval gate
+
+- [x] Soham approved this PRD on 2026-08-24.
+- [x] The time-zone and date-boundary behavior is locked.
+- [x] Unit, PostgreSQL, authorization, eval, and browser checks are mapped below.

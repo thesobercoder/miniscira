@@ -41,18 +41,27 @@ Let users add photos straight from a camera through the composer "+" menu, with 
 - No new state shapes; reuse `UploadedDoc` and `useChatAttachments().uploadFiles`.
 - Touch targets and focus order follow the existing menu row patterns; reduced-motion unaffected.
 
-## Acceptance criteria
-
-- Mobile Safari and Android Chrome open the rear camera from the menu row.
-- Captured photos appear as image chips, upload successfully, render on the sent turn, and survive reload.
-- Multiple photos attach across repeated captures.
-- Desktop and non-supporting browsers degrade to the image picker.
-- Focused tests, typecheck, lint, build, and `git diff --check` pass.
-- Production browser verification covers staging, sending, and rendering a camera-shot photo.
-
-## Evals
+### Evals
 
 Model evals do not apply. This change adds a client-side capture input; it does not alter agent behavior, prompts, tools, retrieval, memory, or model routing.
+
+## Acceptance criteria
+
+- [x] Mobile Safari and Android Chrome open the rear camera from the menu row.
+- [x] Captured photos appear as image chips, upload successfully, render on the sent turn, and survive reload.
+- [x] Multiple photos attach across repeated captures.
+- [x] Desktop and non-supporting browsers degrade to the image picker.
+- [x] Focused tests, typecheck, lint, build, and `git diff --check` pass.
+- [x] Production browser verification covers staging, sending, and rendering a camera-shot photo.
+
+### Completion evidence (2026-08-27)
+
+- `components/chat/composer.tsx`: `Take photo` row (`RiCameraLine`, `Photo` hint) above `Attach files`; hidden camera input with `accept="image/*" capture="environment"` feeding the existing `onUpload`. One focused static-render test covers both attributes. Commit `8f17e3a`.
+- Gates: typecheck, lint, `bun test` 334/334 across 55 files, `git diff --check` all pass.
+- Deployed to production Stack 30 as image `miniscira:camera-photo-attachments-20260827-1`; `/api/health` 200; data counts unchanged (80 chats pre-deploy).
+- Live production browser flow: two captures staged through the camera input into one send, both chips accumulated, sent turn rendered two photo thumbnails plus a correct assistant description, 17 events persisted including the base64 file part, state survived full reload, stored file re-downloaded as `200 image/png`.
+- Caveat: automation-browser captures exercise the picker fallback path (no mobile camera hardware attached). Mobile Safari/Android Chrome camera-open behavior is verified by markup and platform spec, not on live hardware.
+- Test-data note: verification created four throwaway production chats between 07:29 and 07:42 UTC, three of them dead rows from an automation-hostname limitation (`umbrel.local` unresolvable from the test browser); left in place as eval-account data.
 
 ## Deployment
 
@@ -69,12 +78,3 @@ Restore the previous app image. No data, schema, or configuration rollback is re
 ## Open questions
 
 None. Placement between `Attach files` and the mode section follows existing information hierarchy and can move during implementation review without scope change.
-
-## Completion evidence (2026-08-27)
-
-- `components/chat/composer.tsx`: `Take photo` row (`RiCameraLine`, `Photo` hint) above `Attach files`; hidden camera input with `accept="image/*" capture="environment"` feeding the existing `onUpload`. One focused static-render test covers both attributes. Commit `8f17e3a`.
-- Gates: typecheck, lint, `bun test` 334/334 across 55 files, `git diff --check` all pass.
-- Deployed to production Stack 30 as image `miniscira:camera-photo-attachments-20260827-1`; `/api/health` 200; data counts unchanged (80 chats pre-deploy).
-- Live production browser flow: two captures staged through the camera input into one send, both chips accumulated, sent turn rendered two photo thumbnails plus a correct assistant description, 17 events persisted including the base64 file part, state survived full reload, stored file re-downloaded as `200 image/png`.
-- Caveat: automation-browser captures exercise the picker fallback path (no mobile camera hardware attached). Mobile Safari/Android Chrome camera-open behavior is verified by markup and platform spec, not on live hardware.
-- Test-data note: verification created four throwaway production chats between 07:29 and 07:42 UTC, three of them dead rows from an automation-hostname limitation (`umbrel.local` unresolvable from the test browser); left in place as eval-account data.

@@ -11,7 +11,7 @@ A photo sent from a phone with a vision model behaves like desktop: uploads,
 reaches the model natively, renders on the sent turn, and never surfaces a
 cryptic encoding error.
 
-## Diagnosis summary (why this PRD exists)
+### Diagnosis summary (why this PRD exists)
 
 Production evidence from Soham's failed mobile turns (`chat_event` rows for
 chats `375729bd`/`4512905f`) established:
@@ -28,6 +28,10 @@ chats `375729bd`/`4512905f`) established:
   same bytes succeed fresh. Conclusion: provider-side image-decode sensitivity
   (dimension/payload handling of raw multi-megapixel camera frames or transient
   fault) — outside our control, so we normalize inputs and degrade gracefully.
+
+## User stories
+
+No separate user stories were recorded.
 
 ## Scope
 
@@ -81,6 +85,13 @@ chats `375729bd`/`4512905f`) established:
   friendly sentence while keeping the raw provider line available beneath it.
 - Logger lives beside the gateway wrapper; off unless env set.
 
+### Evals
+
+Applicable — this touches the agent-visible failure path (failure rendering,
+instruction text) and the gateway call layer. Run strict live Eve evals against
+deployed prod per canonical procedure in docs/UMBREL_SANDBOX_OPERATIONS.md.
+(Typo fix noted: original draft misspelled the operations doc name.)
+
 ## Acceptance criteria
 
 - [x] Phone-captured JPEG normalizes to ≤1600px standard-baseline JPEG before upload (verified via saved bytes in prod storage).
@@ -94,13 +105,18 @@ passes 3/3 gates against deployed prod with a 4032×3024 photo (native vision
 answer, no UTF-8 error); repository gates 342/342 tests, typecheck, lint,
 build clean.
 
-## Evals
-
-Applicable — this touches the agent-visible failure path (failure rendering,
-instruction text) and the gateway call layer. Run strict live Eve evals against
-deployed prod per canonical procedure in docs/UMBREL_SANDBOX_OPERATIONS.md.
-(Typo fix noted: original draft misspelled the operations doc name.)
-
 ## Deployment
 
 Build image via existing clean-context Portainer Stack 30 procedure; preserve Stack environment and volumes. Rollback artifacts pre-staged per ops doc.
+
+## Observability
+
+No separate observability requirements were recorded.
+
+## Rollback
+
+No separate rollback requirements were recorded.
+
+## Open questions
+
+None recorded.

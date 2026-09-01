@@ -5,22 +5,17 @@
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Approval:** Approved by Soham on 2026-08-27
 
-## Summary
+## Goal
+
+### Summary
 
 Provide a reliable authenticated application layout across desktop and mobile viewports. Navigation must remain discoverable and usable at production mobile widths while preserving the existing desktop sidebar experience.
 
-## Problem
+### Problem
 
 Below the `md` breakpoint, the sidebar becomes a `Sheet`, but only `SidebarTrigger` currently sits inside the sidebar. At a production viewport width of 390 px, neither the sidebar nor a trigger is visible, leaving authenticated users without navigation.
 
-## Product decisions
-
-- Treat desktop and mobile layout as one app-shell problem.
-- Fix navigation access before route-specific layout defects.
-- Reuse `SidebarProvider`, `SidebarTrigger`, and the existing mobile `Sheet`.
-- Keep installability and offline behavior in the separate [Installable app and offline mode PRD](prd-installable-app-and-offline-mode.md).
-
-## Goals
+### Goals
 
 - Keep authenticated navigation visible or immediately accessible at every supported viewport size.
 - Support the application's core routes without clipped, overlapping, or unreachable content.
@@ -28,12 +23,6 @@ Below the `md` breakpoint, the sidebar becomes a `Sheet`, but only `SidebarTrigg
 - Handle mobile browser safe areas and software-keyboard resizing.
 - Preserve usable layout behavior through loading, empty, error, long-content, and streaming states.
 - Work consistently across supported themes and reduced-motion preferences.
-
-## Non-goals
-
-- Installability, web-app manifests, app icons, standalone display metadata, service workers, offline behavior, or caching. Those belong to [Installable App and Offline Mode](./prd-installable-app-and-offline-mode.md).
-- Redesigning information architecture or adding new product routes.
-- Replacing the existing sidebar primitives.
 
 ## User stories
 
@@ -44,6 +33,21 @@ Authenticated users must be able to:
 - Identify the current route and return to primary content.
 - Complete route-specific work without horizontal page overflow or controls hidden behind browser chrome, safe areas, or the software keyboard.
 - Continue reading and interacting while content loads or streams.
+
+## Scope
+
+### Product decisions
+
+- Treat desktop and mobile layout as one app-shell problem.
+- Fix navigation access before route-specific layout defects.
+- Reuse `SidebarProvider`, `SidebarTrigger`, and the existing mobile `Sheet`.
+- Keep installability and offline behavior in the separate [Installable app and offline mode PRD](prd-installable-app-and-offline-mode.md).
+
+## Non-goals
+
+- Installability, web-app manifests, app icons, standalone display metadata, service workers, offline behavior, or caching. Those belong to [Installable App and Offline Mode](./prd-installable-app-and-offline-mode.md).
+- Redesigning information architecture or adding new product routes.
+- Replacing the existing sidebar primitives.
 
 ## Functional requirements
 
@@ -95,6 +99,13 @@ The layout must remain navigable and structurally stable for:
 - Honor `prefers-reduced-motion`; navigation and sheet transitions must remain understandable without relying on animation.
 - Theme changes must not alter the availability or placement of navigation controls.
 
+### UX notes
+
+- Reuse MiniScira's existing design tokens, controls, icon style, spacing, motion, and established sheet patterns.
+- Mobile navigation access should live in a stable authenticated header or equivalent persistent shell region, not inside content that may be absent, loading, or scrolled away before navigation is needed.
+- The mobile trigger must not overlap route-level primary actions.
+- Closing the sheet should return focus to the control that opened it.
+
 ## Technical requirements
 
 - Keep sidebar state in its current `SidebarProvider` owner.
@@ -103,27 +114,7 @@ The layout must remain navigable and structurally stable for:
 - Contain overflow in the component that owns the long content. Do not hide document overflow globally.
 - Inspect the installed Next.js documentation and adjacent app-shell code before implementation.
 
-## UX notes
-
-- Reuse MiniScira's existing design tokens, controls, icon style, spacing, motion, and established sheet patterns.
-- Mobile navigation access should live in a stable authenticated header or equivalent persistent shell region, not inside content that may be absent, loading, or scrolled away before navigation is needed.
-- The mobile trigger must not overlap route-level primary actions.
-- Closing the sheet should return focus to the control that opened it.
-
-## Acceptance criteria
-
-- At a production viewport of 390 px, an authenticated user can see and activate the navigation trigger without first opening or revealing another control.
-- The trigger uses the standard menu or sidebar icon, has the accessible name `Open navigation`, and measures at least 44 by 44 CSS pixels.
-- The mobile sheet exposes every primary/core route, identifies the current route, closes after route selection, and restores focus after dismissal.
-- At and above `md`, the existing desktop sidebar remains available through `SidebarProvider` and its trigger behavior.
-- Every core authenticated route is usable at supported desktop and mobile widths with no document-level horizontal overflow.
-- Touch and keyboard users can open, traverse, select from, and close navigation.
-- Content and controls remain usable with safe-area insets and while the software keyboard is displayed.
-- Loading, empty, error, long-content, and streaming states do not remove navigation access or break the responsive shell.
-- Supported themes have readable navigation and visible focus states.
-- Reduced-motion mode avoids unnecessary movement while preserving state changes.
-
-## Validation plan
+### Validation plan
 
 ### Unit and component checks
 
@@ -163,17 +154,30 @@ The layout must remain navigable and structurally stable for:
 - Record the routes, viewport classes, browsers, input methods, and route states tested.
 - Treat a health response or viewport resize without interaction as insufficient evidence.
 
-## Dependencies and risks
+### Dependencies and risks
 
 - Depends on the behavior and accessibility of the existing `SidebarProvider`, `SidebarTrigger`, and `Sheet` primitives.
 - Route-specific fixed widths or overflow rules may need remediation to conform to the shared shell.
 - Mobile browser viewport and software-keyboard behavior varies by operating system and browser and requires device-level validation.
 
-## Open questions
+### Implementation handoff
 
-- Which exact routes constitute the release-blocking core authenticated route set?
-- What minimum viewport width and browser/device matrix are supported?
-- Should the mobile navigation trigger remain sticky while route content scrolls, or remain in a top shell that users can readily return to?
+The implementation agent must receive this PRD, `AGENTS.md`, the mapped TODO and test plan, and the observed 390 px production reproduction. The agent must preserve the existing sidebar state owner and keep the PWA and offline PRD out of scope.
+
+Model evals do not apply because this work does not change agent behavior, prompts, tools, retrieval, memory, or model routing.
+
+## Acceptance criteria
+
+- [x] At a production viewport of 390 px, an authenticated user can see and activate the navigation trigger without first opening or revealing another control.
+- [x] The trigger uses the standard menu or sidebar icon, has the accessible name `Open navigation`, and measures at least 44 by 44 CSS pixels.
+- [x] The mobile sheet exposes every primary/core route, identifies the current route, closes after route selection, and restores focus after dismissal.
+- [x] At and above `md`, the existing desktop sidebar remains available through `SidebarProvider` and its trigger behavior.
+- [x] Every core authenticated route is usable at supported desktop and mobile widths with no document-level horizontal overflow.
+- [x] Touch and keyboard users can open, traverse, select from, and close navigation.
+- [x] Content and controls remain usable with safe-area insets and while the software keyboard is displayed.
+- [x] Loading, empty, error, long-content, and streaming states do not remove navigation access or break the responsive shell.
+- [x] Supported themes have readable navigation and visible focus states.
+- [x] Reduced-motion mode avoids unnecessary movement while preserving state changes.
 
 ## Deployment
 
@@ -199,15 +203,15 @@ The layout must remain navigable and structurally stable for:
 - Re-run authenticated desktop and mobile navigation checks after rollback.
 - No database rollback is required.
 
-## Approval gate
+## Open questions
+
+- Which exact routes constitute the release-blocking core authenticated route set?
+- What minimum viewport width and browser/device matrix are supported?
+- Should the mobile navigation trigger remain sticky while route content scrolls, or remain in a top shell that users can readily return to?
+
+### Approval gate
 
 - [x] The user reviews and approves this exact PRD. Approved 2026-08-27 ("Then do the responsive layout next using poteto mode, don't digress").
 - [x] Implementation TODOs map every acceptance criterion to a check.
 - [x] The browser and production acceptance matrix is recorded: production MiniScira, desktop and emulated mobile, routes `/`, `/projects`, `/lookouts`, `/mcps`, `/settings`; widths 320, 390, 430 (mobile header with 44 px trigger), 768, 1024, 1440 (desktop sidebar); trigger click and Enter open the sheet; Escape closes with focus restored; route selection navigates and closes the sheet; active route marked; no document-level overflow on any tested route; dark theme and reduced motion checked at 390 px.
 - [x] No installability, offline, manifest, icon, service-worker, caching, or HTTPS work is included.
-
-## Implementation handoff
-
-The implementation agent must receive this PRD, `AGENTS.md`, the mapped TODO and test plan, and the observed 390 px production reproduction. The agent must preserve the existing sidebar state owner and keep the PWA and offline PRD out of scope.
-
-Model evals do not apply because this work does not change agent behavior, prompts, tools, retrieval, memory, or model routing.

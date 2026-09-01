@@ -5,19 +5,19 @@
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Approval:** Not approved
 
-## Problem
+## Goal
+
+### Problem
 
 MiniScira already has a short writing standard in `agent/instructions/00-core.md`. It blocks several common AI writing habits, but it covers only part of the useful guidance in the public Unslop skill.
 
 A mandatory writing standard should not depend on the model deciding to load a skill. An always-on skill would add a tool call, timeline noise, context use, and a failure mode on every turn.
 
-## Goal
-
 Expand MiniScira's existing core writing rules using the useful parts of Unslop. Apply the rules directly on every answer without adding an `unslop` skill or runtime tool call.
 
 The change must preserve accuracy, citations, user preferences, task-specific skills, exact output formats, and the user's requested tone.
 
-## Source
+### Source
 
 Use the public skill as design input:
 
@@ -27,16 +27,13 @@ Do not copy it verbatim. Adapt the useful rules into MiniScira's shorter core wr
 
 Before implementation, inspect the upstream repository license and compare the final wording with the source. If the adopted text copies or substantially reproduces protected wording, preserve the required MIT license notice in the repository. Record the review result even if attribution is not required.
 
-## Product behavior
+## User stories
 
-1. The core instructions give every root-agent answer the same plain-writing baseline.
-2. The model applies the writing standard while composing its final answer. No skill load or second model pass is required.
-3. Task-specific skills still control research method, output structure, citations, and domain requirements.
-4. User tone and standing instructions still control voice unless they conflict with accuracy or safety.
-5. The model writes direct, specific prose and removes common AI writing habits before sending the answer.
-6. Hidden reasoning and tool work remain unaffected.
+No separate user stories were recorded.
 
-## Core instruction decision
+## Scope
+
+### Core instruction decision
 
 Replace the current short Style subsection with a fuller but still compact standard. It should cover these rules:
 
@@ -54,17 +51,27 @@ Replace the current short Style subsection with a fuller but still compact stand
 
 The final section should remain small enough to belong in the system prompt. Do not reproduce the full upstream checklist or its examples.
 
-## Precedence
+## Non-goals
 
-The core writing standard is a default editing rule. It must not override:
-
-1. Accuracy and safety requirements.
-2. The user's explicit language, tone, length, or format request.
-3. User settings and standing instructions.
-4. Required citations and task-specific skill instructions.
-5. Exact code, commands, paths, API names, numbers, dates, URLs, quotations, legal text, or structured data.
+- Creating or installing an `unslop` skill.
+- Adding a second post-processing model call.
+- Adding a client-side prose rewriter.
+- Replacing user tone settings.
+- Rewriting retrieved source text or direct quotations.
+- Banning punctuation characters in code, data, citations, or requested prose.
+- Scoring or storing a user's writing style.
+- Applying a separate editing pass to hidden reasoning or every subagent message.
 
 ## Functional requirements
+
+### Product behavior
+
+1. The core instructions give every root-agent answer the same plain-writing baseline.
+2. The model applies the writing standard while composing its final answer. No skill load or second model pass is required.
+3. Task-specific skills still control research method, output structure, citations, and domain requirements.
+4. User tone and standing instructions still control voice unless they conflict with accuracy or safety.
+5. The model writes direct, specific prose and removes common AI writing habits before sending the answer.
+6. Hidden reasoning and tool work remain unaffected.
 
 1. `agent/instructions/00-core.md` contains the revised writing standard.
 2. MiniScira does not add `agent/skills/unslop.md`.
@@ -79,7 +86,19 @@ The core writing standard is a default editing rule. It must not override:
 11. The existing language, Markdown, recency-date, and newest-reliable-source defaults remain in force.
 12. A pre-implementation license review records whether the adopted wording requires the upstream MIT notice, and the repository includes that notice when required.
 
-## Test plan
+## Technical requirements
+
+### Precedence
+
+The core writing standard is a default editing rule. It must not override:
+
+1. Accuracy and safety requirements.
+2. The user's explicit language, tone, length, or format request.
+3. User settings and standing instructions.
+4. Required citations and task-specific skill instructions.
+5. Exact code, commands, paths, API names, numbers, dates, URLs, quotations, legal text, or structured data.
+
+### Test plan
 
 ### Static and unit checks
 
@@ -154,24 +173,19 @@ Inspect the production timeline to confirm that there is no `unslop` skill call 
 - [ ] A mocked Nodemailer regression proves that the current Lookout sender, owner recipient, subject, report link, and HTML-only payload remain unchanged.
 - [ ] Typecheck, lint, the full test suite, repository checks, and production build pass.
 
-## Non-goals
+## Deployment
 
-- Creating or installing an `unslop` skill.
-- Adding a second post-processing model call.
-- Adding a client-side prose rewriter.
-- Replacing user tone settings.
-- Rewriting retrieved source text or direct quotations.
-- Banning punctuation characters in code, data, citations, or requested prose.
-- Scoring or storing a user's writing style.
-- Applying a separate editing pass to hidden reasoning or every subagent message.
-
-## Deployment and observability
+### Deployment and observability
 
 - Deploy through the normal MiniScira production path.
 - Check app and Eve health after deployment.
 - Run the applicable live Eve evals through the dedicated production eval account.
 - Inspect production timelines for unexpected skill calls or missing task-specific skills.
 - Check Eve and app logs for prompt or context-limit errors.
+
+## Observability
+
+No separate observability requirements were recorded.
 
 ## Rollback
 
@@ -181,7 +195,7 @@ Restore the previous Style subsection in `agent/instructions/00-core.md` and red
 
 None. The core instructions should own the always-on writing standard.
 
-## Approval gate
+### Approval gate
 
 Implementation starts only after Soham explicitly approves this revised PRD. After approval, create TODOs mapped to the acceptance criteria and eval cases above.
 

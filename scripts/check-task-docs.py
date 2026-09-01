@@ -19,27 +19,78 @@ LIFECYCLE_STATUSES = {"To do", "In progress", "Done"}
 APPROVAL_PATTERN = re.compile(
     r"^- \*\*Approval:\*\* (?:Not approved|Approved by Soham on \d{4}-\d{2}-\d{2}(?:\. .+)?)$"
 )
+CANONICAL_PRD_SECTIONS = (
+    "Goal",
+    "User stories",
+    "Scope",
+    "Non-goals",
+    "Functional requirements",
+    "Technical requirements",
+    "Acceptance criteria",
+    "Deployment",
+    "Observability",
+    "Rollback",
+    "Open questions",
+)
+TASK_ITEM_PATTERN = re.compile(r"^\s*- \[([ xX])\] .+")
 
 
 def relative_markdown_links(text: str) -> list[str]:
     return re.findall(r"\[[^\]]*\]\(([^)]+)\)", text)
 
 
-def has_unchecked_acceptance_criterion(text: str) -> bool:
-    acceptance_seen = False
+def prd_sections(text: str) -> list[str]:
+    return re.findall(r"^## (?!#)(.+)$", text, re.MULTILINE)
 
-    for line in text.splitlines():
-        stripped = line.strip()
-        if re.fullmatch(r"#{2,6} Acceptance criteria:?", stripped, re.IGNORECASE):
-            acceptance_seen = True
-            continue
-        if stripped.lower() == "**acceptance criteria:**":
-            acceptance_seen = True
-            continue
-        if acceptance_seen and re.fullmatch(r"- \[ \] .+", stripped):
-            return True
 
-    return False
+def acceptance_criterion_states(text: str) -> list[str]:
+    lines = text.splitlines()
+    try:
+        start = lines.index("## Acceptance criteria") + 1
+    except ValueError:
+        return []
+
+    states: list[str] = []
+    for line in lines[start:]:
+        if line.startswith("## "):
+            break
+        match = TASK_ITEM_PATTERN.fullmatch(line)
+        if match:
+            states.append(match.group(1).lower())
+    return states
+
+
+def prd_structure_errors(text: str, status: str | None) -> list[str]:
+    errors: list[str] = []
+    sections = prd_sections(text)
+    expected = list(CANONICAL_PRD_SECTIONS)
+    if sections != expected:
+        errors.append(
+            "top-level sections must match the canonical PRD order; "
+            f"expected {expected!r}, found {sections!r}"
+        )
+
+    criterion_states = acceptance_criterion_states(text)
+    if not criterion_states:
+        errors.append("Acceptance criteria must contain at least one Markdown task-list item")
+    elif status == "Done" and any(state != "x" for state in criterion_states):
+        errors.append("Done PRD acceptance criteria must all be checked")
+    elif status in {"To do", "In progress"} and " " not in criterion_states:
+        errors.append(f"{status} PRD must have at least one unchecked acceptance criterion")
+
+    without_acceptance = re.sub(
+        r"^## Acceptance criteria$.*?(?=^## |\Z)",
+        "",
+        text,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    if re.search(
+        r"^(?:### .*acceptance criteria.*|\*\*Acceptance criteria:\*\*)$",
+        without_acceptance,
+        flags=re.MULTILINE | re.IGNORECASE,
+    ):
+        errors.append("Acceptance criteria labels must appear only in ## Acceptance criteria")
+    return errors
 
 
 def main() -> int:
@@ -167,12 +218,8 @@ def main() -> int:
                             f"{task_name}: status does not match its Product Ideas row"
                         )
 
-            if status == "In progress" and not has_unchecked_acceptance_criterion(
-                task_text
-            ):
-                errors.append(
-                    f"{task_name}: In progress PRD must have at least one unchecked acceptance criterion"
-                )
+            for structure_error in prd_structure_errors(task_text, status):
+                errors.append(f"{task_name}: {structure_error}")
 
     files_to_check = [
         ROOT / "docs" / "PRODUCT_IDEAS.md",

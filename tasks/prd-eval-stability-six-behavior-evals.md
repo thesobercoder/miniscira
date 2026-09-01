@@ -14,7 +14,7 @@ plans the prompt strengthening and repeat-run evidence needed to reach that
 bar. Soham deferred this work on 2026-08-27; it starts only after explicit
 approval.
 
-## Baseline evidence (2026-08-27)
+### Baseline evidence (2026-08-27)
 
 Full strict production sweep (`python3 scripts/run-production-evals.py
 --strict --max-concurrency 1`) against the deployed system
@@ -40,6 +40,13 @@ Four further evals (`compare-options`, `deep-research-fanout`,
 boundary" before gates can judge. Reproduced 4/4 on a dedicated re-run. That
 is a long-turn streaming problem, not agent behavior, and is out of scope
 here.
+
+### Evidence log
+
+- 2026-08-27: full strict sweep 21/31 evals, 148/154 gates on
+  `miniscira:photo-send-reliability-20260827-1`; the six behavior failures
+  listed above. Dedicated re-run of the four stream evals reproduced 4/4 in
+  23m26s.
 
 ## User stories
 
@@ -97,7 +104,9 @@ here.
       Stack 30 flow; deployed health verified.
 - [ ] `python3 scripts/check-task-docs.py` passes.
 
-## Deployment and rollback
+## Deployment
+
+### Deployment and rollback
 
 Deploy the rebuilt image through the documented Stack 30 update flow. Rollback
 is reverting the prompt/fixture commit and redeploying the previous image.
@@ -107,6 +116,10 @@ is reverting the prompt/fixture commit and redeploying the previous image.
 While the stability window runs, record each production run (date, image tag,
 per-eval result) in the evidence log below so pass-rate trends stay visible.
 
+## Rollback
+
+No separate rollback requirements were recorded.
+
 ## Open questions
 
 1. Is 10 consecutive passes the right confidence bar, or should the bar be a
@@ -114,10 +127,3 @@ per-eval result) in the evidence log below so pass-rate trends stay visible.
 2. Should the four stream-transport evals get their own PRD now?
 3. For `thread-search-no-match`, is the gated denial regex the product voice
    we want, or should the fixture accept a broader honest-denial phrasing set?
-
-## Evidence log
-
-- 2026-08-27: full strict sweep 21/31 evals, 148/154 gates on
-  `miniscira:photo-send-reliability-20260827-1`; the six behavior failures
-  listed above. Dedicated re-run of the four stream evals reproduced 4/4 in
-  23m26s.

@@ -10,6 +10,10 @@
 Close the failure-handling and proof gaps found in the shipped camera and photo
 send path without replacing its small browser-upload design.
 
+## User stories
+
+No separate user stories were recorded.
+
 ## Scope
 
 1. Keep staged attachments recoverable until Eve accepts the turn.
@@ -29,7 +33,13 @@ send path without replacing its small browser-upload design.
   behavioral changes.
 - No Eve turn identifier invented at the model boundary. Use a local request ID.
 
-## TODO
+## Functional requirements
+
+No separate functional requirements were recorded.
+
+## Technical requirements
+
+### TODO
 
 - [ ] Defer attachment removal and sent-turn rendering until Eve accepts the
   turn. Keep the question and attachment staged after chat creation, binding,
@@ -43,7 +53,7 @@ send path without replacing its small browser-upload design.
   ID, model ID, attempt, role and part counts, media types, and derivable byte
   sizes.
 
-## Test plan
+### Test plan
 
 - Deterministic normalization tests cover dimensions, JPEG type, quality,
   bitmap cleanup, both canvas paths, encoding failure, decode fallback, and the
@@ -57,7 +67,7 @@ send path without replacing its small browser-upload design.
   allowlist.
 - Multi-image tests prove stable picker order and isolated failures.
 
-## Eval and acceptance plan
+### Eval and acceptance plan
 
 - Run focused tests, all repository tests, typecheck, lint, build, task-document
   checks, and `git diff --check`.
@@ -69,6 +79,13 @@ send path without replacing its small browser-upload design.
   IDs before the update.
 - Run `python3 scripts/run-production-evals.py` against the deployed system.
   Report browser-path proof separately from the Eve model-delivery eval.
+
+### Evals
+
+Applicable because this changes attachment delivery and the model-call boundary.
+Run strict live Eve evals through the canonical production runner. The direct
+photo eval proves model delivery only; browser acceptance proves the camera and
+upload path.
 
 ## Acceptance criteria
 
@@ -89,16 +106,23 @@ send path without replacing its small browser-upload design.
 - [ ] Production runs the pushed commit, the intended working tree is clean,
   and local `HEAD` equals `origin/main`.
 
-## Evals
+## Deployment
 
-Applicable because this changes attachment delivery and the model-call boundary.
-Run strict live Eve evals through the canonical production runner. The direct
-photo eval proves model delivery only; browser acceptance proves the camera and
-upload path.
-
-## Deployment and rollback
+### Deployment and rollback
 
 Build and deploy through the Stack 30 procedure. Preserve the Stack environment,
 external volumes, previous Compose, and previous immutable app image. There is
 no schema migration or stored-byte rewrite, so code and image rollback is
 sufficient.
+
+## Observability
+
+No separate observability requirements were recorded.
+
+## Rollback
+
+No separate rollback requirements were recorded.
+
+## Open questions
+
+None recorded.

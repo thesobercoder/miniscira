@@ -5,15 +5,15 @@
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Approval:** Not approved
 
-## Problem
+## Goal
+
+### Problem
 
 When the agent asks the user a question, MiniScira renders the question inside the collapsible research timeline. The question step also uses its own collapsible container and indented content frame.
 
 The current code forces the outer research timeline open while a question is pending. The inner `QuestionNode` still inherits the closed default from `ChainOfThoughtStep`. This can hide the prompt and answer controls behind the **Question for you** row. The user sees that the agent stopped producing output but may not see that MiniScira is waiting for an answer.
 
 A pending question is not background research. It is the next required action and must remain visible.
-
-## Goal
 
 Show a pending question as an inline action that the user can answer immediately. Do not require an expand action before the answer action.
 
@@ -25,7 +25,9 @@ Show a pending question as an inline action that the user can answer immediately
 - As a user, I can see the answer that MiniScira captured after I submit it.
 - As a mobile user, I can read and answer the question without nested indentation reducing the available width.
 
-## UX decision
+## Scope
+
+### UX decision
 
 ### Pending state
 
@@ -54,6 +56,14 @@ The answered record may follow normal completed-timeline behavior after the turn
 
 This PRD changes only `question` requests. Keep tool approvals and session-limit requests visually distinct. Review them separately before changing their disclosure or warning behavior.
 
+## Non-goals
+
+- Changing when the agent decides to ask a question.
+- Changing Eve's input-request protocol.
+- Adding a modal, toast, browser notification, or separate inbox for questions.
+- Redesigning authorization, tool-approval, or session-limit requests.
+- Keeping pending questions collapsible as a user preference.
+
 ## Functional requirements
 
 1. A pending `question` request shows its prompt and answer controls without any user expansion.
@@ -69,7 +79,9 @@ This PRD changes only `question` requests. Keep tool approvals and session-limit
 11. Keyboard users can reach every option, the freeform field, and the submit button in a clear order.
 12. The freeform form submits with Enter and retains an accessible **Send answer** name.
 
-## Technical direction
+## Technical requirements
+
+### Technical direction
 
 - Keep Eve's `inputRequest` and `inputResponse` metadata as the source of truth.
 - Keep the existing `onAnswer(requestId, response)` boundary.
@@ -78,7 +90,7 @@ This PRD changes only `question` requests. Keep tool approvals and session-limit
 - Do not add a second question state store. Local optimistic state may prevent duplicate interaction while the response event arrives, but the persisted `inputResponse` must win after reload.
 - Reuse the existing button, input, color, and motion tokens.
 
-## Test plan
+### Test plan
 
 ### Component tests
 
@@ -131,21 +143,19 @@ The model eval proves the question and resume behavior. Browser acceptance prove
 - [ ] Desktop and narrow mobile browser acceptance passes on the deployed MiniScira system.
 - [ ] Typecheck, lint, the full test suite, repository checks, and production build pass.
 
-## Non-goals
+## Deployment
 
-- Changing when the agent decides to ask a question.
-- Changing Eve's input-request protocol.
-- Adding a modal, toast, browser notification, or separate inbox for questions.
-- Redesigning authorization, tool-approval, or session-limit requests.
-- Keeping pending questions collapsible as a user preference.
-
-## Deployment and observability
+### Deployment and observability
 
 - Deploy through the normal MiniScira production path.
 - Confirm the production app is healthy after deployment.
 - Use the dedicated eval account and `python3 scripts/run-production-evals.py` for the applicable live eval.
 - Verify the real question flow in the production browser, including the reload state.
 - Check browser console and app logs for response or rendering errors.
+
+## Observability
+
+No separate observability requirements were recorded.
 
 ## Rollback
 

@@ -5,13 +5,15 @@
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Approval:** Approved by Soham on 2026-08-29
 
-## Summary
+## Goal
+
+### Summary
 
 Lookout reports are generated as Markdown. `lib/lookout-runner.ts` extracts the final assistant text and passes it to `lib/email.ts`. The email code uses a small regular-expression converter and sends an HTML-only message through the existing Nodemailer and Fastmail path.
 
 Replace the hand-built email HTML with a React Email template. Render the report as readable HTML email and keep the message usable in light and dark email readers.
 
-## Goals
+### Goals
 
 - Make Lookout reports easy to scan in an email reader.
 - Preserve useful report structure such as headings, paragraphs, lists, emphasis, and links.
@@ -26,7 +28,9 @@ Replace the hand-built email HTML with a React Email template. Render the report
 - As a recipient using a dark email reader, I can read every part of the message without low-contrast text, invisible links, or broken backgrounds.
 - As a MiniScira operator, I can keep the existing Fastmail SMTP configuration and sender identity.
 
-## Product decisions
+## Scope
+
+### Product decisions
 
 - Use React Email components and its render utility for the HTML email.
 - Keep Nodemailer and the current Fastmail SMTP transport.
@@ -38,14 +42,21 @@ Replace the hand-built email HTML with a React Email template. Render the report
 - Do not depend on an email client's dark-mode behavior being consistent. Supply explicit dark-mode hints and styles, then use colors that remain legible when a client ignores or overrides them.
 - Treat Lookout Markdown as untrusted text. Raw HTML from the report must not become executable or active email markup.
 
-## Scope
-
 - A React Email template for successful Lookout reports.
 - Safe conversion of report Markdown into email content.
 - Subject, preheader, report title, report body, empty-report state, and the `Open in MiniScira` action.
 - Light and dark email-reader styling.
 - Tests for rendering, content safety, SMTP payloads, and the existing recipient rules.
 - Production delivery and inspection of a real Lookout email.
+
+## Non-goals
+
+- No change to Lookout creation, prompts, models, schedules, leases, retries, or report persistence.
+- No change to who receives a Lookout email.
+- No email editor, per-user email theme setting, custom template builder, or marketing layout.
+- No attachments, embedded report images, open tracking, click tracking, unsubscribe workflow, or bulk-mail system.
+- No change to the in-app report page.
+- No migration from Fastmail or Nodemailer.
 
 ## Functional requirements
 
@@ -71,7 +82,9 @@ Replace the hand-built email HTML with a React Email template. Render the report
 11. Email rendering failure follows the current email-failure path. It must not send malformed fallback HTML, expose report contents in logs, erase the persisted report, or turn a successful research run into a failed run.
 12. Missing SMTP configuration keeps the current no-send behavior.
 
-## Design requirements
+## Technical requirements
+
+### Design requirements
 
 - Use semantic React Email components and email-safe inline styles for the base presentation.
 - Use a neutral MiniScira layout with a clear heading, muted context text, readable report typography, restrained separators, and one primary action.
@@ -84,8 +97,6 @@ Replace the hand-built email HTML with a React Email template. Render the report
 - Do not rely on background images, remote fonts, animation, hover, or JavaScript.
 - Decorative emoji or icons must not be required to understand the subject or content.
 
-## Technical requirements
-
 - Add the smallest supported React Email dependency set needed for components and HTML rendering.
 - Keep the template in a server-only module near the email delivery code. It must not enter the browser bundle.
 - Keep SMTP credentials and transport construction in the existing server-side email boundary.
@@ -97,7 +108,7 @@ Replace the hand-built email HTML with a React Email template. Render the report
 - Do not add a hosted email-template service or restore Resend.
 - Preserve the existing `sendLookoutEmail` caller contract unless a narrow typed change makes rendering safer.
 
-## Security and privacy requirements
+### Security and privacy requirements
 
 - Never include SMTP credentials, authorization data, internal headers, stack configuration, or server errors in the email body or logs.
 - Escape user-controlled Lookout names and model-generated report content.
@@ -106,27 +117,7 @@ Replace the hand-built email HTML with a React Email template. Render the report
 - Keep recipient selection owner-scoped through `lookoutRecipient`.
 - The report link must identify only the persisted chat. Existing application authentication and ownership checks remain responsible for access.
 
-## Non-goals
-
-- No change to Lookout creation, prompts, models, schedules, leases, retries, or report persistence.
-- No change to who receives a Lookout email.
-- No email editor, per-user email theme setting, custom template builder, or marketing layout.
-- No attachments, embedded report images, open tracking, click tracking, unsubscribe workflow, or bulk-mail system.
-- No change to the in-app report page.
-- No migration from Fastmail or Nodemailer.
-
-## Acceptance criteria
-
-- [x] A report containing the supported Markdown structures arrives as structured HTML without visible Markdown markers.
-- [x] Raw HTML and unsafe links in a report cannot become active email content.
-- [ ] The message remains readable in representative light and dark clients, including a client that honors custom dark styles and a client that applies forced color inversion.
-- [ ] The primary action remains visible and understandable in each tested mode even when button background styling is changed by the client.
-- [ ] The layout fits a narrow mobile reader without horizontal page scrolling.
-- [x] Empty and long reports render without broken markup.
-- [x] The existing Fastmail sender, owner signup-email recipient, subject purpose, report URL, and SMTP behavior remain intact.
-- [ ] A production Lookout run sends one real message to the approved test recipient, and the delivered message passes the content, link, light-mode, dark-mode, and mobile-width checks.
-
-## Test plan
+### Test plan
 
 ### Unit tests
 
@@ -164,7 +155,33 @@ Record client and platform versions. Check content order, contrast, forced inver
 
 Model evals do not apply. This change does not alter prompts, tools, retrieval, memory, routing, or the report generated by the model. Deterministic rendering and real email-client checks cover the affected behavior.
 
-## Production acceptance
+### Implementation handoff
+
+After approval:
+
+1. Create TODOs that map every acceptance criterion to code, tests, email-client checks, production delivery, and rollback.
+2. Add the smallest React Email dependency set.
+3. Add safe report-content rendering and the React Email template.
+4. Send the rendered HTML through the existing Nodemailer path.
+5. Run focused tests and all applicable repository quality gates.
+6. Deploy through the canonical Umbrel procedure.
+7. Deliver and inspect the real production email before marking the idea done.
+8. Commit and push the verified source so local `HEAD` equals `origin/main` and the working tree is clean.
+
+## Acceptance criteria
+
+- [x] A report containing the supported Markdown structures arrives as structured HTML without visible Markdown markers.
+- [x] Raw HTML and unsafe links in a report cannot become active email content.
+- [ ] The message remains readable in representative light and dark clients, including a client that honors custom dark styles and a client that applies forced color inversion.
+- [ ] The primary action remains visible and understandable in each tested mode even when button background styling is changed by the client.
+- [ ] The layout fits a narrow mobile reader without horizontal page scrolling.
+- [x] Empty and long reports render without broken markup.
+- [x] The existing Fastmail sender, owner signup-email recipient, subject purpose, report URL, and SMTP behavior remain intact.
+- [ ] A production Lookout run sends one real message to the approved test recipient, and the delivered message passes the content, link, light-mode, dark-mode, and mobile-width checks.
+
+## Deployment
+
+### Production acceptance
 
 After approval, implementation, tests, and deployment:
 
@@ -186,8 +203,6 @@ Live Eve evals are not required because the agent output contract does not chang
 - User review of that message still preferred the older plain report. Commit `0a4c3e7` removes the logo, card, accent rule, and filled action while keeping the safe Markdown renderer, real tables, headings, links, and code formatting.
 - Fastmail light-mode and desktop-width inspection passed. Dark-mode, forced-inversion, narrow mobile, Apple Mail, Gmail, and Outlook checks remain open.
 
-## Deployment
-
 - Add the React Email runtime dependencies to the production image through the normal repository build.
 - Deploy the application change without changing SMTP credentials or exposing an additional service.
 - No database migration is expected.
@@ -208,19 +223,6 @@ Live Eve evals are not required because the agent output contract does not chang
 
 - Which exact Outlook environment or rendering service is available for acceptance testing?
 
-## Approval gate
+### Approval gate
 
 Soham approved implementation on 2026-08-29.
-
-## Implementation handoff
-
-After approval:
-
-1. Create TODOs that map every acceptance criterion to code, tests, email-client checks, production delivery, and rollback.
-2. Add the smallest React Email dependency set.
-3. Add safe report-content rendering and the React Email template.
-4. Send the rendered HTML through the existing Nodemailer path.
-5. Run focused tests and all applicable repository quality gates.
-6. Deploy through the canonical Umbrel procedure.
-7. Deliver and inspect the real production email before marking the idea done.
-8. Commit and push the verified source so local `HEAD` equals `origin/main` and the working tree is clean.

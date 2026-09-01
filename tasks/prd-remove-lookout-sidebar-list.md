@@ -45,6 +45,10 @@ Keep the sidebar focused on primary navigation and active research history.
 - Preserve the existing Lookout scheduler and database behavior.
 - Do not add new state, routes, or abstractions.
 
+### Evals
+
+Model evals do not apply. This change does not affect agent behavior, prompts, tools, retrieval, memory, or model routing.
+
 ## Acceptance criteria
 
 - [x] Desktop and narrow-screen sidebars show the `Lookouts` navigation item once.
@@ -56,7 +60,7 @@ Keep the sidebar focused on primary navigation and active research history.
 - [x] Focused tests, the full test suite, typecheck, lint, build, and `git diff --check` pass.
 - [x] Production browser verification covers the sidebar and Lookouts page.
 
-## Completion evidence
+### Completion evidence
 
 - Implementation: `de30249`.
 - Production browser verification 2026-08-27: sidebar shows exactly one
@@ -67,10 +71,6 @@ Keep the sidebar focused on primary navigation and active research history.
   ordering). Production currently holds only three lookouts, so the overflow
   case was verified by code and test rather than by creating real lookouts,
   which would have fired scheduled emails to the owner.
-
-## Evals
-
-Model evals do not apply. This change does not affect agent behavior, prompts, tools, retrieval, memory, or model routing.
 
 ## Deployment
 

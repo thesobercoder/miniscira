@@ -6,7 +6,9 @@
 - **Approval:** Approved by Soham on 2026-08-27
 - **Revision:** 2 (2026-08-27). Revision 1 planned an Invidious sidecar plus a dedicated `youtube_transcript` tool. A proof of concept on 2026-08-27 showed the Docker Sandbox reaches YouTube captions directly once two egress entries exist. This revision makes the sandbox the primary architecture and demotes the sidecar to a documented upgrade path.
 
-## Problem
+## Goal
+
+### Problem
 
 Users share YouTube links during research. The agent can read the video page title and description through general web fetches. It cannot read the spoken content, so it answers from metadata or says it cannot watch videos.
 
@@ -17,13 +19,17 @@ YouTube exposes transcripts as caption tracks. The agent's sandbox already runs 
 - Deny probes stayed intact: non-allowlisted hosts returned `403 Forbidden`.
 - The installed yt-dlp (2026.08.19) warned that no impersonation target was available and still succeeded. This is the early warning for future YouTube client checks, so the image must ship `curl-cffi`.
 
-## Goal
-
 When research needs what a specific video says, the agent loads a skill that tells it to fetch the caption track with `yt-dlp` in the sandbox, then cites the spoken content with timestamps.
 
 The mechanism follows the existing skill pattern (`docx`, `pdf`, `xlsx`): one skill file in `agent/skills/`, one line in the core instructions' skills list, capability delivered through the existing `run_code` tool. No new Eve tool, no new service container, no database change.
 
-## Product decisions
+## User stories
+
+No separate user stories were recorded.
+
+## Scope
+
+### Product decisions
 
 - One new skill file: `agent/skills/youtube_transcript.md`.
 - The sandbox runner image bakes in pinned `yt-dlp` and `curl-cffi` versions. Generated code does not install packages at chat time.
@@ -33,7 +39,7 @@ The mechanism follows the existing skill pattern (`docx`, `pdf`, `xlsx`): one sk
 - If no caption track exists, the agent says so plainly. Fabricating spoken content is an eval failure.
 - The researcher subagent inherits the capability through core instructions. No schedule changes.
 
-## Accepted risk
+### Accepted risk
 
 Squid filters by domain, so `.googlevideo.com` permits caption data and video media alike. A determined generated program could download video. This deployment is single-operator on a private server with deny-by-default for every other domain, and the risk is accepted. The validation suite's deny probes guard the breadth of the exposure. The skill does not offer or document media download.
 
@@ -45,14 +51,6 @@ Squid filters by domain, so `.googlevideo.com` permits caption data and video me
 - No transcript cache, storage, or database migration.
 - No published host ports and no Umbrel app-store install.
 
-## Data shape
-
-No typed contract exists in this architecture. The skill defines the behavior contract instead:
-
-- Input: one YouTube URL or bare 11-character video id, optionally with a language hint from the user's question.
-- Output in the answer: spoken content cited as `[mm:ss]` moments, drawn only from the retrieved captions.
-- Failure: a plain statement that no captions were found or retrieval failed. Never invented content.
-
 ## Functional requirements
 
 1. `agent/skills/youtube_transcript.md` exists with frontmatter description "Use when the user shares a YouTube link or asks what a specific video says." Its body states: use `run_code`, the sandbox has `yt-dlp`, do not install packages, extract the 11-character id, run the caption-fetch command shape, read the `.vtt` from `/workspace`, cite `[mm:ss]` moments, and report missing captions honestly.
@@ -63,7 +61,17 @@ No typed contract exists in this architecture. The skill defines the behavior co
 6. `evals/youtube-transcript.eval.ts` covers routing in, routing restraint, and honest failure, and is registered in `evals/evals.config.ts` so strict mode runs it.
 7. `docs/DEPLOYMENT.md` documents the two allowlist entries, the image-baked packages, and rollback.
 
-## Test plan
+## Technical requirements
+
+### Data shape
+
+No typed contract exists in this architecture. The skill defines the behavior contract instead:
+
+- Input: one YouTube URL or bare 11-character video id, optionally with a language hint from the user's question.
+- Output in the answer: spoken content cited as `[mm:ss]` moments, drawn only from the retrieved captions.
+- Failure: a plain statement that no captions were found or retrieval failed. Never invented content.
+
+### Test plan
 
 ### Skill and image checks
 
@@ -90,6 +98,12 @@ No typed contract exists in this architecture. The skill defines the behavior co
 3. Confirm from the deployed sandbox image that `yt-dlp --version` matches the pinned version and that a non-allowlisted host is denied through the proxy.
 4. Record the routes, inputs, and results in the PRD completion evidence.
 
+### Dependencies and risks
+
+- YouTube changes break caption retrieval for third-party clients periodically. Mitigation: pin yt-dlp and curl-cffi in the image, record the versions, and treat updates as scheduled maintenance with a unique tag per bump. The PoC warning about impersonation shows this is a live surface, not a theoretical one.
+- Skill routing is model behavior and can drift. Mitigation: the routing eval runs in strict mode, and the documented upgrade path is the revision 1 dedicated tool if drift persists.
+- The `.googlevideo.com` exposure is broader than captions alone. Accepted above and guarded by the validation suite.
+
 ## Acceptance criteria
 
 - [ ] `agent/skills/youtube_transcript.md` exists and the core skills list in `agent/agent.ts` names it.
@@ -103,12 +117,6 @@ No typed contract exists in this architecture. The skill defines the behavior co
 - [ ] `docs/DEPLOYMENT.md` documents the allowlist entries, the baked packages, and rollback.
 - [ ] Source is committed and pushed with a clean tree and `HEAD == origin/main`.
 
-## Dependencies and risks
-
-- YouTube changes break caption retrieval for third-party clients periodically. Mitigation: pin yt-dlp and curl-cffi in the image, record the versions, and treat updates as scheduled maintenance with a unique tag per bump. The PoC warning about impersonation shows this is a live surface, not a theoretical one.
-- Skill routing is model behavior and can drift. Mitigation: the routing eval runs in strict mode, and the documented upgrade path is the revision 1 dedicated tool if drift persists.
-- The `.googlevideo.com` exposure is broader than captions alone. Accepted above and guarded by the validation suite.
-
 ## Deployment
 
 1. Obtain explicit approval of this PRD.
@@ -121,16 +129,18 @@ No typed contract exists in this architecture. The skill defines the behavior co
 8. Run the routing eval against production and the production browser acceptance.
 9. Commit and push; confirm a clean tree and `HEAD == origin/main`.
 
-## Rollback
-
-Revert the sandbox image reference to the previous tag, redeploy the previous egress proxy image, and remove the skill line from the core skills list. No stored data changes. The deny-probe suite re-runs after rollback.
-
 ## Observability
 
 - Review the sandbox validation output for deny-probe failures after any allowlist change.
 - Review failed research turns that mention YouTube for honest-failure quality.
 - Treat fabricated video content as a release blocker.
 
-## Approval gate
+## Rollback
+
+Revert the sandbox image reference to the previous tag, redeploy the previous egress proxy image, and remove the skill line from the core skills list. No stored data changes. The deny-probe suite re-runs after rollback.
+
+## Open questions
+
+### Approval gate
 
 Do not rebuild images, change the allowlist, change Stack 30, or write skill or eval code until Soham approves this PRD. After approval, create TODOs mapped to the acceptance criteria, then implement in the deployment order above.
