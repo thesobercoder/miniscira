@@ -27,11 +27,7 @@ A user can continue one research conversation for as long as the product permits
 
 ## User stories
 
-No separate user stories were recorded.
-
 ## Scope
-
-No separate scope notes were recorded.
 
 ## Non-goals
 
@@ -41,8 +37,6 @@ No separate scope notes were recorded.
 - Changing DeerFlow.
 
 ## Functional requirements
-
-No separate functional requirements were recorded.
 
 ## Technical requirements
 
@@ -72,16 +66,8 @@ See `/opt/data/reports/miniscira-next-steps/implementation-plan.md`, Phase 1.
 
 ## Deployment
 
-No separate deployment requirements were recorded.
-
 ## Observability
-
-No separate observability requirements were recorded.
 
 ## Rollback
 
-No separate rollback requirements were recorded.
-
 ## Open questions
-
-None recorded.

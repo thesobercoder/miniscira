@@ -5,35 +5,10 @@ from pathlib import Path
 import re
 import sys
 
+from prd_format import CANONICAL_PRD_SECTIONS
 
 ROOT = Path(__file__).resolve().parents[1]
 TASKS_DIR = ROOT / "tasks"
-CANONICAL_SECTIONS = (
-    "Goal",
-    "User stories",
-    "Scope",
-    "Non-goals",
-    "Functional requirements",
-    "Technical requirements",
-    "Acceptance criteria",
-    "Deployment",
-    "Observability",
-    "Rollback",
-    "Open questions",
-)
-EMPTY_TEXT = {
-    "Goal": "No separate goal was recorded.",
-    "User stories": "No separate user stories were recorded.",
-    "Scope": "No separate scope notes were recorded.",
-    "Non-goals": "No separate non-goals were recorded.",
-    "Functional requirements": "No separate functional requirements were recorded.",
-    "Technical requirements": "No separate technical requirements were recorded.",
-    "Acceptance criteria": "- [ ] Define acceptance criteria.",
-    "Deployment": "No separate deployment requirements were recorded.",
-    "Observability": "No separate observability requirements were recorded.",
-    "Rollback": "No separate rollback requirements were recorded.",
-    "Open questions": "None recorded.",
-}
 
 
 def clean_heading(heading: str) -> str:
@@ -43,7 +18,7 @@ def clean_heading(heading: str) -> str:
 def classify_heading(heading: str) -> str:
     name = clean_heading(heading)
     lower = name.lower()
-    canonical = {section.lower(): section for section in CANONICAL_SECTIONS}
+    canonical = {section.lower(): section for section in CANONICAL_PRD_SECTIONS}
     if lower in canonical:
         return canonical[lower]
     if "acceptance criteria" in lower or "remaining completion work" in lower or "completion evidence" in lower:
@@ -138,7 +113,9 @@ def normalize_prd(text: str) -> str:
     if not status_match:
         raise ValueError("missing status metadata")
     status = status_match.group(1).strip()
-    buckets: dict[str, list[str]] = {section: [] for section in CANONICAL_SECTIONS}
+    buckets: dict[str, list[str]] = {
+        section: [] for section in CANONICAL_PRD_SECTIONS
+    }
 
     for heading, body in source_sections:
         target = classify_heading(heading)
@@ -153,11 +130,13 @@ def normalize_prd(text: str) -> str:
         buckets[target].append(block.strip())
 
     rendered = [prefix]
-    for section in CANONICAL_SECTIONS:
+    for section in CANONICAL_PRD_SECTIONS:
         body = "\n\n".join(block for block in buckets[section] if block).strip()
-        if not body:
-            body = EMPTY_TEXT[section]
-        rendered.append(f"## {section}\n\n{body}")
+        if section == "Acceptance criteria" and not re.search(
+            r"^\s*- \[[ xX]\] .+", body, re.MULTILINE
+        ):
+            raise ValueError("missing acceptance criteria")
+        rendered.append(f"## {section}" + (f"\n\n{body}" if body else ""))
     return "\n\n".join(rendered).rstrip() + "\n"
 
 

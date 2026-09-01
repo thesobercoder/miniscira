@@ -18,11 +18,7 @@ A user can ask the agent to create or edit a PDF, DOCX, PPTX, or XLSX file. The 
 
 ## User stories
 
-No separate user stories were recorded.
-
 ## Scope
-
-No separate scope notes were recorded.
 
 ## Non-goals
 
@@ -163,15 +159,9 @@ recorded, the PRD is Done.
 
 ## Deployment
 
-No separate deployment requirements were recorded.
-
 ## Observability
 
-No separate observability requirements were recorded.
-
 ## Rollback
-
-No separate rollback requirements were recorded.
 
 ## Open questions
 

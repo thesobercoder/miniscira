@@ -99,11 +99,7 @@ Model evals do not apply. This change affects deterministic list pagination and 
 
 ## Observability
 
-No separate observability requirements were recorded.
-
 ## Rollback
-
-No separate rollback requirements were recorded.
 
 ## Open questions
 

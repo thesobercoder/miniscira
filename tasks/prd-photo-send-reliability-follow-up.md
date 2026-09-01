@@ -12,8 +12,6 @@ send path without replacing its small browser-upload design.
 
 ## User stories
 
-No separate user stories were recorded.
-
 ## Scope
 
 1. Keep staged attachments recoverable until Eve accepts the turn.
@@ -34,8 +32,6 @@ No separate user stories were recorded.
 - No Eve turn identifier invented at the model boundary. Use a local request ID.
 
 ## Functional requirements
-
-No separate functional requirements were recorded.
 
 ## Technical requirements
 
@@ -117,12 +113,6 @@ sufficient.
 
 ## Observability
 
-No separate observability requirements were recorded.
-
 ## Rollback
 
-No separate rollback requirements were recorded.
-
 ## Open questions
-
-None recorded.

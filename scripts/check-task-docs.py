@@ -4,9 +4,12 @@ from pathlib import Path
 import re
 import sys
 
+from prd_format import CANONICAL_PRD_SECTIONS
+
 ROOT = Path(__file__).resolve().parents[1]
 TASKS_DIR = ROOT / "tasks"
 PRODUCT_IDEAS = ROOT / "docs" / "PRODUCT_IDEAS.md"
+PRODUCT_PLANNING = ROOT / "docs" / "PRODUCT_PLANNING.md"
 PLANNING_LINK = (
     "- **Planning process:** "
     "[Product planning and execution](../docs/PRODUCT_PLANNING.md)"
@@ -19,19 +22,6 @@ LIFECYCLE_STATUSES = {"To do", "In progress", "Done"}
 APPROVAL_PATTERN = re.compile(
     r"^- \*\*Approval:\*\* (?:Not approved|Approved by Soham on \d{4}-\d{2}-\d{2}(?:\. .+)?)$"
 )
-CANONICAL_PRD_SECTIONS = (
-    "Goal",
-    "User stories",
-    "Scope",
-    "Non-goals",
-    "Functional requirements",
-    "Technical requirements",
-    "Acceptance criteria",
-    "Deployment",
-    "Observability",
-    "Rollback",
-    "Open questions",
-)
 TASK_ITEM_PATTERN = re.compile(r"^\s*- \[([ xX])\] .+")
 
 
@@ -41,6 +31,10 @@ def relative_markdown_links(text: str) -> list[str]:
 
 def prd_sections(text: str) -> list[str]:
     return re.findall(r"^## (?!#)(.+)$", text, re.MULTILINE)
+
+
+def documented_prd_sections(text: str) -> list[str]:
+    return re.findall(r"^  ## (.+)$", text, re.MULTILINE)
 
 
 def acceptance_criterion_states(text: str) -> list[str]:
@@ -97,6 +91,15 @@ def main() -> int:
     errors: list[str] = []
     task_files = sorted(TASKS_DIR.glob("*.md"))
     product_ideas = PRODUCT_IDEAS.read_text()
+    product_planning = PRODUCT_PLANNING.read_text()
+
+    documented_sections = documented_prd_sections(product_planning)
+    if documented_sections != list(CANONICAL_PRD_SECTIONS):
+        errors.append(
+            "docs/PRODUCT_PLANNING.md: canonical PRD template does not match "
+            f"scripts/prd_format.py; expected {list(CANONICAL_PRD_SECTIONS)!r}, "
+            f"found {documented_sections!r}"
+        )
 
     if "## Task index" in product_ideas or "## Backlog" in product_ideas:
         errors.append(
@@ -223,7 +226,7 @@ def main() -> int:
 
     files_to_check = [
         ROOT / "docs" / "PRODUCT_IDEAS.md",
-        ROOT / "docs" / "PRODUCT_PLANNING.md",
+        PRODUCT_PLANNING,
         *task_files,
     ]
     for markdown_file in files_to_check:

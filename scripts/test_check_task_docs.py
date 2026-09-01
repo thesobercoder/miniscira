@@ -2,10 +2,12 @@
 
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+import sys
 import unittest
 
 
 SCRIPT = Path(__file__).with_name("check-task-docs.py")
+sys.path.insert(0, str(SCRIPT.parent))
 SPEC = spec_from_file_location("check_task_docs", SCRIPT)
 assert SPEC and SPEC.loader
 CHECKER = module_from_spec(SPEC)
@@ -22,6 +24,13 @@ def prd(*, status: str = "To do", sections: tuple[str, ...] | None = None, task:
 
 
 class PrdStructureTests(unittest.TestCase):
+    def test_documented_sections_match_the_shared_definition(self) -> None:
+        planning = (SCRIPT.parents[1] / "docs" / "PRODUCT_PLANNING.md").read_text()
+        self.assertEqual(
+            CHECKER.documented_prd_sections(planning),
+            list(CHECKER.CANONICAL_PRD_SECTIONS),
+        )
+
     def test_accepts_canonical_todo_prd(self) -> None:
         self.assertEqual(CHECKER.prd_structure_errors(prd(), "To do"), [])
 

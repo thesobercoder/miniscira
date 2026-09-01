@@ -20,8 +20,6 @@ This extends the existing PostgreSQL previous-thread search. It does not add emb
 
 ## User stories
 
-No separate user stories were recorded.
-
 ## Scope
 
 ### Locked decisions
@@ -128,15 +126,9 @@ rejects plain HTTP remote targets. Never print or commit the token.
 
 ## Deployment
 
-No separate deployment requirements were recorded.
-
 ## Observability
 
-No separate observability requirements were recorded.
-
 ## Rollback
-
-No separate rollback requirements were recorded.
 
 ## Open questions
 

@@ -24,6 +24,12 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+      - name: Check product planning
+        run: |
+          python3 scripts/test_check_task_docs.py
+          python3 scripts/test_normalize_prd_format.py
+          python3 scripts/normalize-prd-format.py --check
+          python3 scripts/check-task-docs.py
       - run: bun install --frozen-lockfile
 
       - name: Typecheck

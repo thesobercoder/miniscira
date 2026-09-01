@@ -110,8 +110,6 @@ Keep OAuth client ID and secret settings under the MCP server's Advanced panel.
 
 ## Functional requirements
 
-No separate functional requirements were recorded.
-
 ## Technical requirements
 
 - Store callback mode and configured callback URL per MCP server.

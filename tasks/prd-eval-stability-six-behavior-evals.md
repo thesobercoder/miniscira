@@ -118,8 +118,6 @@ per-eval result) in the evidence log below so pass-rate trends stay visible.
 
 ## Rollback
 
-No separate rollback requirements were recorded.
-
 ## Open questions
 
 1. Is 10 consecutive passes the right confidence bar, or should the bar be a

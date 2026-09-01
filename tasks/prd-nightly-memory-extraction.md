@@ -906,8 +906,6 @@ Metrics must not collect memory content or transcript text.
 
 ## Rollback
 
-No separate rollback requirements were recorded.
-
 ## Open questions
 
 ### Open questions requiring resolution before implementation

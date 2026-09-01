@@ -590,8 +590,6 @@ If these targets fail, measure the actual bottleneck before changing the archite
 
 ## Rollback
 
-No separate rollback requirements were recorded.
-
 ## Open questions
 
 ### Approval gate

@@ -25,8 +25,6 @@ The mechanism follows the existing skill pattern (`docx`, `pdf`, `xlsx`): one sk
 
 ## User stories
 
-No separate user stories were recorded.
-
 ## Scope
 
 ### Product decisions

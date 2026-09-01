@@ -2,10 +2,12 @@
 
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+import sys
 import unittest
 
 
 SCRIPT = Path(__file__).with_name("normalize-prd-format.py")
+sys.path.insert(0, str(SCRIPT.parent))
 SPEC = spec_from_file_location("normalize_prd_format", SCRIPT)
 assert SPEC and SPEC.loader
 NORMALIZER = module_from_spec(SPEC)
@@ -42,10 +44,19 @@ Keep this deployment note.
 """
         normalized = NORMALIZER.normalize_prd(source)
         _, sections = NORMALIZER.parse_prd(normalized)
-        self.assertEqual([heading for heading, _ in sections], list(NORMALIZER.CANONICAL_SECTIONS))
+        self.assertEqual(
+            [heading for heading, _ in sections],
+            list(NORMALIZER.CANONICAL_PRD_SECTIONS),
+        )
         self.assertIn("Keep this problem statement.", normalized)
         self.assertIn("Keep this deployment note.", normalized)
         self.assertIn("- [ ] The behavior works.", normalized)
+        self.assertEqual(dict(sections)["Observability"], "")
+
+    def test_rejects_missing_acceptance_criteria(self) -> None:
+        source = PREFIX + "\n## Goal\n\nDescribe the goal.\n"
+        with self.assertRaisesRegex(ValueError, "missing acceptance criteria"):
+            NORMALIZER.normalize_prd(source)
 
     def test_done_acceptance_bullets_become_checked(self) -> None:
         source = (PREFIX.replace("To do", "Done") + "\n## Acceptance criteria\n\n- Shipped.\n")

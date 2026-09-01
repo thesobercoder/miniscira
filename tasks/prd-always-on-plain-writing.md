@@ -29,8 +29,6 @@ Before implementation, inspect the upstream repository license and compare the f
 
 ## User stories
 
-No separate user stories were recorded.
-
 ## Scope
 
 ### Core instruction decision
@@ -184,8 +182,6 @@ Inspect the production timeline to confirm that there is no `unslop` skill call 
 - Check Eve and app logs for prompt or context-limit errors.
 
 ## Observability
-
-No separate observability requirements were recorded.
 
 ## Rollback
 

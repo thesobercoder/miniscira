@@ -895,8 +895,6 @@ Existing health endpoints prove process/database availability only. They do not 
 
 ## Rollback
 
-No separate rollback requirements were recorded.
-
 ## Open questions
 
 ### Open questions that need review

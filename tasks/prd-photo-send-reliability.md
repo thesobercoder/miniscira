@@ -31,8 +31,6 @@ chats `375729bd`/`4512905f`) established:
 
 ## User stories
 
-No separate user stories were recorded.
-
 ## Scope
 
 1. **Client-side photo normalization** — every staged image (capture, picker,
@@ -111,12 +109,6 @@ Build image via existing clean-context Portainer Stack 30 procedure; preserve St
 
 ## Observability
 
-No separate observability requirements were recorded.
-
 ## Rollback
 
-No separate rollback requirements were recorded.
-
 ## Open questions
-
-None recorded.

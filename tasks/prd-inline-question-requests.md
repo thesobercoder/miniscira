@@ -155,8 +155,6 @@ The model eval proves the question and resume behavior. Browser acceptance prove
 
 ## Observability
 
-No separate observability requirements were recorded.
-
 ## Rollback
 
 Revert the question-specific presentation change. The existing Eve request and response data remain compatible because this feature does not change the protocol or stored event shape.

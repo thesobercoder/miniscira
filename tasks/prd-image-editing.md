@@ -175,8 +175,6 @@ A correct solution must address more than an image API call:
 
 ## Non-goals
 
-No separate non-goals were recorded.
-
 ## Functional requirements
 
 ### Product and UX requirements
