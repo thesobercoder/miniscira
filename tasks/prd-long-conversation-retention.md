@@ -1,9 +1,9 @@
 # PRD: Long-conversation retention
 
-- **Status:** To do
+- **Status:** In progress
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-long-conversation-retention)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
-- **Approval:** Not approved
+- **Approval:** Approved by Soham on 2026-09-01. Fix long-conversation retention before other roadmap work.
 
 ## Goal
 
