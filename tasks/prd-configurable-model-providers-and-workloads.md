@@ -16,6 +16,7 @@ Make provider freedom a working product feature. MiniScira uses OpenRouter as th
 - As an administrator, I can allow only reviewed models and hide every other provider model.
 - As an administrator, I can assign different models to chat, research, compaction, Lookouts, memory work, image generation, and video generation.
 - As a user, I can choose my chat default from the administrator's allowed multimodal chat models.
+- As a user, I can choose compatible models for research, Lookouts, image generation, image editing, and video generation.
 - As a user, I never see text-only models or provider capability details in the chat picker.
 
 ## Product decisions
@@ -27,11 +28,13 @@ Make provider freedom a working product feature. MiniScira uses OpenRouter as th
 5. Environment variables bootstrap the first administrator identity and hold deployment encryption roots. They are not the normal interface for model policy.
 6. A signed-in user's chat default is a preference inside the administrator's allowed multimodal chat catalog.
 7. Every user-visible chat model must accept both text and image input and produce text output. Text-only models never enter the user catalog.
-8. Background workloads do not inherit a user's chat choice.
-9. Provider model lists are discovery input, not policy. A discovered model is unavailable until the administrator allows it.
-10. MiniScira never guesses missing capabilities. Generic providers may require administrator-supplied capability overrides.
-11. A workload runs only when its assigned model satisfies every required capability.
-12. Model IDs remain provider values. MiniScira does not silently substitute a different model when an ID is missing.
+8. Users can override models for user-facing features. This includes chat, research, Lookouts, image generation, image editing, and video generation.
+9. Internal maintenance workloads remain administrator-controlled. Users cannot override title generation, conversation compaction, memory extraction, summaries, or evaluation models.
+10. Background workloads do not inherit a user's chat choice.
+11. Provider model lists are discovery input, not policy. A discovered model is unavailable until the administrator allows it.
+12. MiniScira never guesses missing capabilities. Generic providers may require administrator-supplied capability overrides.
+13. A workload runs only when its assigned model satisfies every required capability.
+14. Model IDs remain provider values. MiniScira does not silently substitute a different model when an ID is missing.
 
 ## Scope
 
@@ -100,30 +103,37 @@ The final names may follow repository conventions, but the distinctions are requ
 
 ### Workload model policy
 
-The administrator can assign allowed models to these workloads:
+The policy registry defines who can override each workload model:
 
-- Interactive chat deployment fallback.
-- Deep-research root agent.
-- Researcher subagent.
-- Conversation compaction.
-- Lookout execution.
-- Memory extraction and other scheduled memory work.
-- Chat title and summary generation.
-- Evaluation runs.
-- Image generation.
-- Image editing.
-- Video generation.
+| Workload | Administrator default | User override | Override scope |
+|---|---|---|---|
+| Interactive chat | Required | Allowed | Saved default and current turn |
+| Deep-research root agent | Required | Allowed | Saved default and current research run |
+| Researcher subagent | Required | Allowed | Saved default and current research run |
+| Lookout execution | Required | Allowed | Saved default and individual Lookout |
+| Image generation | Required | Allowed | Saved default and current generation |
+| Image editing | Required | Allowed | Saved default and current edit |
+| Video generation | Required | Allowed | Saved default and current generation |
+| Chat title generation | Required | Not allowed | Administrator only |
+| Conversation summary generation | Required | Not allowed | Administrator only |
+| Conversation compaction | Required | Not allowed | Administrator only |
+| Memory extraction and scheduled memory work | Required | Not allowed | Administrator only |
+| Evaluation runs | Required | Not allowed | Administrator only |
 
-Each workload has one primary model and an optional ordered fallback list. Every fallback must satisfy the same capability requirements. No workload falls back to an unapproved model.
+The administrator default applies when a user has not saved an override. Each user choice must come from the administrator's allowed catalog and satisfy the workload requirements. A current-action override does not change the saved default unless the user asks MiniScira to save it.
 
-### Per-user chat choice
+Each workload has one primary administrator model and an optional ordered fallback list. Every fallback must satisfy the same capability requirements. A user override replaces the primary model for that workload, but it does not replace the administrator's fallback policy. No workload falls back to an unapproved model.
 
-- A signed-in user chooses a default interactive-chat model from the administrator's allowed multimodal chat catalog.
-- Every visible choice accepts text and image input and produces text output.
-- The choice follows the user across browsers and devices.
-- The picker shows model names and selection state. It does not expose modality fields, text-only models, disabled models, or provider-policy errors.
-- The server rejects any saved or dispatched chat model outside the current multimodal allowlist.
-- Retry-with-another-model remains a turn-level override and does not change the saved default unless the user explicitly makes it the default.
+### Per-user feature model choices
+
+- A signed-in user chooses defaults for user-facing features from the compatible administrator-approved catalog.
+- Chat choices accept text and image input and produce text output.
+- Image and video pickers show only models that support the exact generation or editing workload.
+- The choices follow the user across browsers and devices.
+- The interface shows model names and selection state. It does not expose provider capability fields, disabled models, or provider-policy errors.
+- The server rejects any saved or dispatched choice outside the compatible allowlist for that workload.
+- A per-action override does not change the saved default unless the user explicitly saves it.
+- Title generation and other internal maintenance workloads do not appear in user settings or action-level model pickers.
 
 ## Capability rules
 
@@ -137,6 +147,9 @@ The initial workload requirements are:
 | Compaction | Text input and output, sufficient verified context window |
 | Lookout | Text input and output, tools |
 | Memory extraction | Text input and output, structured output |
+| Title generation | Text input and output, structured output |
+| Conversation summary | Text input and output, sufficient verified context window |
+| Evaluation | Capabilities required by the evaluation suite |
 | Image generation | Text input, image output, image-generation endpoint support |
 | Image editing | Text and image input, image output, image-edit endpoint support |
 | Video generation | Text input, video output, video-generation adapter support |
@@ -154,15 +167,17 @@ A provider may use separate endpoints for chat, image, and video work. OpenAI co
 7. MiniScira records whether each capability came from provider metadata, an administrator override, or a verified probe.
 8. The administrator can assign workload models only from the enabled catalog.
 9. Saving an incompatible assignment fails with a specific missing-capability error.
-10. Removing a model from the allowed catalog identifies affected users and workloads before the change takes effect.
-11. A user cannot view or save a chat default outside the allowed multimodal chat catalog.
-12. If a saved user default becomes unavailable, MiniScira uses the deployment chat fallback without deleting the user's preference.
-13. The server validates multimodal eligibility before every interactive dispatch.
-14. The active provider configuration has a connection test that does not send private user content.
-15. The OpenRouter adapter supports required attribution headers without requiring them for generic providers.
-16. API keys never reach browser code, logs, model metadata responses, or committed files.
-17. A failed background model assignment fails that workload clearly. It does not borrow the interactive user's model or credential silently.
-18. Every generated artifact records the provider model ID used without recording credentials.
+10. Removing a model from the allowed catalog identifies affected user preferences and workload assignments before the change takes effect.
+11. A user can view and save compatible defaults for chat, research, researcher subagents, Lookouts, image generation, image editing, and video generation.
+12. A user can override those models for one turn, run, Lookout, generation, or edit without changing the saved default.
+13. A user cannot view or change title, summary, compaction, memory, or evaluation model assignments.
+14. If a saved user default becomes unavailable, MiniScira uses the administrator default without deleting the user's preference.
+15. The server validates catalog membership and workload capabilities before every dispatch.
+16. The active provider configuration has a connection test that does not send private user content.
+17. The OpenRouter adapter supports required attribution headers without requiring them for generic providers.
+18. API keys never reach browser code, logs, model metadata responses, or committed files.
+19. A failed internal workload assignment fails that workload clearly. It does not borrow a user-selected model or credential silently.
+20. Every generated artifact records the provider model ID used without recording credentials.
 
 ## Technical requirements
 
@@ -171,7 +186,10 @@ A provider may use separate endpoints for chat, image, and video work. OpenAI co
 - Store non-secret catalog policy and workload assignments in Postgres.
 - Seal shared provider credentials before storing them in Postgres. Derive encryption from a deployment-held encryption root that never enters the database.
 - Preserve per-user credential encryption for supported bring-your-own-key flows.
+- Define workload ownership in one typed registry. Each entry declares its capability requirements, administrator default, whether a user override is allowed, and the supported override scopes.
+- Store user model preferences by workload. Do not add one database column for each new workload.
 - Resolve a workload model through one typed function that returns the model ID, credential policy, and verified capabilities.
+- Resolve models in this order: a valid action-level override, a valid saved user preference, the administrator default, and then the administrator fallback list.
 - Replace the universal 200,000-token assumption with provider metadata or an explicit verified override.
 - Cache model discovery for a bounded period and expose the last successful refresh time.
 - Keep the last valid policy when provider discovery is temporarily unavailable.
@@ -213,6 +231,10 @@ OmniRoute and CLIProxyAPI are possible rollback or external-routing choices. Nei
 - Reject non-administrator access to provider and model-policy routes.
 - Save the administrator allowlist and workload assignments.
 - Save two users' different chat defaults without cross-user leakage.
+- Save two users' different research, Lookout, image, and video defaults without cross-user leakage.
+- Reject a user override for title generation, summaries, compaction, memory extraction, and evaluations.
+- Reject an image or video model that lacks the required endpoint and output capability.
+- Apply a one-action override without changing the user's saved default.
 - Dispatch chat, tool, structured-output, image, and video requests through their assigned models.
 - Return a clear error when the endpoint does not implement a required generation API.
 
@@ -247,9 +269,11 @@ OmniRoute and CLIProxyAPI are possible rollback or external-routing choices. Nei
 - [ ] Text-only and unknown-modality models never appear to ordinary users.
 - [ ] Every user-visible chat model accepts text and image input and produces text output.
 - [ ] Per-user chat defaults persist across browsers and remain isolated between users.
-- [ ] Background workloads use independent administrator-selected models.
-- [ ] Image generation and image editing use independently selected compatible models.
-- [ ] Video generation uses an independently selected compatible model and provider adapter.
+- [ ] Users can save compatible research, Lookout, image-generation, image-editing, and video-generation defaults.
+- [ ] Users can override a model for one user-facing action without changing the saved default.
+- [ ] Image generation and image editing use user-selected compatible models when present.
+- [ ] Video generation uses a user-selected compatible model and provider adapter when present.
+- [ ] Title generation, summaries, compaction, memory extraction, and evaluations use administrator-selected models that users cannot view or override.
 - [ ] Compaction uses the selected model's verified context limit.
 - [ ] No workload silently substitutes an unavailable or incompatible model.
 - [ ] Provider credentials remain server-side and secret.
@@ -260,7 +284,8 @@ OmniRoute and CLIProxyAPI are possible rollback or external-routing choices. Nei
 - Building a general-purpose multi-provider router inside MiniScira.
 - Automatically enabling every model returned by a provider.
 - Assuming that chat compatibility includes image or video generation.
-- Letting users override operator workload policy.
+- Letting users select models outside the administrator catalog or bypass workload capability rules.
+- Letting users override internal maintenance models.
 - Changing models automatically based only on price or popularity.
 - Removing the existing rollback provider before production soak completes.
 
