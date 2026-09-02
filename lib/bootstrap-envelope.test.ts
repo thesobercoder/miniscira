@@ -29,6 +29,10 @@ describe("bootstrap checkpoint envelope", () => {
     expect(wrapped[1]).toMatchObject({ type: "text" })
     if (wrapped[1]?.type !== "text") throw new Error("expected checkpoint text")
     expect(wrapped[1].text).toContain("EARLY=violet-orbit")
+    if (wrapped[0]?.type !== "file") throw new Error("expected checkpoint file")
+    expect(decodeURIComponent(String(wrapped[0].data))).not.toContain(
+      "EARLY=violet-orbit"
+    )
     expect(wrapped[2]).toEqual({
       type: "text",
       text: "What did I tell you?",

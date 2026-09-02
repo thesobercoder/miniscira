@@ -5,6 +5,7 @@ import {
   drainUntilBoundary,
   initialCursorForEvents,
   shouldForgetSession,
+  shouldResumeStream,
 } from "@/hooks/use-eve-chat"
 import type { ChatEvent } from "@/lib/chat-events"
 import { consumeDurableTurn } from "@/lib/eve-stream-consume"
@@ -45,6 +46,27 @@ describe("shouldForgetSession", () => {
 })
 
 const event = (type: string) => ({ type }) as unknown as ChatEvent
+
+describe("shouldResumeStream", () => {
+  const session = { sessionId: "ses_new", streamIndex: 4 }
+
+  test("reattaches when the persisted tail is still active", () => {
+    expect(shouldResumeStream([event("message.appended")], session)).toBe(true)
+  })
+
+  test("reattaches across the cursor-before-first-event crash gap", () => {
+    expect(
+      shouldResumeStream([event("session.waiting")], {
+        sessionId: "ses_new",
+        streamIndex: 0,
+      })
+    ).toBe(true)
+  })
+
+  test("does not reopen an already settled persisted session", () => {
+    expect(shouldResumeStream([event("session.waiting")], session)).toBe(false)
+  })
+})
 
 describe("initialCursorForEvents", () => {
   const session = {

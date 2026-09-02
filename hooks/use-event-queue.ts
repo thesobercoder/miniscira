@@ -166,15 +166,25 @@ export function useEventQueue(initialChatId?: string) {
   const patchCursor = useCallback(async (cursor: SessionState) => {
     const id = chatIdRef.current
     if (!id || !cursor.sessionId) return
-    await fetch(`/api/chats/${id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        eveSessionId: cursor.sessionId,
-        continuationToken: cursor.continuationToken,
-        streamIndex: cursor.streamIndex,
-      }),
-    })
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const response = await fetch(`/api/chats/${id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            eveSessionId: cursor.sessionId,
+            continuationToken: cursor.continuationToken,
+            streamIndex: cursor.streamIndex,
+          }),
+        })
+        if (response.ok) return
+      } catch {
+        // Retry below. The cursor is the recovery handle for an accepted turn.
+      }
+      if (attempt < 3)
+        await new Promise((resolve) => setTimeout(resolve, attempt * 250))
+    }
+    throw new Error("Failed to persist the Eve session cursor")
   }, [])
 
   /**

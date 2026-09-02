@@ -93,6 +93,15 @@ export function shouldForgetSession({
   return response != null && !followed && hadSession
 }
 
+export function shouldResumeStream(
+  initialEvents: readonly ChatEvent[],
+  initialSession?: SessionState
+): boolean {
+  if (!initialSession?.sessionId) return false
+  const last = initialEvents.at(-1)
+  return !last || !isTurnBoundary(last) || initialSession.streamIndex === 0
+}
+
 export function initialCursorForEvents(
   _initialEvents: readonly ChatEvent[],
   initialSession?: SessionState
@@ -315,9 +324,8 @@ export function useEveChat({
   // projection events we persisted alongside them.
   // Mount-only: re-running would re-attach to the stream and duplicate events.
   useMountEffect(() => {
-    const last = initialEvents.at(-1)
-    const inFlight = last && !isTurnBoundary(last) && initialSession?.sessionId
-    if (!inFlight) return
+    const inFlight = shouldResumeStream(initialEvents, initialSession)
+    if (!inFlight || !initialSession?.sessionId) return
     const session = getSession()
     const ac = new AbortController()
     abortRef.current = ac
@@ -388,18 +396,18 @@ export function useEveChat({
    */
   const resetSession = useCallback(async () => {
     const previous = { ...cursorRef.current }
-    await forgetSession()
+    // Replacement work must use a fresh append-only Eve session, but the
+    // durable chat cursor stays on the original session until the first new
+    // event and supersede marker are accepted atomically.
+    cursorRef.current = { streamIndex: 0 }
+    sessionRef.current = null
     return previous
-  }, [forgetSession])
+  }, [])
 
-  const restoreSession = useCallback(
-    async (previous: SessionState) => {
-      cursorRef.current = previous
-      sessionRef.current = null
-      await patchCursor(previous)
-    },
-    [patchCursor]
-  )
+  const restoreSession = useCallback(async (previous: SessionState) => {
+    cursorRef.current = previous
+    sessionRef.current = null
+  }, [])
 
   /**
    * Paint the user's turn straight away.
@@ -489,9 +497,17 @@ export function useEveChat({
             return decision
           }
         : undefined
-      const followed =
-        response != null &&
-        (await followTurn(response, accept, !atomicAcceptance, firstMessage))
+      let followed = false
+      try {
+        followed =
+          response != null &&
+          (await followTurn(response, accept, !atomicAcceptance, firstMessage))
+      } catch (error) {
+        console.error("eve cursor persistence error", error)
+        toast.error("Couldn't save the active session. Your message wasn't accepted.")
+        setTurn(READY)
+        return false
+      }
       if (followed) return true
       if (acceptanceRejected) {
         setTurn(READY)
@@ -528,7 +544,14 @@ export function useEveChat({
         setTurn(READY)
         return false
       }
-      return await followTurn(retry, accept, !atomicAcceptance, retryMessage)
+      try {
+        return await followTurn(retry, accept, !atomicAcceptance, retryMessage)
+      } catch (error) {
+        console.error("eve cursor persistence error", error)
+        toast.error("Couldn't save the active session. Your message wasn't accepted.")
+        setTurn(READY)
+        return false
+      }
     },
     [getSession, followTurn, forgetSession]
   )
