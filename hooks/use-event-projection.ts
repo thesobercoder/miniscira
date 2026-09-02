@@ -7,36 +7,17 @@ import {
   asEveEvent,
   type ChatEvent,
   eventId,
-  eventType,
   isSessionStart,
-  isSupersedeEvent,
-  SUPERSEDE_EVENT,
-  scopeSessions,
   withSessionScope,
 } from "@/lib/chat-events"
+import { projectPersistedChat } from "@/lib/chat-projection"
 import {
   annotateEvent,
-  annotateEvents,
   isAnnotatedEvent,
   type TurnAnnotations,
 } from "@/lib/turn-annotations"
 
 type Reducer = ReturnType<typeof defaultMessageReducer>
-
-function reduceEvents(reducer: Reducer, events: readonly ChatEvent[]) {
-  let data = reducer.initial()
-  for (const event of events) data = reducer.reduce(data, asEveEvent(event))
-  return data
-}
-
-function collectSuperseded(events: readonly ChatEvent[]): Set<string> {
-  const ids = new Set<string>()
-  for (const event of events) {
-    if (!isSupersedeEvent(event)) continue
-    for (const id of event.ids) ids.add(id)
-  }
-  return ids
-}
 
 /**
  * Turns the agent's event stream into what the transcript renders: messages,
@@ -53,31 +34,17 @@ export function useEventProjection({
   reducer: Reducer
   initialEvents: readonly ChatEvent[]
 }) {
-  // A chat's log can span several durable sessions, and eve restarts turn ids at
-  // `turn_0` in each one. Scope them before anything reduces, or session 2's
-  // first turn lands inside session 1's first turn.
-  const seeded = useMemo(() => scopeSessions(initialEvents), [initialEvents])
-  // Which session live events belong to; advanced when a `session.started`
-  // arrives so streamed turns keep numbering on from the persisted log.
+  const seeded = useMemo(
+    () => projectPersistedChat(reducer, initialEvents),
+    [reducer, initialEvents]
+  )
   const liveSessionRef = useRef(seeded.lastSession)
-  const [data, setData] = useState<EveMessageData>(() =>
-    // The supersede marker is display-only — keep it out of the eve reducer.
-    reduceEvents(
-      reducer,
-      seeded.events.filter((e) => eventType(e) !== SUPERSEDE_EVENT)
-    )
+  const [data, setData] = useState<EveMessageData>(() => seeded.data)
+  const [supersededIds, setSupersededIds] = useState<Set<string>>(
+    () => seeded.supersededIds
   )
-  // Message ids hidden by a retry (the turn it replaced). Seeded from persisted
-  // markers so a retried thread stays collapsed after reload.
-  const [supersededIds, setSupersededIds] = useState<Set<string>>(() =>
-    collectSuperseded(seeded.events)
-  )
-  // Lifecycle events the eve reducer drops (failures, cancellation, compaction,
-  // finish reasons). Kept beside `data` so the transcript can explain itself.
-  const [annotations, setAnnotations] = useState<TurnAnnotations>(() =>
-    // Scoped too: annotations are keyed by turnId and looked up from the
-    // rendered message's metadata, so both sides must agree on the id.
-    annotateEvents(seeded.events.map(asEveEvent))
+  const [annotations, setAnnotations] = useState<TurnAnnotations>(
+    () => seeded.annotations
   )
   // Server event ids already projected for this chat, seeded from the full
   // stored log. A durable stream can hand back events we have already seen —

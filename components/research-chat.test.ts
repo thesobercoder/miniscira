@@ -4,6 +4,7 @@ import type { EveMessage, EveMessagePart } from "eve/client"
 import {
   acceptAttachmentTurn,
   acceptReplacementTurn,
+  messagesForFreshSession,
   modelFileParts,
   selectChildParts,
 } from "@/components/research-chat"
@@ -51,7 +52,10 @@ describe("attachment acceptance wiring", () => {
 })
 
 describe("replacement attachment acceptance", () => {
-  test("supersedes the old turn only after rebinding succeeds", async () => {
+  const firstEvent = { type: "session.started" } as never
+  const cursor = { sessionId: "session-1", streamIndex: 0 }
+
+  test("persists the first event and supersede before rebinding attachments", async () => {
     const calls: string[] = []
     const accepted = await acceptReplacementTurn({
       attachments: [
@@ -59,34 +63,60 @@ describe("replacement attachment acceptance", () => {
       ],
       turnIndex: 3,
       ids: ["old-question", "old-answer"],
+      firstEvent,
+      cursor,
       rebind: async (attachments, turnIndex) => {
         calls.push(`bind:${attachments[0]?.id}:${turnIndex}`)
         return true
       },
-      commitSupersede: (ids) => calls.push(`supersede:${ids.join(",")}`),
+      commitSupersede: async (ids, event, committedCursor) => {
+        calls.push(
+          `supersede:${ids.join(",")}:${event.type}:${committedCursor.sessionId}`
+        )
+        return true
+      },
     })
 
     expect(accepted).toBe(true)
     expect(calls).toEqual([
+      "supersede:old-question,old-answer:session.started:session-1",
       "bind:photo-1:3",
-      "supersede:old-question,old-answer",
     ])
   })
 
-  test("keeps the old turn when rebinding fails", async () => {
-    let superseded = false
+  test("keeps the old turn when supersede persistence fails", async () => {
+    let rebound = false
     const accepted = await acceptReplacementTurn({
       attachments: [],
       turnIndex: 3,
       ids: ["old-question"],
-      rebind: async () => false,
-      commitSupersede: () => {
-        superseded = true
+      firstEvent,
+      cursor,
+      rebind: async () => {
+        rebound = true
+        return true
       },
+      commitSupersede: async () => false,
     })
 
     expect(accepted).toBe(false)
-    expect(superseded).toBe(false)
+    expect(rebound).toBe(false)
+  })
+})
+
+describe("fresh-session transcript", () => {
+  test("excludes messages hidden by prior retries or edits", () => {
+    const messages = [
+      { id: "keep", role: "user", parts: [] },
+      { id: "hidden", role: "assistant", parts: [] },
+      { id: "replacement", role: "assistant", parts: [] },
+    ] as EveMessage[]
+
+    expect(
+      messagesForFreshSession(messages, new Set(["hidden"])).map(
+        (message) => message.id
+      )
+    ).toEqual(["keep", "replacement"])
   })
 })
 

@@ -216,6 +216,39 @@ export const chatEvent = pgTable(
   ]
 )
 
+export const conversationCheckpoint = pgTable(
+  "conversation_checkpoint",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chatId: uuid("chat_id")
+      .notNull()
+      .references(() => chat.id, { onDelete: "cascade" }),
+    version: integer("version").notNull().default(1),
+    coveredMessageCount: integer("covered_message_count").notNull(),
+    coveredMessageDigest: text("covered_message_digest").notNull(),
+    summary: text("summary").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("conversation_checkpoint_chat_digest_idx").on(
+      table.chatId,
+      table.coveredMessageDigest
+    ),
+    index("conversation_checkpoint_chat_created_idx").on(
+      table.chatId,
+      table.createdAt.desc()
+    ),
+    check(
+      "conversation_checkpoint_version_check",
+      sql`${table.version} = 1`
+    ),
+    check(
+      "conversation_checkpoint_count_check",
+      sql`${table.coveredMessageCount} >= 0`
+    ),
+  ]
+)
+
 /* -------------------------------------------------------------------------- */
 /*  Memories: durable per-user facts the agent saves and recalls across chats */
 /* -------------------------------------------------------------------------- */

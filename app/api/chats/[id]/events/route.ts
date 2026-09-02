@@ -5,6 +5,12 @@ import { authedWithParams } from "@/lib/api-auth"
 import { requireOwnedChat } from "@/lib/api-ownership"
 import { db } from "@/lib/db"
 
+type EventCursor = {
+  sessionId: string
+  continuationToken?: string
+  streamIndex: number
+}
+
 // Postgres `unique_violation`. Raised by the `chat_event_chat_id_seq_idx`
 // unique index when a concurrent flush already claimed these `seq` values.
 const UNIQUE_VIOLATION = "23505"
@@ -66,10 +72,23 @@ export const POST = authedWithParams<{ id: string }>(
 
     const body = (await request.json().catch(() => ({}))) as {
       events?: unknown[]
+      cursor?: unknown
+      operationId?: unknown
     }
     const events = Array.isArray(body.events) ? body.events : []
     if (events.length === 0) {
       return NextResponse.json({ ok: true, appended: 0 })
+    }
+    const cursor = parseEventCursor(body.cursor)
+    if (body.cursor != null && !cursor) {
+      return NextResponse.json({ error: "Invalid session cursor" }, { status: 400 })
+    }
+    const operationId =
+      typeof body.operationId === "string" && body.operationId.length > 0
+        ? body.operationId
+        : undefined
+    if (body.operationId != null && !operationId) {
+      return NextResponse.json({ error: "Invalid operation id" }, { status: 400 })
     }
 
     // `(chat_id, seq)` is unique, so a flush that loses a race against another
@@ -78,7 +97,7 @@ export const POST = authedWithParams<{ id: string }>(
     // lands after the winner's rows.
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
-        const appended = await appendEvents(id, events)
+        const appended = await appendEvents(id, events, cursor, operationId)
         return NextResponse.json({ ok: true, appended })
       } catch (error) {
         const action = seqConflictAction(error, attempt)
@@ -101,6 +120,32 @@ export const POST = authedWithParams<{ id: string }>(
   // traffic before it could brake anything — and a 429 on this path costs the
   // transcript: the queue retries on a bounded backoff, then gives up, and an
   // unmount while still over budget drops the buffered events for good.
+  { metered: false }
+)
+
+export const GET = authedWithParams<{ id: string }>(
+  async (request, { userId, params: { id } }) => {
+    const owned = await requireOwnedChat(id, userId)
+    if ("error" in owned) return owned.error
+    const operationId = new URL(request.url).searchParams.get("operationId")
+    if (!operationId) {
+      return NextResponse.json(
+        { error: "operationId is required" },
+        { status: 400 }
+      )
+    }
+    const result = await db.execute(sql`
+      select exists (
+        select 1 from chat_event
+        where chat_id = ${id}::uuid
+          and event ->> 'operationId' = ${operationId}
+      ) as accepted
+    `)
+    const rows = (Array.isArray(result) ? result : result.rows) as {
+      accepted: boolean
+    }[]
+    return NextResponse.json({ accepted: rows[0]?.accepted === true })
+  },
   { metered: false }
 )
 
@@ -127,8 +172,22 @@ export const POST = authedWithParams<{ id: string }>(
 //
 // @public Exported for unit tests; not a route handler export.
 export function appendEventsQuery(id: string, events: unknown[]) {
+  return appendEventsWithCursorQuery(id, events)
+}
+
+export function appendEventsWithCursorQuery(
+  id: string,
+  events: unknown[],
+  cursor?: EventCursor,
+  operationId?: string
+) {
   return sql`
-    with inserted as (
+    with locked as (
+      select case
+        when ${operationId != null}
+          then pg_advisory_xact_lock(hashtextextended(${id}, 0))
+      end
+    ), inserted as (
       insert into chat_event (chat_id, seq, event, created_at)
       select ${id}::uuid,
              (coalesce(
@@ -139,16 +198,63 @@ export function appendEventsQuery(id: string, events: unknown[]) {
              now()
       from jsonb_array_elements(${JSON.stringify(events)}::jsonb)
         with ordinality as elem(value, ord)
+      cross join locked
+      where ${operationId == null}
+         or not exists (
+           select 1
+           from chat_event
+           where chat_id = ${id}::uuid
+             and event ->> 'operationId' = ${operationId ?? null}
+         )
       returning 1 as one
     ), touched as (
-      update chat set updated_at = now() where id = ${id}::uuid
+      update chat
+      set updated_at = now(),
+          eve_session_id = case
+            when ${cursor != null} then ${cursor?.sessionId ?? null}
+            else eve_session_id
+          end,
+          continuation_token = case
+            when ${cursor != null} then ${cursor?.continuationToken ?? null}
+            else continuation_token
+          end,
+          stream_index = case
+            when ${cursor != null} then ${cursor?.streamIndex ?? 0}
+            else stream_index
+          end
+      where id = ${id}::uuid
     )
     select count(*)::int as appended from inserted
   `
 }
 
-async function appendEvents(id: string, events: unknown[]): Promise<number> {
-  const result = await db.execute(appendEventsQuery(id, events))
+function parseEventCursor(value: unknown): EventCursor | undefined {
+  if (value == null) return undefined
+  if (typeof value !== "object") return undefined
+  const cursor = value as Record<string, unknown>
+  if (
+    typeof cursor.sessionId !== "string" ||
+    cursor.sessionId.length === 0 ||
+    !Number.isInteger(cursor.streamIndex) ||
+    (cursor.continuationToken != null &&
+      typeof cursor.continuationToken !== "string")
+  ) return undefined
+  return {
+    sessionId: cursor.sessionId,
+    continuationToken: cursor.continuationToken as string | undefined,
+    streamIndex: cursor.streamIndex as number,
+  }
+}
+
+async function appendEvents(
+  id: string,
+  events: unknown[],
+  cursor?: EventCursor,
+  operationId?: string
+): Promise<number> {
+  const result = await db.execute(
+    appendEventsWithCursorQuery(id, events, cursor, operationId)
+  )
 
   const rows = (Array.isArray(result) ? result : result.rows) as {
     appended: number

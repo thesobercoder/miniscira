@@ -124,14 +124,44 @@ export function useEventQueue(initialChatId?: string) {
     [flush]
   )
 
-  /** Buffer an event and push it now, skipping the batching window. */
-  const enqueueNow = useCallback(
-    (event: ChatEvent) => {
-      bufferRef.current.push(event)
-      void flush()
-    },
-    [flush]
-  )
+  const persistNow = useCallback(async (
+    events: readonly ChatEvent[],
+    cursor: SessionState,
+    operationId: string
+  ): Promise<boolean> => {
+    const id = chatIdRef.current
+    if (!id) return false
+    const operationUrl = `/api/chats/${id}/events?operationId=${encodeURIComponent(operationId)}`
+    for (let attempt = 1; attempt <= 6; attempt++) {
+      try {
+        const response = await fetch(`/api/chats/${id}/events`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ events, cursor, operationId }),
+          signal: AbortSignal.timeout(10_000),
+        })
+        if (response.ok) return true
+        if ([400, 401, 403, 404].includes(response.status)) return false
+      } catch {
+        // The operation ID makes another POST safe after a lost response.
+      }
+      if (attempt < 6) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, Math.min(attempt * 250, 2_000))
+        )
+      }
+    }
+    try {
+      const response = await fetch(operationUrl, {
+        signal: AbortSignal.timeout(10_000),
+      })
+      if (!response.ok) return false
+      const body = (await response.json()) as { accepted?: unknown }
+      return body.accepted === true
+    } catch {
+      return false
+    }
+  }, [])
 
   const patchCursor = useCallback(async (cursor: SessionState) => {
     const id = chatIdRef.current
@@ -186,5 +216,5 @@ export function useEventQueue(initialChatId?: string) {
     chatIdRef.current = id
   }, [])
 
-  return { enqueue, enqueueNow, flush, patchCursor, clearCursor, setChatId }
+  return { enqueue, persistNow, flush, patchCursor, clearCursor, setChatId }
 }

@@ -28,6 +28,7 @@ export type { InputResponse }
 export type SupersedeEvent = {
   type: typeof SUPERSEDE_EVENT
   ids: readonly string[]
+  operationId?: string
 }
 
 /**

@@ -3,6 +3,7 @@ import { PgDialect } from "drizzle-orm/pg-core"
 
 import {
   appendEventsQuery,
+  appendEventsWithCursorQuery,
   isUniqueViolation,
   seqConflictAction,
 } from "./route"
@@ -88,10 +89,33 @@ describe("appendEventsQuery", () => {
   test("keeps ordinality numbering, the touched CTE and the single statement", () => {
     const rendered = render([{ a: 1 }, { b: 2 }])
     expect(rendered).toContain("with ordinality")
-    expect(rendered).toContain("update chat set updated_at = now()")
+    expect(rendered).toMatch(/update chat\s+set updated_at = now\(\)/)
     expect(rendered.split(";").filter((s) => s.trim().length > 0)).toHaveLength(
       1
     )
+  })
+
+  test("updates the accepted Eve cursor in the same idempotent statement", () => {
+    const rendered = new PgDialect().sqlToQuery(
+      appendEventsWithCursorQuery(
+        "00000000-0000-0000-0000-000000000001",
+        [{ type: "message.received" }, { type: "client.superseded" }],
+        {
+          sessionId: "session-1",
+          continuationToken: "continuation-1",
+          streamIndex: 7,
+        },
+        "operation-1"
+      )
+    )
+    expect(rendered.sql).toContain("eve_session_id")
+    expect(rendered.sql).toContain("continuation_token")
+    expect(rendered.sql).toContain("stream_index")
+    expect(rendered.sql).toContain("pg_advisory_xact_lock")
+    expect(rendered.sql).toContain("event ->> 'operationId'")
+    expect(rendered.params).toContain("session-1")
+    expect(rendered.params).toContain("continuation-1")
+    expect(rendered.params).toContain(7)
   })
 })
 

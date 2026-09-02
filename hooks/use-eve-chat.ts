@@ -14,11 +14,11 @@ import {
   eventType,
   INPUT_RESPONDED_EVENT,
   type InputResponse,
-  isClientEvent,
   isTurnBoundary,
   SUPERSEDE_EVENT,
   subagentCallId,
 } from "@/lib/chat-events"
+import { stripSentBootstrapEnvelope } from "@/lib/bootstrap-envelope"
 import { consumeDurableTurn } from "@/lib/eve-stream-consume"
 import { EVE_LONG_RUNNING_STREAM_POLICY } from "@/lib/eve-stream-policy"
 import { segmentedMessageReducer } from "@/lib/message-reducer"
@@ -54,15 +54,17 @@ export type SendInput = {
   clientContext?: Record<string, string | string[]>
   /** Shown immediately as the user's turn while the server catches up. */
   optimisticText: string
-  /**
-   * Context to use if the stored session turns out to be gone and the message
-   * has to go to a brand-new one. That session has never seen this chat, so
-   * this is where a recap of the visible history belongs.
-   */
-  freshContext?: () => Record<string, string | string[]> | undefined
-  /** Runs once Eve accepts the message, before following the streamed turn. */
-  onAccepted?: () => void
+  freshMessage?: () => Promise<UserContent>
+  atomicAcceptance?: boolean
+  onAccepted?: (
+    firstEvent: ChatEvent,
+    cursor: SessionState
+  ) => TurnAcceptance | Promise<TurnAcceptance>
 }
+
+export type TurnAcceptance =
+  | { accepted: false }
+  | { accepted: true; firstEventPersisted: boolean }
 
 type Options = {
   chatId?: string
@@ -89,6 +91,38 @@ export function shouldForgetSession({
   hadSession: boolean
 }): boolean {
   return response != null && !followed && hadSession
+}
+
+export function initialCursorForEvents(
+  _initialEvents: readonly ChatEvent[],
+  initialSession?: SessionState
+): SessionState {
+  return initialSession ?? { streamIndex: 0 }
+}
+
+export function createOperationId(
+  source: Pick<Crypto, "getRandomValues"> &
+    Partial<Pick<Crypto, "randomUUID">> = globalThis.crypto
+): string {
+  if (typeof source.randomUUID === "function") return source.randomUUID()
+  const bytes = source.getRandomValues(new Uint8Array(16))
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"))
+  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`
+}
+
+export function cursorForTurn(
+  previous: SessionState,
+  response: { sessionId?: string; continuationToken?: string }
+): SessionState {
+  const sameSession =
+    response.sessionId != null && response.sessionId === previous.sessionId
+  return {
+    sessionId: response.sessionId,
+    continuationToken: response.continuationToken,
+    streamIndex: sameSession ? previous.streamIndex : 0,
+  }
 }
 
 /**
@@ -134,7 +168,7 @@ export function useEveChat({
   const sessionRef = useRef<ClientSession | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const cursorRef = useRef<SessionState>(
-    initialSession ?? { streamIndex: initialEvents.length }
+    initialCursorForEvents(initialEvents, initialSession)
   )
   // One value, not four booleans. See lib/turn-state.ts for why.
   const [turn, setTurn] = useState<TurnState>(READY)
@@ -143,13 +177,13 @@ export function useEveChat({
   // fresh object literal every render, so a `useCallback` that depended on
   // `queue` or `projection` would be rebuilt on every render and defeat every
   // memo below it. The individual callbacks are stable.
-  const { enqueue, enqueueNow, flush, patchCursor, clearCursor, setChatId } =
+  const { enqueue, persistNow, flush, patchCursor, clearCursor, setChatId } =
     queue
   const { project } = projection
   const { attach, ingestChild, markDone } = subagents
 
   const ingest = useCallback(
-    (event: ChatEvent) => {
+    (event: ChatEvent, persist = true) => {
       // Projection dedupes; a null means the log already held this event and
       // every effect below — which is written to run once per event — must be
       // skipped.
@@ -168,7 +202,7 @@ export function useEveChat({
       // Inline subagents forward their events instead; harmless when unused.
       const child = subagentChild(eve)
       if (child) ingestChild(child.callId, child.event)
-      enqueue(event)
+      if (persist) enqueue(event)
       if (type === "message.received") setTurn(clearOptimistic)
     },
     [project, enqueue, attach, ingestChild, markDone]
@@ -206,7 +240,8 @@ export function useEveChat({
   const consume = useCallback(
     async (
       iterable: AsyncIterable<ChatEvent>,
-      onStarted?: () => void | Promise<void>
+      onStarted?: (event: ChatEvent) => TurnAcceptance | Promise<TurnAcceptance>,
+      normalizeEvent?: (event: ChatEvent) => ChatEvent
     ) => {
       setTurn(beginStreaming)
       // A turn ends when a boundary event says so — not when an iterator stops.
@@ -215,6 +250,7 @@ export function useEveChat({
       let settled = false
       let received = 0
       let started = false
+      let rejected = false
       try {
         const consumed = await consumeDurableTurn({
           initialStream: iterable,
@@ -226,11 +262,22 @@ export function useEveChat({
             }),
           isBoundary: isTurnBoundary,
           onEvent: async (event) => {
+            const normalizedEvent = normalizeEvent?.(event) ?? event
             if (!started) {
               started = true
-              await onStarted?.()
+              const decision = await onStarted?.(normalizedEvent)
+              if (decision && !decision.accepted) {
+                rejected = true
+                await sessionRef.current?.cancel().catch(() => {})
+                abortRef.current?.abort()
+                const error = new Error("turn acceptance failed")
+                error.name = "AbortError"
+                throw error
+              }
+              ingest(normalizedEvent, !decision?.firstEventPersisted)
+              return
             }
-            ingest(event)
+            ingest(normalizedEvent)
           },
           signal: abortRef.current?.signal,
         })
@@ -245,17 +292,19 @@ export function useEveChat({
         setTurn(settle)
         // Merge the settled cursor; keep the sessionId we already captured if the
         // state cursor hasn't filled it in.
-        const state = sessionRef.current?.state
-        cursorRef.current = {
-          sessionId: state?.sessionId ?? cursorRef.current.sessionId,
-          continuationToken:
-            state?.continuationToken ?? cursorRef.current.continuationToken,
-          streamIndex: state?.streamIndex ?? cursorRef.current.streamIndex,
+        if (!rejected && (started || !onStarted)) {
+          const state = sessionRef.current?.state
+          cursorRef.current = {
+            sessionId: state?.sessionId ?? cursorRef.current.sessionId,
+            continuationToken:
+              state?.continuationToken ?? cursorRef.current.continuationToken,
+            streamIndex: state?.streamIndex ?? cursorRef.current.streamIndex,
+          }
+          await patchCursor(cursorRef.current)
+          await flush()
         }
-        await patchCursor(cursorRef.current)
-        await flush()
       }
-      return settled || received > 0
+      return !rejected && (settled || received > 0)
     },
     [ingest, getSession, patchCursor, flush]
   )
@@ -269,13 +318,12 @@ export function useEveChat({
     const last = initialEvents.at(-1)
     const inFlight = last && !isTurnBoundary(last) && initialSession?.sessionId
     if (!inFlight) return
-    const startIndex = initialEvents.filter((e) => !isClientEvent(e)).length
     const session = getSession()
     const ac = new AbortController()
     abortRef.current = ac
     void consume(
       session.stream({
-        startIndex,
+        startIndex: initialSession.streamIndex,
         signal: ac.signal,
         streamReconnectPolicy: EVE_LONG_RUNNING_STREAM_POLICY,
       })
@@ -302,15 +350,19 @@ export function useEveChat({
         sessionId?: string
         continuationToken?: string
       } & AsyncIterable<ChatEvent>,
-      onStarted?: () => void | Promise<void>
+      onStarted?: (event: ChatEvent) => TurnAcceptance | Promise<TurnAcceptance>,
+      persistCursorBeforeEvents = true,
+      sentMessage?: UserContent
     ) => {
-      cursorRef.current = {
-        sessionId: turnResponse.sessionId,
-        continuationToken: turnResponse.continuationToken,
-        streamIndex: cursorRef.current.streamIndex,
-      }
-      void patchCursor(cursorRef.current)
-      return await consume(turnResponse, onStarted)
+      cursorRef.current = cursorForTurn(cursorRef.current, turnResponse)
+      if (persistCursorBeforeEvents) await patchCursor(cursorRef.current)
+      return await consume(
+        turnResponse,
+        onStarted,
+        sentMessage
+          ? (event) => stripSentBootstrapEnvelope(event, sentMessage)
+          : undefined
+      )
     },
     [patchCursor, consume]
   )
@@ -319,12 +371,10 @@ export function useEveChat({
    * Forget the durable session this chat was bound to.
    *
    * Used when the session turns out to be gone. The transcript is untouched —
-   * it lives in the persisted event log, not the session — so the next send
-   * opens a fresh session and the caller can seed it with a recap of what the
-   * reader can still see above the composer.
+   * it lives in the persisted event log, not the session.
    */
   const forgetSession = useCallback(async () => {
-    cursorRef.current = { streamIndex: cursorRef.current.streamIndex }
+    cursorRef.current = { streamIndex: 0 }
     sessionRef.current = null
     await clearCursor()
   }, [clearCursor])
@@ -377,19 +427,23 @@ export function useEveChat({
       message,
       clientContext,
       optimisticText,
-      freshContext,
+      freshMessage,
       onAccepted,
+      atomicAcceptance = false,
     }: SendInput): Promise<boolean> => {
       // A no-op when the caller already announced this turn via beginTurn.
       setTurn(submit(optimisticText))
 
-      const attempt = async (context: SendInput["clientContext"]) => {
+      const attempt = async (
+        attemptMessage: UserContent,
+        context: SendInput["clientContext"]
+      ) => {
         const session = getSession()
         const ac = new AbortController()
         abortRef.current = ac
         try {
           return await session.send({
-            message,
+            message: attemptMessage,
             signal: ac.signal,
             clientContext: context,
             streamReconnectPolicy: EVE_LONG_RUNNING_STREAM_POLICY,
@@ -401,16 +455,48 @@ export function useEveChat({
         }
       }
 
+      const prepareFreshMessage = async () => {
+        try {
+          return freshMessage ? await freshMessage() : message
+        } catch (error) {
+          console.error("conversation checkpoint error", error)
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : "Couldn't prepare the conversation checkpoint."
+          )
+          return null
+        }
+      }
+
       // Whether this send was riding an existing session. Only then is "the turn
       // produced nothing" evidence of a dead session rather than a dead network.
       const hadSession = cursorRef.current.sessionId != null
-      const response = await attempt(clientContext)
+      const firstMessage = hadSession ? message : await prepareFreshMessage()
+      if (firstMessage == null) {
+        setTurn(READY)
+        return false
+      }
+      const response = await attempt(firstMessage, clientContext)
+      let acceptanceRejected = false
+      const accept = onAccepted
+        ? async (event: ChatEvent) => {
+            const decision = await onAccepted(event, {
+              ...cursorRef.current,
+              streamIndex: cursorRef.current.streamIndex + 1,
+            })
+            acceptanceRejected = !decision.accepted
+            return decision
+          }
+        : undefined
       const followed =
         response != null &&
-        (await followTurn(response, () => {
-          onAccepted?.()
-        }))
+        (await followTurn(response, accept, !atomicAcceptance, firstMessage))
       if (followed) return true
+      if (acceptanceRejected) {
+        setTurn(READY)
+        return false
+      }
 
       if (!shouldForgetSession({ response, followed, hadSession })) {
         // A null response means we never heard back from the server, so the
@@ -424,8 +510,7 @@ export function useEveChat({
       }
 
       // The session this chat was bound to is gone — destroyed, expired, or its
-      // event log corrupted. Drop it and ask again on a fresh one, seeded with
-      // whatever recap the caller builds for a chat with no history behind it.
+      // event log corrupted. Drop it and ask again on a checkpointed fresh one.
       //
       // INVARIANT: forgetSession() is only correct when the server answered.
       // Reaching here requires a non-null response (see shouldForgetSession);
@@ -433,14 +518,17 @@ export function useEveChat({
       console.warn("eve session unavailable; retrying on a fresh session")
       await forgetSession()
       setTurn(submit(optimisticText))
-      const retry = await attempt(freshContext?.() ?? clientContext)
+      const retryMessage = await prepareFreshMessage()
+      if (retryMessage == null) {
+        setTurn(READY)
+        return false
+      }
+      const retry = await attempt(retryMessage, clientContext)
       if (!retry) {
         setTurn(READY)
         return false
       }
-      return await followTurn(retry, () => {
-        onAccepted?.()
-      })
+      return await followTurn(retry, accept, !atomicAcceptance, retryMessage)
     },
     [getSession, followTurn, forgetSession]
   )
@@ -511,10 +599,16 @@ export function useEveChat({
     else abortRef.current?.abort()
   }, [])
 
-  /** Persist an accepted replacement so the collapse survives reload. */
   const commitSupersede = useCallback(
-    (ids: readonly string[]) => enqueueNow({ type: SUPERSEDE_EVENT, ids }),
-    [enqueueNow]
+    (ids: readonly string[], firstEvent: ChatEvent, cursor: SessionState) => {
+      const operationId = createOperationId()
+      return persistNow(
+        [firstEvent, { type: SUPERSEDE_EVENT, ids, operationId }],
+        cursor,
+        operationId
+      )
+    },
+    [persistNow]
   )
 
   return {

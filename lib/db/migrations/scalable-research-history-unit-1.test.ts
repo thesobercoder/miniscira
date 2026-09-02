@@ -117,7 +117,7 @@ describe("scalable research history Unit 1 migration", () => {
       expect(writer).not.toContain("archiveStateChangedAt:")
     }
     expect(eventRoute).toContain("insert into chat_event")
-    expect(eventRoute).toContain("update chat set updated_at = now()")
+    expect(eventRoute).toMatch(/update chat\s+set updated_at = now\(\)/)
     expect(lookoutRoute).toContain(".insert(lookout)")
     expect(chatUpdateRoute).toContain("continuationToken")
     expect(chatUpdateRoute).toContain("streamIndex")

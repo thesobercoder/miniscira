@@ -33,10 +33,12 @@ import {
 import { useChatModel } from "@/hooks/use-chat-model"
 import { useEveChat } from "@/hooks/use-eve-chat"
 import { useMountEffect } from "@/hooks/use-mount-effect"
-import { buildClientContext, conversationRecap } from "@/lib/chat-context"
-import { type ChatEvent, partText } from "@/lib/chat-events"
+import { buildClientContext } from "@/lib/chat-context"
+import type { ChatEvent } from "@/lib/chat-events"
 import { chatCreatedEvent, chatTitledEvent } from "@/lib/chat-list-events"
 import { chatTurnPath } from "@/lib/chat-route"
+import { visibleBootstrapText } from "@/lib/bootstrap-envelope"
+import { checkpointedMessage } from "@/lib/conversation-checkpoint-client"
 import {
   messagesBeforeReplacement,
   nextReplacementTurnIndex,
@@ -51,6 +53,13 @@ import { cn } from "@/lib/utils"
  * as the whole-conversation object it replaces.
  */
 const NO_CHILD_PARTS: Record<string, readonly EveMessagePart[]> = {}
+
+export function messagesForFreshSession(
+  messages: readonly EveMessage[],
+  supersededIds: ReadonlySet<string>
+): readonly EveMessage[] {
+  return messages.filter((message) => !supersededIds.has(message.id))
+}
 
 /**
  * Last subset handed to each message. Keyed weakly by the message object,
@@ -140,20 +149,30 @@ export async function acceptReplacementTurn({
   attachments,
   turnIndex,
   ids,
+  firstEvent,
+  cursor,
   rebind,
   commitSupersede,
 }: {
   attachments: readonly UploadedDoc[]
   turnIndex: number
   ids: readonly string[]
+  firstEvent: ChatEvent
+  cursor: SessionState
   rebind: (
     attachments: readonly UploadedDoc[],
     turnIndex: number
   ) => Promise<boolean>
-  commitSupersede: (ids: readonly string[]) => void
+  commitSupersede: (
+    ids: readonly string[],
+    firstEvent: ChatEvent,
+    cursor: SessionState
+  ) => Promise<boolean>
 }): Promise<boolean> {
-  if (!(await rebind(attachments, turnIndex))) return false
-  commitSupersede(ids)
+  if (!(await commitSupersede(ids, firstEvent, cursor))) return false
+  if (!(await rebind(attachments, turnIndex))) {
+    toast.error("The replacement was sent, but its attachments could not be rebound.")
+  }
   return true
 }
 
@@ -238,7 +257,6 @@ export function ResearchChat({
     canceling,
     detached,
     pendingUser,
-    hasSession,
     setChatId,
     beginTurn,
     abandonTurn,
@@ -454,7 +472,7 @@ export function ResearchChat({
       }
     }
 
-    const context = (recap: string | null) =>
+    const context = () =>
       buildClientContext({
         chatModel: modelOverride ?? chatModel,
         projectInstructions,
@@ -463,33 +481,40 @@ export function ResearchChat({
         uploadedDocuments: attached
           .filter((d) => d.kind !== "image")
           .map((d) => d.filename),
-        conversationRecap: recap,
       })
-    // A recap is only worth sending to a session that hasn't seen this chat:
-    // one that was branched from another, or a fresh one replacing a session
-    // that turned out to be gone. eve sessions can't be forked, so it's the
-    // only way the agent knows about history the reader can still see.
-    const recapMessages = replacement?.retainedMessages ?? messages
-    const recap = () =>
-      recapMessages.length === 0 ? null : conversationRecap(recapMessages)
+    const retainedMessages =
+      replacement?.retainedMessages ??
+      messagesForFreshSession(messages, supersededIds)
+    const message =
+      fileParts && fileParts.length > 0
+        ? [{ type: "text" as const, text }, ...fileParts]
+        : text
 
     const myTurn = ++turnSeqRef.current
     let accepted = false
     const sent = await send({
       optimisticText: text,
-      message:
-        fileParts && fileParts.length > 0
-          ? [{ type: "text", text }, ...fileParts]
-          : text,
-      clientContext: context(hasSession() ? null : recap()),
-      freshContext: () => context(recap()),
-      onAccepted: async () => {
-        if (accepted) return
+      message,
+      clientContext: context(),
+      freshMessage: () =>
+        checkpointedMessage({
+          chatId: id,
+          model: modelOverride ?? chatModel,
+          message,
+          retainedMessageIds: retainedMessages.map((item) => item.id),
+        }),
+      atomicAcceptance: Boolean(replacement),
+      onAccepted: async (firstEvent, cursor) => {
+        if (accepted) {
+          return { accepted: true, firstEventPersisted: Boolean(replacement) }
+        }
         if (replacement) {
           accepted = await acceptReplacementTurn({
             attachments: replacement.attachments,
             turnIndex: replacement.turnIndex,
             ids: replacement.ids,
+            firstEvent,
+            cursor,
             rebind: rebindTurnAttachments,
             commitSupersede,
           })
@@ -501,6 +526,9 @@ export function ResearchChat({
             persistBinding: persistTurnBinding,
           })
         }
+        return accepted
+          ? { accepted: true, firstEventPersisted: Boolean(replacement) }
+          : { accepted: false }
       },
     })
 
@@ -561,7 +589,7 @@ export function ResearchChat({
     if (isBusy || replacementLockRef.current) return
     const question = messages[questionIndex]
     if (question?.role !== "user") return
-    const next = text ?? partText(question.parts, "text")
+    const next = text ?? visibleBootstrapText(question.parts)
     if (!next) return
     const ids = replacementMessageIds(messages, questionIndex, supersededIds)
     const retainedMessages = messagesBeforeReplacement(
@@ -586,6 +614,12 @@ export function ResearchChat({
       replacementLockRef.current = false
     }
   }
+
+  // UserBubble is memoized by value and intentionally ignores callback identity.
+  // Route its retained callback through a ref so retry/edit always sees the latest
+  // messages and idle state after streaming finishes.
+  const replaceTurnRef = useRef(replaceTurn)
+  replaceTurnRef.current = replaceTurn
 
   // Answering a question mid-turn has to repeat the model marker and the project
   // instructions: clientContext applies to a single model call, so without them
@@ -700,16 +734,17 @@ export function ResearchChat({
                           >
                             {message.role === "user" ? (
                               <UserBubble
-                                text={partText(message.parts, "text")}
+                                text={visibleBootstrapText(message.parts)}
                                 attachments={attachmentsByTurn[userTurnOf[i]]}
                                 onRetry={
                                   !isBusy
-                                    ? () => void replaceTurn(i)
+                                    ? () => void replaceTurnRef.current(i)
                                     : undefined
                                 }
                                 onEdit={
                                   !isBusy
-                                    ? (next) => void replaceTurn(i, next)
+                                    ? (next) =>
+                                        void replaceTurnRef.current(i, next)
                                     : undefined
                                 }
                               />
@@ -726,7 +761,7 @@ export function ResearchChat({
                                   i === messages.length - 1 &&
                                   messages[i - 1]?.role === "user"
                                     ? (modelId) =>
-                                        void replaceTurn(
+                                        void replaceTurnRef.current(
                                           i - 1,
                                           undefined,
                                           modelId

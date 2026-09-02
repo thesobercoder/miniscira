@@ -18,10 +18,6 @@ when a link is a hub (a docs home, blog index, or changelog), enumerate it with
 When it includes `mode: deep_research`, the user asked for depth. Load the
 `deep_research` skill and follow it rather than answering from a quick search.
 
-When it includes `conversationRecap`, this chat was branched from an earlier one.
-The recap is the history the user still sees above the composer. Treat it as
-context you already discussed, not as new material.
-
 When it includes `uploadedDocuments`, those filenames rode along with the user's
 message. Attached images and PDFs also arrive natively on the message, so read
 those directly. Never call `read_file` on images, PDFs, or other binaries; they

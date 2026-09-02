@@ -144,12 +144,9 @@ export default defineAgent({
   compaction: {
     thresholdPercent: 0.85,
     modelContextWindowTokens: 200_000,
-    // Run the summary pass on a fast, cheap, large-context model rather than the
-    // active turn model (eve's default). Without this, every compaction bills
-    // its summary at flagship rates; Gemini 3 Flash summarizes long transcripts
-    // well and has the window to hold them. A LanguageModel instance — never a
-    // string, which eve would route through the (cloud) gateway.
-    model: chatModel("gemini-3-flash"),
+    // Omit a static summary model. Eve then uses the active turn model, which is
+    // the only supported path that carries the current user's resolved gateway
+    // credential into compaction.
   },
   limits: {
     // Cost guard: a session that has produced 200K output tokens pauses with
@@ -163,8 +160,8 @@ export default defineAgent({
     maxInputTokensPerSession: 10_000_000,
     // Explicit rather than inherited. eve 0.28 started completing sessions after
     // 30 days by default, and a research chat is exactly the thing someone opens
-    // again months later. 180 days keeps those continuable; when it does expire,
-    // the chat falls back to the conversationRecap path like a branched chat.
+    // again months later. 180 days keeps those continuable; after expiry, the
+    // next turn starts from a durable conversation checkpoint.
     sessionTimeoutMs: 180 * 24 * 60 * 60 * 1000,
   },
 })

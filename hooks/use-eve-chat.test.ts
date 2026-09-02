@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test"
-import { drainUntilBoundary, shouldForgetSession } from "@/hooks/use-eve-chat"
+import {
+  createOperationId,
+  cursorForTurn,
+  drainUntilBoundary,
+  initialCursorForEvents,
+  shouldForgetSession,
+} from "@/hooks/use-eve-chat"
 import type { ChatEvent } from "@/lib/chat-events"
 import { consumeDurableTurn } from "@/lib/eve-stream-consume"
 
@@ -39,6 +45,75 @@ describe("shouldForgetSession", () => {
 })
 
 const event = (type: string) => ({ type }) as unknown as ChatEvent
+
+describe("initialCursorForEvents", () => {
+  const session = {
+    sessionId: "session-1",
+    continuationToken: "continuation-1",
+    streamIndex: 42,
+  }
+
+  test("preserves a valid session after a settled turn", () => {
+    expect(initialCursorForEvents([event("session.waiting")], session)).toBe(
+      session
+    )
+    expect(
+      initialCursorForEvents(
+        [event("session.waiting"), event("client.message.superseded")],
+        session
+      )
+    ).toBe(session)
+  })
+
+  test("keeps the cursor only while a server turn is in flight", () => {
+    expect(
+      initialCursorForEvents([event("message.appended")], session)
+    ).toBe(session)
+    expect(initialCursorForEvents([], session)).toBe(session)
+  })
+})
+
+describe("createOperationId", () => {
+  test("falls back to getRandomValues when randomUUID is unavailable", () => {
+    const source = {
+      getRandomValues: (bytes: Uint8Array) => {
+        bytes.set(Array.from({ length: 16 }, (_, index) => index))
+        return bytes
+      },
+    }
+    expect(createOperationId(source)).toBe(
+      "00010203-0405-4607-8809-0a0b0c0d0e0f"
+    )
+  })
+})
+
+describe("cursorForTurn", () => {
+  test("keeps the per-session index for a continuation", () => {
+    expect(
+      cursorForTurn(
+        { sessionId: "same", continuationToken: "old", streamIndex: 42 },
+        { sessionId: "same", continuationToken: "new" }
+      )
+    ).toEqual({
+      sessionId: "same",
+      continuationToken: "new",
+      streamIndex: 42,
+    })
+  })
+
+  test("starts a replacement session at index zero", () => {
+    expect(
+      cursorForTurn(
+        { sessionId: "old", continuationToken: "old", streamIndex: 42 },
+        { sessionId: "replacement", continuationToken: "new" }
+      )
+    ).toEqual({
+      sessionId: "replacement",
+      continuationToken: "new",
+      streamIndex: 0,
+    })
+  })
+})
 
 describe("drainUntilBoundary", () => {
   test("stops at the boundary even when the stream stays open", async () => {

@@ -10,8 +10,7 @@ import { chat, chatEvent } from "@/lib/db/schema"
 // Copies the event history for display only. The eve session cursor is NOT
 // copied: a durable session has exactly one active continuation token, so two
 // chats sharing it would invalidate each other (the second send is rejected).
-// The branch starts a fresh session on its next message; the client seeds it
-// with a recap of the visible conversation.
+// The branch starts a checkpointed fresh session on its next message.
 export const POST = authedWithParams<{ id: string }>(
   async (_request, { userId, params: { id } }) => {
     const owned = await requireOwnedChat(id, userId)
