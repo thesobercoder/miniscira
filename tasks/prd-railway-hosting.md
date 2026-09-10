@@ -1,9 +1,9 @@
 # PRD: Railway hosting with OpenRouter default
 
-- **Status:** To do
+- **Status:** In progress
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-railway-hosting)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
-- **Approval:** Not approved
+- **Approval:** Approved by Soham on 2026-09-10
 
 ## Goal
 

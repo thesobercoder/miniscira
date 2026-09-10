@@ -56,7 +56,8 @@ export function gatewayBaseUrl(): string {
 }
 
 // Models the gateway exposes that are not chat models (image/video generators)
-// and must never appear in the chat picker.
+// and must never appear in the chat picker. Covers bare CLIProxyAPI ids and
+// OpenRouter-style provider/model ids with image/video suffixes.
 const NON_CHAT_MODELS = new Set([
   "grok-imagine-image",
   "grok-imagine-image-quality",
@@ -67,6 +68,18 @@ const NON_CHAT_MODELS = new Set([
   "gpt-image-2",
   "gpt-image-1.5",
 ])
+
+// OpenRouter image/video model suffixes (e.g. "openai/gpt-image-1:free",
+// "google/imagen-4.0"). Applied to the tail after an optional provider/
+// prefix; chat models never carry these segments.
+const NON_CHAT_ID_RE = /(^|[/:_-])(image|video|imagen|dall-e)($|[/:_.-])/i
+
+function isNonChatModel(id: string): boolean {
+  if (NON_CHAT_MODELS.has(id)) return true
+  const tail = id.split("/")[1] ?? id
+  if (NON_CHAT_MODELS.has(tail)) return true
+  return NON_CHAT_ID_RE.test(tail)
+}
 
 // The gateway does not advertise context windows, so every model gets the
 // deployment-wide default (matches the 200K convention used elsewhere).
@@ -84,6 +97,17 @@ const RawModelSchema = z.object({
   name: z.string().optional(),
   owned_by: z.string().optional(),
   created: z.number().optional(),
+  // OpenRouter catalog fields. context_length is the verified context window
+  // for the model; architecture/supported_parameters are accepted so entries
+  // carrying them still parse.
+  context_length: z.number().optional(),
+  architecture: z
+    .object({
+      input_modalities: z.array(z.string()).optional(),
+      output_modalities: z.array(z.string()).optional(),
+    })
+    .optional(),
+  supported_parameters: z.array(z.string()).optional(),
 })
 
 const CatalogSchema = z.object({
@@ -125,12 +149,15 @@ export async function fetchGatewayModels(
     const models = catalog.data
       .map((entry) => RawModelSchema.safeParse(entry))
       .flatMap((parsed) => (parsed.success ? [parsed.data] : []))
-      .filter((m) => !NON_CHAT_MODELS.has(m.id))
+      .filter((m) => !isNonChatModel(m.id))
       .map((m) => ({
         id: m.id,
         name: m.name ?? m.id.split("/")[1] ?? m.id,
         provider: MODEL_VENDOR[m.id] ?? m.owned_by ?? providerOf(m.id),
-        context: CONTEXT_WINDOWS[m.id] ?? DEFAULT_CONTEXT_WINDOW,
+        context:
+          m.context_length && m.context_length > 0
+            ? m.context_length
+            : (CONTEXT_WINDOWS[m.id] ?? DEFAULT_CONTEXT_WINDOW),
         // Chat models behind the gateway are treated as vision + file capable;
         // the research harness relies on attachments and tool use.
         vision: true,

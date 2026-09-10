@@ -73,8 +73,8 @@ ENV AI_GATEWAY_BASE_URL=http://localhost:3000/v1
 # Server-side defaults read DEFAULT_CHAT_MODEL from the runtime environment.
 # Docker Compose forwards the same .env value as this build argument so the
 # browser and server agree. Changing the browser default requires rebuilding
-# the image. Unset arg = built-in default (gpt-5.6-sol) baked in.
-ARG DEFAULT_CHAT_MODEL=gpt-5.6-sol
+# the image. Unset arg = free OpenRouter default baked in.
+ARG DEFAULT_CHAT_MODEL=nex-agi/nex-n2.5-pro:free
 ENV NEXT_PUBLIC_DEFAULT_CHAT_MODEL=${DEFAULT_CHAT_MODEL}
 
 # Both halves. `next build` does NOT build the agent — skip the first line and
@@ -159,14 +159,14 @@ RUN chmod 0755 /app/scripts/eve-docker-wrapper.mjs \
 
 EXPOSE 3000
 
-# Readiness = BOTH halves answer: /api/health (Next up AND database responds,
-# SELECT 1) and /eve/v1/health (eve agent runtime ready — returned by the
-# nitro health route, `{ok:true,status:"ready"}`). A healthy container means
-# chat actually works, not merely that Next is listening. Used by
-# docker-compose.yml and any orchestrator that reads the image HEALTHCHECK;
-# inert when run without a healthcheck config.
+# Readiness = BOTH halves answer on the runtime port: /api/health (Next up
+# AND database responds, SELECT 1) and /eve/v1/health (eve agent runtime
+# ready — returned by the nitro health route, `{ok:true,status:"ready"}`).
+# A healthy container means chat actually works, not merely that Next is
+# listening. Used by docker-compose.yml and any orchestrator that reads the
+# image HEALTHCHECK; inert when run without a healthcheck config.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-  CMD node -e "Promise.all([fetch('http://localhost:3000/api/health'),fetch('http://localhost:3000/eve/v1/health')]).then(rs=>process.exit(rs.every(r=>r.ok)?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "const p=process.env.PORT||3000;Promise.all([fetch('http://localhost:'+p+'/api/health'),fetch('http://localhost:'+p+'/eve/v1/health')]).then(rs=>process.exit(rs.every(r=>r.ok)?0:1)).catch(()=>process.exit(1))"
 
 # Two processes. 4274 is the port withEve rewrites to when VERCEL is unset.
 # Phase 2: the entrypoint waits for the database, honors the RUN_DB_PUSH gate,
