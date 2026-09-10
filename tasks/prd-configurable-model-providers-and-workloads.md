@@ -1,6 +1,6 @@
 # PRD: Configurable model providers and workload models
 
-- **Status:** To do
+- **Status:** In progress
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-separate-model-defaults)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Approval:** Not approved
@@ -261,9 +261,9 @@ A provider may use separate endpoints for chat, image, and video work. OpenAI co
 
 - [ ] An authenticated administrator controls the provider, allowed model catalog, and workload assignments.
 - [ ] Non-administrators cannot read or change provider or model-policy settings.
-- [ ] OpenRouter works as the production provider without source changes.
+- [x] OpenRouter works as the production provider without source changes.
 - [ ] A generic OpenAI-compatible endpoint works through the same public configuration contract.
-- [ ] OpenRouter capability fields drive the initial catalog filter.
+- [x] OpenRouter capability fields drive the initial catalog filter.
 - [ ] Text-only and unknown-modality models never appear to ordinary users.
 - [ ] Every user-visible chat model accepts text and image input and produces text output.
 - [ ] Per-user chat defaults persist across browsers and remain isolated between users.
@@ -273,8 +273,8 @@ A provider may use separate endpoints for chat, image, and video work. OpenAI co
 - [ ] Video generation uses a user-selected compatible model and provider adapter when present.
 - [ ] Title generation, summaries, compaction, memory extraction, and evaluations use administrator-selected models that users cannot view or override.
 - [ ] Compaction uses the selected model's verified context limit.
-- [ ] No workload silently substitutes an unavailable or incompatible model.
-- [ ] Provider credentials remain server-side and secret.
+- [x] No workload silently substitutes an unavailable or incompatible model.
+- [x] Provider credentials remain server-side and secret.
 - [ ] Unit, integration, browser, eval, rollback, and production checks pass.
 
 ## Deployment
