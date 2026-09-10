@@ -68,6 +68,9 @@ for (const [agent, tools] of Object.entries(agents)) {
     expect(resolve()).toEqual([false, false, false, false, true, false])
     process.env.XAI_API_KEY = "fixture-key"
     expect(resolve()).toEqual([false, false, false, false, true, true])
+    delete process.env.EXA_API_KEY
+    expect(resolve()).toEqual([false, false, false, false, false, true])
+    process.env.EXA_API_KEY = "fixture-key"
     process.env.FIRECRAWL_API_KEY = "fixture-key"
     expect(resolve()).toEqual([true, true, true, true, true, true])
     for (const key of keys) delete process.env[key]

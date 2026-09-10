@@ -85,19 +85,30 @@ Make Firecrawl the default web search provider. Each search tool turns itself on
 - Pass threshold: all seven fixtures pass. Each configured case starts with its expected tool and returns a source link. Record tool calls and answers. These isolated model fixtures do not prove skill loading, delegated execution, or deployed chat.
 - Run `eve eval --url <deployed-origin> --tag firecrawl-default --strict` against the approved deployment. `evals/firecrawl-default-search.eval.ts` checks general and Reddit chat routing and source links. Also verify one real delegated research turn.
 
+### Verification record
+
+- On 2026-09-10, all seven bounded live-model fixtures passed on `openai/gpt-5.5`. [Recorded tool calls and answers](../evals/results/firecrawl-default-search-2026-09-10.jsonl) include the available tools for each case.
+- The fixture prompts allow one search request and one page read, then require a brief answer with source URLs and any limitations. Provider outputs replay captured Firecrawl responses from `evals/search-provider-responses.json`. This proves routing under those conditions. It does not prove unrestricted research completion or deployment behavior.
+- Earlier exploratory runs with placeholder responses and forced tool shutdown were unsuitable for answer checks. Unbounded replay runs also reached the step limit. The recorded passing run uses captured source content and a user-requested research budget, without forced tool shutdown.
+- The full local suite passed with 446 tests. Typecheck, lint, task-document checks, `bun run check`, and diff checks passed. The formatter changed unrelated files, which were restored.
+- Eve 0.29.4 and Next.js production builds passed on Node.js 24. The Next build used two-CPU affinity after the first attempt exhausted local worker threads.
+- Live `firecrawl_search` and `reddit_search` calls each returned two source links. These calls used the actual tools and Firecrawl Cloud.
+- [PR #11](https://github.com/thesobercoder/miniscira/pull/11) is open. GitHub reported no checks or workflow runs despite an active CI workflow. Remote CI remains unverified.
+- Deployment and merge require approval. Deployed general, Reddit, and delegated-chat acceptance remain pending. The production default model has not passed the final bounded fixture suite.
+
 ## Acceptance criteria
 
-- [ ] General search uses Firecrawl when `FIRECRAWL_API_KEY` or `FIRECRAWL_API_URL` is set, including real model routing.
+- [x] General search uses Firecrawl when `FIRECRAWL_API_KEY` or `FIRECRAWL_API_URL` is set, including real model routing.
 - [x] Reddit search runs on the Firecrawl key and `SEARXNG_URL` is fully removed.
 - [x] Exa remains usable as a fallback when only `EXA_API_KEY` is set.
 - [x] X search remains available with `XAI_API_KEY` and absent without it in both agents.
-- [ ] Only configured providers appear at runtime in both agents. No-provider model fixtures explain the limitation and continue.
+- [x] Only configured providers appear at runtime in both agents. No-provider model fixtures explain the limitation and continue.
 - [x] Provider failures return safe errors and preserve partial search results.
 - [x] `bun run typecheck`, `bun run lint`, `bun test`, `bun run check`, and `git diff --check` pass, including the provider matrix and failure tests.
 - [x] `python3 scripts/check-task-docs.py` passes.
 - [ ] One research turn on the Railway deployment uses Firecrawl and returns sources.
 - [x] No provider key appears in new logs, error responses, diffs, or docs.
-- [ ] The seven isolated live-model fixtures pass and the evidence is recorded.
+- [x] The seven isolated live-model fixtures pass and the evidence is recorded.
 - [ ] Deployed general, Reddit, and delegated research turns pass with recorded tool calls and sources.
 
 ## Deployment

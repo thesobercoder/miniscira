@@ -124,7 +124,7 @@ try {
       const result = await generateText({
         model,
         system,
-        prompt: `${fixture.prompt} Use at most one search request and one page read. Then give a brief answer from the available evidence and disclose any limits.`,
+        prompt: `${fixture.prompt} Use at most one search request and one page read. Then give a brief answer with source URLs from the available evidence and disclose any limits.`,
         tools,
         stopWhen: stepCountIs(8),
         maxOutputTokens: 8000,
