@@ -14,6 +14,7 @@ import {
 } from "@/lib/document-files"
 import { put } from "@/lib/local-blob"
 import { resolveRuntimePort } from "@/lib/runtime-port"
+import { isDockerBackendConfigured } from "@/lib/sandbox-config"
 import {
   isSandboxUnavailableError,
   sandboxUnavailableResult,
@@ -69,6 +70,12 @@ export default defineTool({
     missingFiles: z.array(z.string()).optional(),
   }),
   async execute({ code, title, files }, ctx) {
+    // No Docker daemon on this host (Railway): the sandbox backend is a
+    // simulated fallback that cannot run Python. Fail fast with the clear
+    // message instead of producing misleading output.
+    if (!isDockerBackendConfigured()) {
+      return { title, code, ...sandboxUnavailableResult() }
+    }
     try {
       return await executeWithSandbox({ code, title, files }, ctx)
     } catch (err) {

@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs"
+
 export type SandboxEnvironment = Readonly<Record<string, string | undefined>>
 
 export interface DockerSandboxConfig {
@@ -35,5 +37,24 @@ export function resolveDockerSandboxConfig(
     image,
     networkPolicy: "deny-all",
     pullPolicy: "never",
+  }
+}
+
+/**
+ * Whether a Docker daemon is plausibly reachable for the sandbox backend.
+ *
+ * Eve's `defaultBackend()` picks Docker when a daemon answers and falls back
+ * otherwise. The `run_code` tool uses this to fail fast with a clear message
+ * instead of running Python against a simulated fallback shell. Railway sets
+ * neither DOCKER_HOST nor a socket, so this is false there by design.
+ */
+export function isDockerBackendConfigured(
+  env: SandboxEnvironment = process.env
+): boolean {
+  if (env.DOCKER_HOST?.trim()) return true
+  try {
+    return existsSync("/var/run/docker.sock")
+  } catch {
+    return false
   }
 }
