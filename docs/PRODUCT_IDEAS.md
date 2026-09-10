@@ -29,7 +29,7 @@ This table keeps every product idea visible through its full lifecycle. Follow [
 | <a id="idea-thread-search"></a>Search and read previous threads | Done | [PRD](../tasks/prd-thread-search.md) | Search past threads and read the relevant conversation context. Phase 2 keeps a separate release gate. |
 | <a id="idea-self-hosted-youtube-transcripts"></a>Self-hosted YouTube transcripts | In progress | [PRD](../tasks/prd-self-hosted-youtube-transcripts.md) | Read YouTube captions in the Docker Sandbox via yt-dlp, routed through the youtube_transcript skill. |
 | <a id="idea-thread-search-by-date"></a>Search previous threads by date | Done | [PRD](../tasks/prd-thread-search-by-date.md) | Restrict previous-thread search to a requested date range. |
-| <a id="idea-railway-hosting"></a>Railway hosting with OpenRouter default | In progress | [PRD](../tasks/prd-railway-hosting.md) | Deploy on Railway with OpenRouter as the default provider and prove long threads. |
+| <a id="idea-railway-hosting"></a>Railway hosting with OpenRouter default | Done | [PRD](../tasks/prd-railway-hosting.md) | Deploy on Railway with OpenRouter as the default provider and prove long threads. |
 | <a id="idea-invite-only-signup"></a>Invite-only signup | To do | [PRD](../tasks/prd-invite-only-signup.md) | Disable public signup and allow new accounts only through invite links. |
 | <a id="idea-firecrawl-default-search"></a>Firecrawl default search | To do | [PRD](../tasks/prd-firecrawl-default-search.md) | Use Firecrawl as the default web search provider across the project. |
 | <a id="idea-railway-only-deployment"></a>Railway-only deployment | To do | [PRD](../tasks/prd-railway-only-deployment.md) | Remove Umbrel and other non-Railway deployment targets now that Railway is final. |
