@@ -116,14 +116,17 @@ export function ModelPickerDialog({
     }
   }, [open, models, reloadKey])
 
-  // Group by provider, preserving the server's order (featured first). The
-  // source array is already contiguous per provider, so groups are unique.
-  const groups: { provider: string; models: ApiModel[] }[] = []
+  // Group by derived vendor, sorted alphabetically at render. No maintained
+  // vendor list: every group comes from the catalog entries themselves.
+  const byVendor = new Map<string, ApiModel[]>()
   for (const m of models ?? []) {
-    const last = groups.at(-1)
-    if (last && last.provider === m.provider) last.models.push(m)
-    else groups.push({ provider: m.provider, models: [m] })
+    const list = byVendor.get(m.provider)
+    if (list) list.push(m)
+    else byVendor.set(m.provider, [m])
   }
+  const groups = [...byVendor.entries()]
+    .map(([provider, vendorModels]) => ({ provider, models: vendorModels }))
+    .sort((a, b) => a.provider.localeCompare(b.provider))
 
   const valueProvider = providerOf(value)
   const activeProvider =

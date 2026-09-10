@@ -138,18 +138,15 @@ describe("decorateCatalog", () => {
 
 describe("orderWithMetadata", () => {
   test("pinned order sorts first, ascending", () => {
-    const rank = (p: string) => (p === "openai" ? 0 : 1)
-    const ordered = orderWithMetadata(decorateCatalog(CATALOG), rank)
+    const ordered = orderWithMetadata(decorateCatalog(CATALOG))
     expect(ordered[0].id).toBe("gpt-5.6-sol")
   })
 
-  test("unconfigured models keep the provider-rank fallback", () => {
-    const rank = (p: string) => (p === "openai" ? 0 : p === "google" ? 1 : 2)
+  test("unconfigured models sort alphabetically by vendor", () => {
     const ordered = orderWithMetadata(
-      decorateCatalog(CATALOG).filter((m) => m.id !== "gpt-5.6-sol"),
-      rank
+      decorateCatalog(CATALOG).filter((m) => m.id !== "gpt-5.6-sol")
     )
-    expect(ordered.map((m) => m.id)).toEqual(["gemini-3-flash", "qwen3.8-max"])
+    expect(ordered.map((m) => m.id)).toEqual(["qwen3.8-max", "gemini-3-flash"])
   })
 })
 

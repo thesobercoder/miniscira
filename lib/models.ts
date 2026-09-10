@@ -1,18 +1,11 @@
 // The models users can pick in the composer. All are served by the
-// deployment's own OpenAI-compatible AI gateway (CLIProxyAPI by default) with
-// the shared AI_GATEWAY_API_KEY — no per-provider keys. Every entry must
-// support vision + tool use (attachments and the research tools rely on both).
-export type ChatModel = {
-  id: string
-  name: string
-  vendor: string
-  hint: string
-}
+// deployment's own OpenAI-compatible AI gateway with the caller's own key —
+// no per-provider keys. The live gateway catalog (/v1/models) is the only
+// source of model records; nothing here maps ids to vendors.
 
 // The built-in default, used when neither DEFAULT_CHAT_MODEL nor
 // NEXT_PUBLIC_DEFAULT_CHAT_MODEL is set (or the value is invalid). The ONLY
-// hardcoded model id in the default-resolution path — every other literal was
-// replaced by this one resolution function (Phase 3).
+// hardcoded model id in the default-resolution path.
 const BUILTIN_DEFAULT_CHAT_MODEL = "gpt-5.6-sol"
 
 // Loose shape check for a model id. The gateway serves bare ids (no
@@ -48,124 +41,6 @@ export function resolveDefaultChatModel(): string {
 // Also the dynamic fallback in agent/agent.ts and the researcher subagent's
 // model, so it has to survive long multi-tool turns.
 export const DEFAULT_CHAT_MODEL = resolveDefaultChatModel()
-
-export const CHAT_MODELS: ChatModel[] = [
-  {
-    id: BUILTIN_DEFAULT_CHAT_MODEL,
-    name: "GPT-5.6 Sol",
-    vendor: "openai",
-    hint: "Flagship reasoning · default",
-  },
-  {
-    id: "claude-sonnet-5",
-    name: "Claude Sonnet 5",
-    vendor: "anthropic",
-    hint: "Strong writing & analysis",
-  },
-  {
-    id: "gemini-3-flash",
-    name: "Gemini 3 Flash",
-    vendor: "google",
-    hint: "Fast & cheap",
-  },
-  {
-    id: "gpt-5.6-luna",
-    name: "GPT-5.6 Luna",
-    vendor: "openai",
-    hint: "Routine reasoning",
-  },
-  {
-    id: "deepseek-v4-pro",
-    name: "DeepSeek V4 Pro",
-    vendor: "deepseek",
-    hint: "Deep research",
-  },
-  {
-    id: "claude-opus-5",
-    name: "Claude Opus 5",
-    vendor: "anthropic",
-    hint: "Heavy lifting",
-  },
-  {
-    id: "glm-5.2",
-    name: "GLM 5.2",
-    vendor: "zai",
-    hint: "Versatile all-rounder",
-  },
-  {
-    id: "qwen3.8-max",
-    name: "Qwen 3.8 Max",
-    vendor: "alibaba",
-    hint: "Long context",
-  },
-]
-
-// Bare model id -> provider slug, for ids the gateway serves without a
-// provider/ prefix. Everything CLIProxyAPI exposes maps to a real vendor.
-export const MODEL_VENDOR: Record<string, string> = {
-  // OpenAI
-  "gpt-5.6-sol": "openai",
-  "gpt-5.6-luna": "openai",
-  "gpt-5.6-terra": "openai",
-  "gpt-5.5": "openai",
-  "gpt-5.4": "openai",
-  "gpt-5.4-mini": "openai",
-  "gpt-image-2": "openai",
-  "gpt-image-1.5": "openai",
-  // Anthropic
-  "claude-sonnet-5": "anthropic",
-  "claude-sonnet-4-6": "anthropic",
-  "claude-opus-5": "anthropic",
-  "claude-opus-4-8": "anthropic",
-  "claude-opus-4-6-thinking": "anthropic",
-  "claude-haiku-4-5-20251001": "anthropic",
-  "claude-fable-5": "anthropic",
-  // Google
-  "gemini-3-flash": "google",
-  "gemini-3-flash-agent": "google",
-  "gemini-3.1-flash-lite": "google",
-  "gemini-3.1-flash-image": "google",
-  "gemini-3.6-flash-high": "google",
-  "gemini-pro-agent": "google",
-  // DeepSeek
-  "deepseek-v4-flash": "deepseek",
-  "deepseek-v4-pro": "deepseek",
-  // xAI
-  "grok-4.5": "xai",
-  "grok-composer-2.5-fast": "xai",
-  "grok-imagine-image": "xai",
-  "grok-imagine-image-quality": "xai",
-  "grok-imagine-video": "xai",
-  "grok-imagine-video-1.5": "xai",
-  "grok-imagine-video-1.5-preview": "xai",
-  // Z.ai / Alibaba / Moonshot
-  "glm-5.2": "zai",
-  "qwen3.7-plus": "alibaba",
-  "qwen3.8-max": "alibaba",
-  "kimi-k3": "moonshotai",
-}
-
-const VENDOR_SLUGS = new Set([
-  "xai",
-  "anthropic",
-  "openai",
-  "google",
-  "meta",
-  "mistral",
-  "deepseek",
-  "alibaba",
-  "moonshotai",
-  "cohere",
-  "nvidia",
-  "amazon",
-  "minimax",
-  "bytedance",
-  "xiaomi",
-  "zai",
-  "tencent",
-  "stepfun",
-  "kwaipilot",
-])
 
 /**
  * Provider display names + logos, self-hosted under /public/providers (pulled
@@ -232,34 +107,13 @@ export const PROVIDERS: Record<
     icon: "/providers/thinkingmachines.png",
   },
   interfaze: { name: "Interfaze", icon: "/providers/interfaze.svg" },
-  // The gateway itself, when an id doesn't map to a branded vendor.
-  cpa: { name: "CLIProxyAPI" },
 }
 
-/** Featured providers listed first in the picker; the rest follow alphabetically. */
-export const PROVIDER_ORDER = [
-  "openai",
-  "anthropic",
-  "google",
-  "deepseek",
-  "xai",
-  "zai",
-  "alibaba",
-  "moonshotai",
-]
-
-/** Provider slug of a model id: `openai/gpt-5` → `openai`, `gpt-5.6-sol` → `openai`. */
+/** Vendor slug of a model id: `openai/gpt-5` → `openai`; bare ids → `unknown`. */
 export function providerOf(id: string): string {
-  if (MODEL_VENDOR[id]) return MODEL_VENDOR[id]
-  const rawHead = id.split("/")[0] ?? id
-  const head = rawHead.toLowerCase()
-  if (VENDOR_SLUGS.has(head)) return head
-  if (MODEL_VENDOR[head]) return MODEL_VENDOR[head]
-  // OpenRouter-style provider/model ids carry their vendor in the prefix.
-  // An unknown prefix is a vendor name, not the gateway itself. Bare ids
-  // without a prefix keep the legacy gateway fallback.
-  if (rawHead !== id) return head
-  return MODEL_VENDOR[rawHead] ?? "cpa"
+  const slash = id.indexOf("/")
+  if (slash > 0) return id.slice(0, slash).toLowerCase()
+  return "unknown"
 }
 
 export function providerLabel(provider: string): string {
@@ -270,13 +124,12 @@ export function providerLabel(provider: string): string {
 }
 
 /**
- * Human name for a model id when no catalog name is available (featured lookup,
- * then a prettified id tail). Prefer the catalog `name` wherever we have it.
+ * Human name for a model id when no catalog name is available: the prettified
+ * id tail (`openai/gpt-5` → `Gpt 5`). Prefer the catalog `name` wherever we
+ * have it.
  */
 export function shortModelName(id: string): string {
-  const featured = CHAT_MODELS.find((m) => m.id === id)?.name
-  if (featured) return featured
-  const tail = id.split("/")[1] || id
+  const tail = id.split("/").at(-1) ?? id
   return tail
     .split("-")
     .map((w) =>

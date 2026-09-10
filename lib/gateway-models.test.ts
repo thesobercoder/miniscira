@@ -16,7 +16,18 @@ const CATALOG = {
       supported_parameters: ["tools", "tool_choice", "response_format"],
     },
     { id: "gpt-5.6-sol", name: "Sol", owned_by: "openai" },
-    { id: "openai/gpt-image-1", name: "Image 1" },
+    {
+      id: "openai/gpt-image-1",
+      name: "Image 1",
+      architecture: { input_modalities: ["text"], output_modalities: ["image"] },
+    },
+    { id: "mystery-box", name: "Mystery" },
+    // owned_by wins over the slash prefix when both are present.
+    { id: "other-vendor/some-model", name: "Some", owned_by: "  OpenAI " },
+    // Unknown slash prefix yields its own vendor.
+    { id: "mystery-shop/mystery-model", name: "Mystery" },
+    // Bare ids without owned_by yield unknown.
+    { id: "bare-unknown-model", name: "Bare" },
   ],
 }
 
@@ -40,7 +51,20 @@ describe("OpenRouter catalog mapping", () => {
     expect(byId.get("nex-agi/nex-n2.5-pro:free")?.context).toBe(262144)
     expect(byId.get("nex-agi/nex-n2.5-pro:free")?.provider).toBe("nex-agi")
     expect(byId.get("gpt-5.6-sol")?.context).toBe(200_000)
+    expect(byId.get("gpt-5.6-sol")?.provider).toBe("openai")
     expect(byId.has("openai/gpt-image-1")).toBe(false)
+    expect(byId.get("mystery-box")?.provider).toBe("unknown")
+  })
+
+  test("vendor derivation: owned_by wins, unknown prefix is its own vendor, bare ids are unknown", async () => {
+    const models = await fetchGatewayModels("test-key")
+    const byId = new Map(models.map((m) => [m.id, m]))
+
+    expect(byId.get("other-vendor/some-model")?.provider).toBe("openai")
+    expect(byId.get("mystery-shop/mystery-model")?.provider).toBe(
+      "mystery-shop"
+    )
+    expect(byId.get("bare-unknown-model")?.provider).toBe("unknown")
   })
 
   test("contextWindowFor returns the verified limit", async () => {
