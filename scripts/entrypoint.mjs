@@ -273,6 +273,17 @@ if (migrateCode !== 0) {
 }
 log("migrations applied (idempotent)")
 
+// Search provider names only — never keys, URLs, or query bodies. Each tool
+// turns itself on from its own key; chat works with none set.
+const searchProviders = [
+  process.env.FIRECRAWL_API_KEY?.trim() || process.env.FIRECRAWL_API_URL?.trim()
+    ? "firecrawl"
+    : null,
+  process.env.XAI_API_KEY?.trim() ? "xai" : null,
+  process.env.EXA_API_KEY?.trim() ? "exa" : null,
+].filter(Boolean)
+log(`Search providers: ${searchProviders.join(", ") || "none"}`)
+
 log(`starting eve (port ${evePort}) and next (port ${port}) under supervision`)
 const code = await supervise([
   ["node", "node_modules/eve/bin/eve.js", "start", "--port", evePort],

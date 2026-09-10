@@ -1,20 +1,26 @@
 import { defineTool } from "eve/tools"
 import { z } from "zod"
+
+import {
+  FIRECRAWL_NOT_CONFIGURED,
+  firecrawlConfig,
+  firecrawlSearch,
+} from "../../lib/firecrawl-request"
 import { redditQuery } from "../../lib/reddit-search"
 
-type SearxResult = {
-  url?: string
+type FirecrawlWebResult = {
   title?: string
-  content?: string
-  publishedDate?: string
-  engine?: string
-  engines?: string[]
+  description?: string
+  url: string
+  markdown?: string
 }
 
-// The model sees this tool as `reddit_search`, from the filename.
+// Reddit search runs on the same Firecrawl key as general search — no second
+// search service. Each query is scoped with `site:reddit.com` (redditQuery)
+// and sent to the shared Firecrawl `/v2/search` endpoint.
 export default defineTool({
   description:
-    "Search public Reddit discussions through the configured SearXNG instance. Great for opinions, lived experiences, and community consensus.",
+    "Search public Reddit discussions via Firecrawl. Great for opinions, lived experiences, and community consensus.",
   inputSchema: z.object({
     queries: z
       .array(z.string().max(200))
@@ -32,13 +38,13 @@ export default defineTool({
       .describe("Optional per-query time range."),
   }),
   async execute({ queries, maxResults, timeRange }) {
-    const baseUrl = process.env.SEARXNG_URL?.trim()
-    if (!baseUrl)
-      return {
-        queries,
-        error: "SEARXNG_URL is not configured.",
-        results: [],
-      }
+    const config = firecrawlConfig()
+    if (!config.configured)
+      return { queries, error: FIRECRAWL_NOT_CONFIGURED, results: [] }
+
+    // Firecrawl date filter values; keeps the per-query timeRange input shape.
+    const tbsFor = (range: "day" | "week" | "month" | "year") =>
+      ({ day: "qdr:d", week: "qdr:w", month: "qdr:m", year: "qdr:y" })[range]
 
     const perQuery = await Promise.all(
       queries.map(async (query, i) => {
@@ -46,23 +52,22 @@ export default defineTool({
           Math.max(maxResults?.[i] ?? maxResults?.[0] ?? 20, 1),
           25
         )
-        const params = new URLSearchParams({
-          q: redditQuery(query),
-          format: "json",
-          language: "en",
-          safesearch: "0",
-        })
         const range = timeRange?.[i] ?? timeRange?.[0]
-        if (range) params.set("time_range", range)
-
         try {
-          const res = await fetch(
-            `${baseUrl.replace(/\/$/, "")}/search?${params.toString()}`,
-            { headers: { accept: "application/json" } }
+          const res = await firecrawlSearch(
+            {
+              query: redditQuery(query),
+              limit: count,
+              ...(range ? { tbs: tbsFor(range) } : {}),
+              scrapeOptions: { formats: ["markdown"], onlyMainContent: true },
+            },
+            config
           )
           if (!res.ok) return []
-          const data = (await res.json()) as { results?: SearxResult[] }
-          return (data.results ?? [])
+          const data = (await res.json()) as {
+            data?: { web?: FirecrawlWebResult[] }
+          }
+          return (data.data?.web ?? [])
             .filter(
               (result) =>
                 typeof result.url === "string" &&
@@ -75,16 +80,17 @@ export default defineTool({
               return {
                 url: result.url ?? "",
                 title: result.title ?? result.url ?? "",
-                text: result.content ?? "",
+                text:
+                  typeof result.markdown === "string"
+                    ? result.markdown.slice(0, 1500)
+                    : (result.description ?? ""),
                 subreddit,
-                publishedDate: result.publishedDate,
-                engines:
-                  result.engines ??
-                  (result.engine ? [result.engine] : undefined),
               }
             })
-        } catch (err) {
-          console.error(`reddit_search failed for "${query}"`, err)
+        } catch {
+          // Log a fixed string only: queries are user content and fetch
+          // errors can carry URLs, so neither is logged.
+          console.error("reddit_search provider failure")
           return []
         }
       })

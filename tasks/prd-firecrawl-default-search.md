@@ -78,15 +78,15 @@ Make Firecrawl the default web search provider. Each search tool turns itself on
 
 ## Acceptance criteria
 
-- [ ] General search uses Firecrawl when `FIRECRAWL_API_KEY` or `FIRECRAWL_API_URL` is set.
-- [ ] Reddit search runs on the Firecrawl key and `SEARXNG_URL` is fully removed.
-- [ ] Exa remains usable as a fallback when only `EXA_API_KEY` is set.
-- [ ] X search works when `XAI_API_KEY` is set and reports clearly when it is not.
-- [ ] Missing search keys produce a message that names the missing variable and the turn continues.
-- [ ] `bun run typecheck`, `bun run lint`, and `bun test` pass, including the new Reddit and Exa tests.
-- [ ] `python3 scripts/check-task-docs.py` passes.
+- [x] General search uses Firecrawl when `FIRECRAWL_API_KEY` or `FIRECRAWL_API_URL` is set.
+- [x] Reddit search runs on the Firecrawl key and `SEARXNG_URL` is fully removed.
+- [x] Exa remains usable as a fallback when only `EXA_API_KEY` is set.
+- [x] X search works when `XAI_API_KEY` is set and reports clearly when it is not.
+- [x] Missing search keys produce a message that names the missing variable and the turn continues.
+- [x] `bun run typecheck`, `bun run lint`, and `bun test` pass, including the new Reddit and Exa tests.
+- [x] `python3 scripts/check-task-docs.py` passes.
 - [ ] One research turn on the Railway deployment uses Firecrawl and returns sources.
-- [ ] No provider key appears in logs, responses, diffs, or docs.
+- [x] No provider key appears in logs, responses, diffs, or docs.
 - [ ] The four eval fixtures behave as stated and the evidence is recorded.
 
 ## Deployment

@@ -1,6 +1,12 @@
 import { defineTool } from "eve/tools"
 import { z } from "zod"
 
+import {
+  FIRECRAWL_NOT_CONFIGURED,
+  firecrawlConfig,
+  firecrawlSearch,
+} from "../../lib/firecrawl-request"
+
 type FirecrawlWebResult = {
   title?: string
   description?: string
@@ -11,7 +17,7 @@ type FirecrawlWebResult = {
 // The model sees this tool as `firecrawl_search`, from the filename.
 export default defineTool({
   description:
-    "Web search that also scrapes each result's full page content (Markdown) via Firecrawl — search and read in one step. Useful when you need the actual page text, not just snippets. Supports query operators like `site:`, `filetype:pdf`, and `intitle:`.",
+    "Default general web search via Firecrawl — search and read in one step: it also scrapes each result's full page content (Markdown). Reach for it first for broad keyword queries. Supports query operators like `site:`, `filetype:pdf`, and `intitle:`.",
   inputSchema: z.object({
     query: z
       .string()
@@ -28,35 +34,20 @@ export default defineTool({
       .describe("Max number of results to return (default 6)."),
   }),
   async execute({ query, limit = 6 }) {
-    const key = process.env.FIRECRAWL_API_KEY
-    const configuredBase = process.env.FIRECRAWL_API_URL?.trim()
-    if (!key && !configuredBase)
-      return {
-        query,
-        error:
-          "Firecrawl is not configured. Set FIRECRAWL_API_KEY for Firecrawl Cloud or FIRECRAWL_API_URL for a self-hosted server.",
-        results: [],
-      }
+    const config = firecrawlConfig()
+    if (!config.configured)
+      return { query, error: FIRECRAWL_NOT_CONFIGURED, results: [] }
 
     let res: Response
     try {
-      const base = (configuredBase ?? "https://api.firecrawl.dev").replace(
-        /\/+$/,
-        ""
-      )
-      const headers: Record<string, string> = {
-        "content-type": "application/json",
-      }
-      if (key) headers.authorization = `Bearer ${key}`
-      res = await fetch(`${base}/v2/search`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
+      res = await firecrawlSearch(
+        {
           query,
           limit,
           scrapeOptions: { formats: ["markdown"], onlyMainContent: true },
-        }),
-      })
+        },
+        config
+      )
     } catch (err) {
       return {
         query,
