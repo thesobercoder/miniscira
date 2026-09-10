@@ -31,5 +31,5 @@ This table keeps every product idea visible through its full lifecycle. Follow [
 | <a id="idea-thread-search-by-date"></a>Search previous threads by date | Done | [PRD](../tasks/prd-thread-search-by-date.md) | Restrict previous-thread search to a requested date range. |
 | <a id="idea-railway-hosting"></a>Railway hosting with OpenRouter default | Done | [PRD](../tasks/prd-railway-hosting.md) | Deploy on Railway with OpenRouter as the default provider and prove long threads. |
 | <a id="idea-invite-only-signup"></a>Invite-only signup | To do | [PRD](../tasks/prd-invite-only-signup.md) | Disable public signup and allow new accounts only through invite links. |
-| <a id="idea-firecrawl-default-search"></a>Firecrawl default search | To do | [PRD](../tasks/prd-firecrawl-default-search.md) | Use Firecrawl as the default web search provider across the project. |
+| <a id="idea-firecrawl-default-search"></a>Firecrawl default search | In progress | [PRD](../tasks/prd-firecrawl-default-search.md) | Use Firecrawl as the default web search provider across the project. |
 | <a id="idea-railway-only-deployment"></a>Railway-only deployment | In progress | [PRD](../tasks/prd-railway-only-deployment.md) | Remove Umbrel and other non-Railway deployment targets now that Railway is final. |
