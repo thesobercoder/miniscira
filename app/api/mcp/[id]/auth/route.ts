@@ -50,8 +50,6 @@ export const DELETE = authedWithParams<Params>(
         oauthTokens: null,
         oauthVerifier: null,
         oauthState: null,
-        oauthAttemptCallbackUrl: null,
-        oauthAttemptStartedAt: null,
       })
       .where(eq(mcpServer.id, id))
     return NextResponse.json({ ok: true })
