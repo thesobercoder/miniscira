@@ -96,21 +96,16 @@ export function decorateCatalog(models: CatalogModel[]): DecoratedModel[] {
   return models.filter((m) => !meta[m.id]?.hidden).map(decorate)
 }
 
-/** Order models: metadata `order` first (ascending), then provider rank. */
+/** Order models: metadata `order` first (ascending), then vendor A–Z. */
 export function orderWithMetadata(
-  models: DecoratedModel[],
-  rank: (provider: string) => number
+  models: DecoratedModel[]
 ): DecoratedModel[] {
   const meta = loadModelMetadata()
   return [...models].sort((a, b) => {
     const oa = meta[a.id]?.order ?? Number.MAX_SAFE_INTEGER
     const ob = meta[b.id]?.order ?? Number.MAX_SAFE_INTEGER
     if (oa !== ob) return oa - ob
-    return (
-      rank(a.provider) - rank(b.provider) ||
-      a.provider.localeCompare(b.provider) ||
-      b.released - a.released
-    )
+    return a.provider.localeCompare(b.provider) || b.released - a.released
   })
 }
 

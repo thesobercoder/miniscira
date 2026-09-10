@@ -8,7 +8,7 @@ import {
 
 describe("MCP URL policy", () => {
   test("accepts HTTP and HTTPS MCP endpoints on self-hosted names", () => {
-    expect(validateMcpServerUrl("http://umbrel.local:9001/mcp").ok).toBe(true)
+    expect(validateMcpServerUrl("http://homelab.local:9001/mcp").ok).toBe(true)
     expect(validateMcpServerUrl("http://192.168.1.20:9001/mcp").ok).toBe(true)
     expect(validateMcpServerUrl("https://mcp.example.com/mcp").ok).toBe(true)
   })
@@ -31,7 +31,7 @@ describe("MCP URL policy", () => {
     expect(validateMcpCallbackUrl("http://localhost:33418/callback").ok).toBe(
       true
     )
-    expect(validateMcpCallbackUrl("http://umbrel.local:8325/callback").ok).toBe(
+    expect(validateMcpCallbackUrl("http://homelab.local:8325/callback").ok).toBe(
       true
     )
     expect(validateMcpCallbackUrl("https://mini.example/callback").ok).toBe(

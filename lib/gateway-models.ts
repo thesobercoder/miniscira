@@ -7,7 +7,7 @@
 
 import { z } from "zod"
 
-import { MODEL_VENDOR, providerOf } from "./models"
+import { providerOf } from "./models"
 
 export type GatewayModel = {
   id: string
@@ -55,30 +55,21 @@ export function gatewayBaseUrl(): string {
   return url.toString().replace(/\/+$/, "")
 }
 
-// Models the gateway exposes that are not chat models (image/video generators)
-// and must never appear in the chat picker. Covers bare CLIProxyAPI ids and
-// OpenRouter-style provider/model ids with image/video suffixes.
-const NON_CHAT_MODELS = new Set([
-  "grok-imagine-image",
-  "grok-imagine-image-quality",
-  "grok-imagine-video",
-  "grok-imagine-video-1.5",
-  "grok-imagine-video-1.5-preview",
-  "gemini-3.1-flash-image",
-  "gpt-image-2",
-  "gpt-image-1.5",
-])
-
-// OpenRouter image/video model suffixes (e.g. "openai/gpt-image-1:free",
-// "google/imagen-4.0"). Applied to the tail after an optional provider/
-// prefix; chat models never carry these segments.
-const NON_CHAT_ID_RE = /(^|[/:_-])(image|video|imagen|dall-e)($|[/:_.-])/i
-
-function isNonChatModel(id: string): boolean {
-  if (NON_CHAT_MODELS.has(id)) return true
-  const tail = id.split("/")[1] ?? id
-  if (NON_CHAT_MODELS.has(tail)) return true
-  return NON_CHAT_ID_RE.test(tail)
+// Chat eligibility derives from catalog modalities, not id lists. A model
+// stays in the picker when its declared modalities allow a text
+// conversation: text output is required, and text input is required. Entries
+// without modality data stay (generic gateways omit them) since the catalog
+// cannot prove them unusable.
+function isNonChatModel(entry: {
+  architecture?: { input_modalities?: string[]; output_modalities?: string[] }
+}): boolean {
+  const input = entry.architecture?.input_modalities
+  const output = entry.architecture?.output_modalities
+  if (output && !output.map((m) => m.toLowerCase()).includes("text"))
+    return true
+  if (input && !input.map((m) => m.toLowerCase()).includes("text"))
+    return true
+  return false
 }
 
 // The gateway does not advertise context windows, so every model gets the
@@ -149,11 +140,16 @@ export async function fetchGatewayModels(
     const models = catalog.data
       .map((entry) => RawModelSchema.safeParse(entry))
       .flatMap((parsed) => (parsed.success ? [parsed.data] : []))
-      .filter((m) => !isNonChatModel(m.id))
-      .map((m) => ({
-        id: m.id,
-        name: m.name ?? m.id.split("/")[1] ?? m.id,
-        provider: MODEL_VENDOR[m.id] ?? m.owned_by ?? providerOf(m.id),
+      .filter((m) => !isNonChatModel(m))
+      .map((m) => {
+        // The catalog entry is the only model record: vendor derives from
+        // owned_by (normalized) else the slash-prefix head, and the display
+        // name derives from the catalog name else the id tail.
+        const owned = m.owned_by?.trim().toLowerCase()
+        return {
+          id: m.id,
+          name: m.name || m.id.split("/").at(-1) || m.id,
+          provider: owned || providerOf(m.id),
         context:
           m.context_length && m.context_length > 0
             ? m.context_length
@@ -163,7 +159,8 @@ export async function fetchGatewayModels(
         vision: true,
         fileInput: true,
         released: m.created ?? 0,
-      }))
+        }
+      })
     if (models.length > 0) cache = { at: Date.now(), models }
     return models
   } catch (err) {

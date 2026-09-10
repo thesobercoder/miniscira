@@ -27,7 +27,7 @@ describe("eveClientOrigin", () => {
   test("uses the local Eve production port when self-hosted", () => {
     expect(
       eveClientOrigin({
-        appOrigin: "http://umbrel.local:8325",
+        appOrigin: "http://homelab.local:8325",
         nodeEnv: "production",
         productionOrigin: undefined,
         productionPort: undefined,
@@ -36,7 +36,7 @@ describe("eveClientOrigin", () => {
     ).toBe("http://127.0.0.1:4274")
     expect(
       eveClientOrigin({
-        appOrigin: "http://umbrel.local:8325",
+        appOrigin: "http://homelab.local:8325",
         nodeEnv: "production",
         productionOrigin: undefined,
         productionPort: "5000",
@@ -61,7 +61,7 @@ describe("eveClientOrigin", () => {
     for (const productionPort of ["abc", "4274x", "0", "-1", "70000"]) {
       expect(() =>
         eveClientOrigin({
-          appOrigin: "http://umbrel.local:8325",
+          appOrigin: "http://homelab.local:8325",
           nodeEnv: "production",
           productionOrigin: undefined,
           productionPort,

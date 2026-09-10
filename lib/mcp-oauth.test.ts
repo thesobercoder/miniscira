@@ -34,9 +34,9 @@ function row(overrides: Partial<McpServer> = {}): McpServer {
 
 describe("MCP OAuth callback selection", () => {
   test("uses the deployment callback by default", () => {
-    process.env.APP_URL = "http://umbrel.local:8325"
+    process.env.APP_URL = "http://homelab.local:8325"
     expect(oauthRedirectUrl(row())).toBe(
-      "http://umbrel.local:8325/api/mcp/oauth/callback"
+      "http://homelab.local:8325/api/mcp/oauth/callback"
     )
   })
 

@@ -6,8 +6,8 @@ import { db } from "@/lib/db"
 export const dynamic = "force-dynamic"
 
 /**
- * Readiness/liveness endpoint for orchestration (docker-compose healthcheck,
- * Portainer, K8s probes). Returns 200 only when the app is serving AND the
+ * Readiness/liveness endpoint for orchestration (Docker Compose healthcheck,
+ * Railway, K8s probes). Returns 200 only when the app is serving AND the
  * database answers; 503 otherwise.
  */
 export async function GET() {
