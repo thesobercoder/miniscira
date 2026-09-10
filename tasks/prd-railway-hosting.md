@@ -133,13 +133,13 @@ Current state blocks this goal. No `railway.json` or `railway.toml` exists. No c
 - [x] Ordinary chat streams on the shared OpenRouter key with no per-user key.
 - [ ] Compaction timing follows the selected OpenRouter model's verified context limit.
 - [ ] A long thread preserves early, middle, and recent facts across two compactions.
-- [ ] Facts survive reload, restart, branch, retry, edit, and replacement-session rebuild.
-- [ ] Uploads survive a redeploy.
-- [ ] Database rows survive a redeploy.
-- [ ] Repeat migration runs change nothing.
-- [ ] Sandbox calls fail clearly and do not hang the turn.
-- [ ] A template deploy reaches a working app by setting variables only.
-- [ ] No secret appears in code, logs, diffs, or docs.
+- [x] Facts survive reload, restart, branch, retry, edit, and replacement-session rebuild.
+- [x] Uploads survive a redeploy.
+- [x] Database rows survive a redeploy.
+- [x] Repeat migration runs change nothing.
+- [x] Sandbox calls fail clearly and do not hang the turn.
+- [x] A template deploy reaches a working app by setting variables only.
+- [x] No secret appears in code, logs, diffs, or docs.
 
 ## Deployment
 
