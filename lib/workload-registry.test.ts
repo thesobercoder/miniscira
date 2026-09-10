@@ -98,14 +98,32 @@ describe("requires() predicates", () => {
     ).toEqual(["input:image", "streaming"])
   })
 
-  test("research adds tools on top of chat", () => {
-    expect(WORKLOADS.research_root.requires(caps())).toEqual([])
+  test("research root needs text, streaming, and tools, but no image input", () => {
+    expect(
+      WORKLOADS.research_root.requires(caps({ input: new Set(["text"]) }))
+    ).toEqual([])
     expect(WORKLOADS.research_root.requires(caps({ tools: false }))).toEqual([
       "tools",
     ])
-    expect(WORKLOADS.researcher.requires(caps({ tools: false }))).toEqual([
-      "tools",
-    ])
+    expect(
+      WORKLOADS.research_root.requires(caps({ streaming: false }))
+    ).toEqual(["streaming"])
+  })
+
+  test("researcher and lookout need text plus tools only", () => {
+    const textOnly = caps({ input: new Set(["text"]), streaming: false })
+    expect(WORKLOADS.researcher.requires(textOnly)).toEqual([])
+    expect(WORKLOADS.lookout.requires(textOnly)).toEqual([])
+    expect(
+      WORKLOADS.researcher.requires(
+        caps({ input: new Set(["text"]), streaming: false, tools: false })
+      )
+    ).toEqual(["tools"])
+    expect(
+      WORKLOADS.lookout.requires(
+        caps({ input: new Set(["text"]), streaming: false, tools: false })
+      )
+    ).toEqual(["tools"])
   })
 
   test("title and memory need structured output", () => {
@@ -142,5 +160,19 @@ describe("requires() predicates", () => {
       "video-generation",
       "output:video",
     ])
+    expect(
+      WORKLOADS.image_generation.requires(
+        caps({ input: new Set(["image"]), output: new Set(["image"]) })
+      )
+    ).toEqual(["input:text", "image-generation"])
+    expect(
+      WORKLOADS.video_generation.requires(
+        caps({
+          input: new Set(["image"]),
+          output: new Set(["video"]),
+          videoGeneration: true,
+        })
+      )
+    ).toEqual(["input:text"])
   })
 })

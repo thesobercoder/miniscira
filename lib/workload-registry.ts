@@ -48,8 +48,19 @@ function chatBase(caps: ModelCapabilities): string[] {
   return missing
 }
 
-function agentCaps(caps: ModelCapabilities): string[] {
-  const missing = chatBase(caps)
+function researchRootCaps(caps: ModelCapabilities): string[] {
+  const missing: string[] = []
+  textInOut(caps, missing)
+  if (!caps.streaming) missing.push("streaming")
+  if (!caps.tools) missing.push("tools")
+  return missing
+}
+
+// Researcher subagents and Lookouts need text plus tools. The PRD does not
+// require streaming or image input for these workloads.
+function toolCaps(caps: ModelCapabilities): string[] {
+  const missing: string[] = []
+  textInOut(caps, missing)
   if (!caps.tools) missing.push("tools")
   return missing
 }
@@ -81,7 +92,7 @@ export const WORKLOADS: Record<WorkloadId, WorkloadEntry> = {
   },
   research_root: {
     id: "research_root",
-    requires: agentCaps,
+    requires: researchRootCaps,
     userOverridable: true,
     overrideScopes: BOTH_SCOPES,
     fallbackAllowed: false,
@@ -89,7 +100,7 @@ export const WORKLOADS: Record<WorkloadId, WorkloadEntry> = {
   },
   researcher: {
     id: "researcher",
-    requires: agentCaps,
+    requires: toolCaps,
     userOverridable: true,
     overrideScopes: BOTH_SCOPES,
     fallbackAllowed: false,
@@ -97,7 +108,7 @@ export const WORKLOADS: Record<WorkloadId, WorkloadEntry> = {
   },
   lookout: {
     id: "lookout",
-    requires: chatBase,
+    requires: toolCaps,
     userOverridable: true,
     overrideScopes: BOTH_SCOPES,
     fallbackAllowed: true,
@@ -107,6 +118,7 @@ export const WORKLOADS: Record<WorkloadId, WorkloadEntry> = {
     id: "image_generation",
     requires: (caps) => {
       const missing: string[] = []
+      if (!caps.input.has("text")) missing.push("input:text")
       if (!caps.imageGeneration) missing.push("image-generation")
       if (!caps.output.has("image")) missing.push("output:image")
       return missing
@@ -120,6 +132,7 @@ export const WORKLOADS: Record<WorkloadId, WorkloadEntry> = {
     id: "image_editing",
     requires: (caps) => {
       const missing: string[] = []
+      if (!caps.input.has("text")) missing.push("input:text")
       if (!caps.imageEditing) missing.push("image-editing")
       if (!caps.input.has("image")) missing.push("input:image")
       if (!caps.output.has("image")) missing.push("output:image")
@@ -134,6 +147,7 @@ export const WORKLOADS: Record<WorkloadId, WorkloadEntry> = {
     id: "video_generation",
     requires: (caps) => {
       const missing: string[] = []
+      if (!caps.input.has("text")) missing.push("input:text")
       if (!caps.videoGeneration) missing.push("video-generation")
       if (!caps.output.has("video")) missing.push("output:video")
       return missing
