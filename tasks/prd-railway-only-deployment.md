@@ -13,7 +13,8 @@ Make Railway the only deployment target. Remove Umbrel, Portainer, Docker-socket
 
 - As an operator, I find one deployment guide and it covers Railway.
 - As a maintainer, I change one entrypoint and one health check without checking three platforms.
-- As a user, I see no behavior change. Chat, uploads, and research keep working.
+- As a user, I keep automatic MCP OAuth. Manual callback entry goes away.
+- As a user, I see no other behavior change. Chat, uploads, and research keep working.
 
 ## Scope
 
@@ -25,10 +26,11 @@ Make Railway the only deployment target. Remove Umbrel, Portainer, Docker-socket
 6. Remove hardcoded model tables from `lib/models.ts`. The live gateway catalog is the only source for vendors, names, modalities, and context windows.
 7. Apply the slash rule everywhere: a `provider/model` id takes the vendor from the part before the slash and the display tail from the part after it. Bare ids without a slash resolve through catalog `owned_by` and fall back to the id itself.
 8. Group the model picker automatically by the derived vendor. No maintained vendor list and no pinned provider order.
+9. Remove the per-MCP manual OAuth callback path that Umbrel needed. Keep one automatic HTTPS callback. This supersedes `tasks/prd-mcp-oauth-and-self-hosted-endpoints.md`. Delete manual callback mode, custom callback URLs, the pasted-URL completion endpoint, frozen attempt fields, callback validators, and the Advanced callback UI. Restore HTTPS-only MCP endpoints with a localhost exception for local development.
 
 ## Non-goals
 
-- No change to chat, models, auth, search, or Lookouts in this PRD.
+- No change to chat, models, search, or Lookouts in this PRD.
 - No change to the Eve `auth:` chain order in `agent/channels/eve.ts`.
 - No automatic migration of existing Umbrel data. A manual export and import note is enough.
 
@@ -41,6 +43,9 @@ Make Railway the only deployment target. Remove Umbrel, Portainer, Docker-socket
 5. No model id, vendor name, capability, or context window is maintained by hand in code. Every value resolves from the live catalog or the id itself.
 6. The picker shows every catalog chat model grouped under its derived vendor with no missing or gateway-labeled vendors.
 7. The default chat model resolves from `DEFAULT_CHAT_MODEL` and validates against the live catalog. A hardcoded id is only the last-resort fallback when the catalog is unreachable.
+8. MCP OAuth uses one automatic callback derived from the deployment URL. No per-server callback mode exists.
+9. MCP endpoint URLs accept only HTTPS, except `localhost` and `127.0.0.1` for local development. The HTTP trust warning goes away with HTTP support.
+10. Existing MCP OAuth clients and tokens keep working when the callback settings are unchanged. Stored manual callback values are cleared by migration.
 
 ## Technical requirements
 
@@ -53,6 +58,10 @@ Make Railway the only deployment target. Remove Umbrel, Portainer, Docker-socket
 - Filter non-chat models by catalog modalities and endpoint capability, not by id lists. Delete `NON_CHAT_MODELS` and suffix regexes in `lib/gateway-models.ts`.
 - Build picker groups at render time from derived vendors sorted alphabetically. Keep brand icons only as an optional display map with a generic glyph fallback.
 - Resolve the default from environment first and warn when the live catalog does not serve it. Keep one last-resort builtin id for catalog-outage boot only.
+- Delete the MCP manual callback columns through a committed migration: `oauth_callback_mode`, `oauth_callback_url`, `oauth_attempt_callback_url`, `oauth_attempt_started_at`. Normal startup must not modify the schema.
+- Delete `app/api/mcp/oauth/complete/route.ts`, `lib/mcp-url.ts`, and their tests. Simplify `lib/mcp-oauth.ts` to one `oauthRedirectUrl()` derived from the deployment URL.
+- Remove callback mode handling from `app/api/mcp/[id]/route.ts`, `app/api/mcp/[id]/auth/route.ts`, `app/api/mcp/oauth/callback/route.ts`, `app/api/mcp/route.ts`, `lib/mcp.ts`, and `components/mcp-view.tsx`. Keep client ID and secret handling under Advanced.
+- Restore HTTPS-only MCP endpoint validation with a `localhost` and `127.0.0.1` exception for local development.
 
 ### Test plan
 
@@ -62,10 +71,11 @@ Make Railway the only deployment target. Remove Umbrel, Portainer, Docker-socket
 - `python3 scripts/check-task-docs.py` passes.
 - Production build from the root `Dockerfile` passes.
 - `grep` for Umbrel, Portainer, Squid, and middleware names returns only historical notes.
+- `grep` for `oauthCallbackMode`, `oauthCallbackUrl`, `oauthAttemptCallbackUrl`, `mcp-url`, and `oauth/complete` returns no production code.
 
 ### Eval plan
 
-- Evals do not apply. This removes deployment targets only. It does not change agent behavior, prompts, tools, retrieval, memory, or model routing.
+- Evals do not apply. This removes deployment targets and the manual MCP OAuth path. It does not change agent behavior, prompts, tools, retrieval, memory, or model routing.
 
 ## Acceptance criteria
 
@@ -73,6 +83,10 @@ Make Railway the only deployment target. Remove Umbrel, Portainer, Docker-socket
 - [ ] Railway is the single documented deployment target.
 - [ ] No hardcoded model, vendor, capability, or context table remains in code.
 - [ ] The picker groups derived vendors automatically with no maintained list.
+- [ ] MCP OAuth has no manual callback mode, no custom callback URL, and no pasted-URL completion endpoint.
+- [ ] MCP OAuth starts and completes through the automatic deployment callback in a real browser.
+- [ ] MCP endpoint validation accepts HTTPS and localhost HTTP for development, and rejects all other HTTP URLs.
+- [ ] Existing MCP OAuth clients and tokens keep working after migration.
 - [ ] Typecheck, lint, unit, build, and docs checks pass.
 - [ ] The Railway deployment still passes health, chat, and migration checks.
 - [ ] A grep for removed component names finds only historical notes.

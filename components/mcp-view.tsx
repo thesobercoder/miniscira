@@ -59,9 +59,6 @@ type McpServerItem = {
   authorized: boolean
   hasOAuthClient: boolean
   oauthClientId: string | null
-  oauthCallbackMode: "automatic" | "manual"
-  oauthCallbackUrl: string | null
-  oauthPending: boolean
   offersOAuth: boolean
 }
 
@@ -76,12 +73,6 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
   const [configuringOAuth, setConfiguringOAuth] = useState<string | null>(null)
   const [oauthClientId, setOAuthClientId] = useState("")
   const [oauthClientSecret, setOAuthClientSecret] = useState("")
-  const [oauthCallbackMode, setOAuthCallbackMode] = useState<
-    "automatic" | "manual"
-  >("automatic")
-  const [oauthCallbackUrl, setOAuthCallbackUrl] = useState("")
-  const [manualCallbackUrl, setManualCallbackUrl] = useState("")
-  const [completingOAuth, setCompletingOAuth] = useState<string | null>(null)
   const [addTab, setAddTab] = useState<AddTab>("manual")
 
   const refreshServers = async () => {
@@ -124,17 +115,8 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
         toast.success(`${s.name}: already authorized`)
       } else if (json.url) {
         popup.location.href = json.url
-        if (s.oauthCallbackMode === "manual") {
-          setConfiguringOAuth(s.id)
-          setItems((prev) =>
-            prev.map((item) =>
-              item.id === s.id ? { ...item, oauthPending: true } : item
-            )
-          )
-        } else {
-          const poll = window.setInterval(() => void refreshServers(), 2000)
-          window.setTimeout(() => window.clearInterval(poll), 10 * 60 * 1000)
-        }
+        const poll = window.setInterval(() => void refreshServers(), 2000)
+        window.setTimeout(() => window.clearInterval(poll), 10 * 60 * 1000)
       } else {
         popup.close()
         toast.error(json.error ?? "Couldn't start authorization")
@@ -145,29 +127,6 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
       toast.error("Couldn't start authorization")
     } finally {
       setConnecting(null)
-    }
-  }
-
-  const completeManualOAuth = async (s: McpServerItem) => {
-    setCompletingOAuth(s.id)
-    try {
-      const res = await fetch("/api/mcp/oauth/complete", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ callbackUrl: manualCallbackUrl.trim() }),
-      })
-      const json = (await res.json().catch(() => ({}))) as { error?: string }
-      if (!res.ok) {
-        toast.error(json.error ?? "Couldn't complete OAuth")
-        return
-      }
-      setManualCallbackUrl("")
-      await refreshServers()
-      toast.success(`${s.name}: connected`)
-    } catch {
-      toast.error("Couldn't complete OAuth")
-    } finally {
-      setCompletingOAuth(null)
     }
   }
 
@@ -182,9 +141,6 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
           clientId && oauthClientSecret.trim()
             ? oauthClientSecret.trim()
             : undefined,
-        oauthCallbackMode,
-        oauthCallbackUrl:
-          oauthCallbackMode === "manual" ? oauthCallbackUrl.trim() : undefined,
       }),
     })
     const json = (await res.json().catch(() => ({}))) as {
@@ -199,8 +155,6 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
     setItems((prev) => prev.map((item) => (item.id === s.id ? updated : item)))
     setOAuthClientId("")
     setOAuthClientSecret("")
-    setOAuthCallbackMode(updated.oauthCallbackMode)
-    setOAuthCallbackUrl(updated.oauthCallbackUrl ?? "")
     setConfiguringOAuth(null)
     toast.success(`${s.name}: advanced settings saved`)
   }
@@ -210,9 +164,6 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
     setConfiguringOAuth(opening ? s.id : null)
     setOAuthClientId(opening ? (s.oauthClientId ?? "") : "")
     setOAuthClientSecret("")
-    setOAuthCallbackMode(opening ? s.oauthCallbackMode : "automatic")
-    setOAuthCallbackUrl(opening ? (s.oauthCallbackUrl ?? "") : "")
-    setManualCallbackUrl("")
   }
 
   const disconnect = async (s: McpServerItem) => {
@@ -317,9 +268,14 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
     setHeaderError(null)
   }
 
-  const insecureMcpUrl = (() => {
+  const rejectedMcpUrl = (() => {
     try {
-      return new URL(url).protocol === "http:"
+      const parsed = new URL(url)
+      return (
+        parsed.protocol === "http:" &&
+        parsed.hostname !== "localhost" &&
+        parsed.hostname !== "127.0.0.1"
+      )
     } catch {
       return false
     }
@@ -452,18 +408,18 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                   />
                 </div>
                 <div className="grid gap-1.5">
-                  <Label htmlFor="mcp-url">URL</Label>
+                  <Label htmlFor="mcp-server-url">URL</Label>
                   <Input
-                    id="mcp-url"
+                    id="mcp-server-url"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     placeholder="https://mcp.example.com/mcp"
                     className="font-mono text-sm"
                   />
-                  {insecureMcpUrl && (
+                  {rejectedMcpUrl && (
                     <p className="text-amber-700 text-xs dark:text-amber-400">
-                      This server uses unencrypted HTTP. Only connect on a
-                      network you trust.
+                      Only https:// URLs are allowed (http://localhost works
+                      for local development).
                     </p>
                   )}
                 </div>
@@ -711,55 +667,6 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
               />
               {configuringOAuth === s.id && (
                 <div className="grid w-full gap-3 border-t pt-3">
-                  <div className="grid gap-2">
-                    <Label>OAuth callback</Label>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={
-                          oauthCallbackMode === "automatic"
-                            ? "default"
-                            : "outline"
-                        }
-                        onClick={() => setOAuthCallbackMode("automatic")}
-                      >
-                        Automatic
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={
-                          oauthCallbackMode === "manual" ? "default" : "outline"
-                        }
-                        onClick={() => setOAuthCallbackMode("manual")}
-                      >
-                        Manual callback
-                      </Button>
-                    </div>
-                    {oauthCallbackMode === "manual" && (
-                      <div className="grid gap-1.5">
-                        <Label htmlFor={`mcp-callback-${s.id}`}>
-                          Registered callback URL
-                        </Label>
-                        <Input
-                          id={`mcp-callback-${s.id}`}
-                          value={oauthCallbackUrl}
-                          onChange={(event) =>
-                            setOAuthCallbackUrl(event.target.value)
-                          }
-                          placeholder="http://localhost:33418/api/mcp/callback"
-                          className="font-mono text-xs"
-                          autoComplete="off"
-                        />
-                        <p className="text-muted-foreground text-xs">
-                          Enter the exact callback URL registered or required by
-                          this provider. After approval, copy the failed
-                          callback URL from the new tab and paste it below.
-                        </p>
-                      </div>
-                    )}
-                  </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     <div className="grid gap-1.5">
                       <Label htmlFor={`mcp-client-id-${s.id}`}>Client ID</Label>
@@ -798,52 +705,10 @@ export function McpView({ initial }: { initial: McpServerItem[] }) {
                     before storing them.
                   </p>
                   <div>
-                    <Button
-                      disabled={
-                        oauthCallbackMode === "manual" &&
-                        !oauthCallbackUrl.trim()
-                      }
-                      onClick={() => saveAdvanced(s)}
-                    >
+                    <Button onClick={() => saveAdvanced(s)}>
                       Save advanced settings
                     </Button>
                   </div>
-                  {s.oauthCallbackMode === "manual" && s.oauthPending && (
-                    <div className="grid gap-2 rounded-lg border bg-muted/30 p-3">
-                      <div className="grid gap-1.5">
-                        <Label htmlFor={`mcp-complete-${s.id}`}>
-                          Complete OAuth connection
-                        </Label>
-                        <Input
-                          id={`mcp-complete-${s.id}`}
-                          value={manualCallbackUrl}
-                          onChange={(event) =>
-                            setManualCallbackUrl(event.target.value)
-                          }
-                          placeholder={`${s.oauthCallbackUrl ?? "http://localhost/callback"}?code=…&state=…`}
-                          className="font-mono text-xs"
-                          autoComplete="off"
-                        />
-                      </div>
-                      <p className="text-muted-foreground text-xs">
-                        Paste the complete URL from the authorization tab. It is
-                        used once and is not saved.
-                      </p>
-                      <div>
-                        <Button
-                          disabled={
-                            completingOAuth === s.id ||
-                            !manualCallbackUrl.trim()
-                          }
-                          onClick={() => completeManualOAuth(s)}
-                        >
-                          {completingOAuth === s.id
-                            ? "Completing…"
-                            : "Complete connection"}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </li>

@@ -7,7 +7,6 @@ import { mcpServer } from "@/lib/db/schema"
 import {
   clearOAuthAttempt,
   finishOAuth,
-  oauthAttemptIsActive,
   serverIdFromState,
 } from "@/lib/mcp-oauth"
 import { openMcpSecret } from "@/lib/mcp-secrets"
@@ -56,16 +55,6 @@ export async function GET(request: NextRequest) {
       "error",
       "This callback did not match the connection attempt."
     )
-  const expectedCallback = new URL("/api/mcp/oauth/callback", request.url)
-  if (
-    row.oauthCallbackMode !== "automatic" ||
-    !row.oauthAttemptCallbackUrl ||
-    row.oauthAttemptCallbackUrl !== expectedCallback.toString() ||
-    !oauthAttemptIsActive(row.oauthAttemptStartedAt)
-  ) {
-    await clearOAuthAttempt(row.id, true)
-    return callbackPage("error", "This connection attempt expired or changed.")
-  }
   if (oauthError) {
     await clearOAuthAttempt(row.id, true)
     return callbackPage("error", "Authorization was rejected.")
