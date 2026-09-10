@@ -125,12 +125,12 @@ Current state blocks this goal. No `railway.json` or `railway.toml` exists. No c
 
 ## Acceptance criteria
 
-- [ ] Railway builds the root `Dockerfile` without local patches.
-- [ ] The app listens on `PORT` and the Railway health check passes.
-- [ ] `GET /api/health` returns 200 on the Railway domain.
-- [ ] `GET /eve/v1/health` returns ready on the Railway domain.
-- [ ] The model catalog loads from OpenRouter.
-- [ ] Ordinary chat streams on the shared OpenRouter key with no per-user key.
+- [x] Railway builds the root `Dockerfile` without local patches.
+- [x] The app listens on `PORT` and the Railway health check passes.
+- [x] `GET /api/health` returns 200 on the Railway domain.
+- [x] `GET /eve/v1/health` returns ready on the Railway domain.
+- [x] The model catalog loads from OpenRouter.
+- [x] Ordinary chat streams on the shared OpenRouter key with no per-user key.
 - [ ] Compaction timing follows the selected OpenRouter model's verified context limit.
 - [ ] A long thread preserves early, middle, and recent facts across two compactions.
 - [ ] Facts survive reload, restart, branch, retry, edit, and replacement-session rebuild.
