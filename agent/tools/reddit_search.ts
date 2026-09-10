@@ -1,4 +1,4 @@
-import { defineTool } from "eve/tools"
+import { defineDynamic, defineTool } from "eve/tools"
 import { z } from "zod"
 
 import {
@@ -8,17 +8,7 @@ import {
 } from "../../lib/firecrawl-request"
 import { redditQuery } from "../../lib/reddit-search"
 
-type FirecrawlWebResult = {
-  title?: string
-  description?: string
-  url: string
-  markdown?: string
-}
-
-// Reddit search runs on the same Firecrawl key as general search — no second
-// search service. Each query is scoped with `site:reddit.com` (redditQuery)
-// and sent to the shared Firecrawl `/v2/search` endpoint.
-export default defineTool({
+export const tool = defineTool({
   description:
     "Search public Reddit discussions via Firecrawl. Great for opinions, lived experiences, and community consensus.",
   inputSchema: z.object({
@@ -53,53 +43,54 @@ export default defineTool({
           25
         )
         const range = timeRange?.[i] ?? timeRange?.[0]
-        try {
-          const res = await firecrawlSearch(
-            {
-              query: redditQuery(query),
-              limit: count,
-              ...(range ? { tbs: tbsFor(range) } : {}),
-              scrapeOptions: { formats: ["markdown"], onlyMainContent: true },
-            },
-            config
+        const outcome = await firecrawlSearch(
+          {
+            query: redditQuery(query),
+            limit: count,
+            ...(range ? { tbs: tbsFor(range) } : {}),
+            scrapeOptions: { formats: ["markdown"], onlyMainContent: true },
+          },
+          config
+        )
+        const results = outcome.results
+          .filter((result) =>
+            /^https?:\/\/(?:www\.)?reddit\.com\//i.test(result.url)
           )
-          if (!res.ok) return []
-          const data = (await res.json()) as {
-            data?: { web?: FirecrawlWebResult[] }
-          }
-          return (data.data?.web ?? [])
-            .filter(
-              (result) =>
-                typeof result.url === "string" &&
-                /https?:\/\/(?:www\.)?reddit\.com\//i.test(result.url)
-            )
-            .slice(0, count)
-            .map((result) => {
-              const subreddit =
-                result.url?.match(/reddit\.com\/r\/([^/]+)/i)?.[1] ?? "unknown"
-              return {
-                url: result.url ?? "",
-                title: result.title ?? result.url ?? "",
-                text:
-                  typeof result.markdown === "string"
-                    ? result.markdown.slice(0, 1500)
-                    : (result.description ?? ""),
-                subreddit,
-              }
-            })
-        } catch {
-          // Log a fixed string only: queries are user content and fetch
-          // errors can carry URLs, so neither is logged.
-          console.error("reddit_search provider failure")
-          return []
-        }
+          .slice(0, count)
+          .map((result) => {
+            const subreddit =
+              result.url?.match(/reddit\.com\/r\/([^/]+)/i)?.[1] ?? "unknown"
+            return {
+              url: result.url ?? "",
+              title: result.title ?? result.url ?? "",
+              text:
+                typeof result.markdown === "string"
+                  ? result.markdown.slice(0, 1500)
+                  : (result.description ?? ""),
+              subreddit,
+            }
+          })
+        return { results, error: outcome.error }
       })
     )
 
     const seen = new Set<string>()
     const results = perQuery
-      .flat()
+      .flatMap((outcome) => outcome.results)
       .filter((result) => !seen.has(result.url) && seen.add(result.url))
-    return { queries, results }
+    const errors = perQuery.flatMap((outcome, i) =>
+      outcome.error ? [`Query ${i + 1}: ${outcome.error}`] : []
+    )
+    return {
+      queries,
+      results,
+      ...(errors.length ? { error: errors.join(" ") } : {}),
+    }
+  },
+})
+
+export default defineDynamic({
+  events: {
+    "step.started": () => (firecrawlConfig().configured ? tool : null),
   },
 })

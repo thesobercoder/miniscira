@@ -1,13 +1,4 @@
-/**
- * Shared Firecrawl request setup for search tools.
- *
- * `firecrawl_search`, `reddit_search`, and the future GitHub tool all POST to
- * the same Firecrawl `/v2/search` endpoint with the same base-URL rules and
- * the same missing-config error. One module keeps those in sync.
- *
- * Env is read at CALL time, never import time: tests mutate env between calls
- * and operators can change it without a rebuild.
- */
+import { z } from "zod"
 
 export type FirecrawlConfig = {
   apiKey?: string
@@ -25,17 +16,77 @@ export function firecrawlConfig(): FirecrawlConfig {
   return { apiKey, baseUrl, configured: Boolean(apiKey ?? rawBase) }
 }
 
-export function firecrawlSearch(
+const webResult = z.object({
+  url: z.url().refine((url) => /^https?:\/\//i.test(url)),
+  title: z.string().optional(),
+  description: z.string().optional(),
+  markdown: z.string().optional(),
+})
+
+const searchResponse = z.object({
+  success: z.boolean().optional(),
+  data: z.object({ web: z.array(z.unknown()) }),
+})
+
+type SearchOutcome = {
+  results: z.infer<typeof webResult>[]
+  error?: string
+}
+
+export async function firecrawlSearch(
   body: Record<string, unknown>,
   config: FirecrawlConfig = firecrawlConfig()
-): Promise<Response> {
+): Promise<SearchOutcome> {
+  if (!config.configured)
+    return { results: [], error: FIRECRAWL_NOT_CONFIGURED }
   const headers: Record<string, string> = {
     "content-type": "application/json",
   }
   if (config.apiKey) headers.authorization = `Bearer ${config.apiKey}`
-  return fetch(`${config.baseUrl}/v2/search`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  })
+  let response: Response
+  try {
+    response = await fetch(`${config.baseUrl}/v2/search`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(60_000),
+    })
+  } catch {
+    return { results: [], error: "Firecrawl search request failed." }
+  }
+  if (!response.ok) {
+    return {
+      results: [],
+      error: `Firecrawl search failed (HTTP ${response.status}).`,
+    }
+  }
+  let data: unknown
+  try {
+    data = await response.json()
+  } catch {
+    return { results: [], error: "Firecrawl search returned invalid JSON." }
+  }
+  const parsed = searchResponse.safeParse(data)
+  if (!parsed.success) {
+    return {
+      results: [],
+      error: z.object({ success: z.literal(false) }).safeParse(data).success
+        ? "Firecrawl search reported a provider failure."
+        : "Firecrawl search returned an invalid response.",
+    }
+  }
+  const results: SearchOutcome["results"] = []
+  let malformed = false
+  for (const item of parsed.data.data.web) {
+    const result = webResult.safeParse(item)
+    if (result.success) results.push(result.data)
+    else malformed = true
+  }
+  const error =
+    parsed.data.success === false
+      ? "Firecrawl search reported a provider failure."
+      : malformed
+        ? "Firecrawl search returned invalid results."
+        : undefined
+  return { results, ...(error ? { error } : {}) }
 }

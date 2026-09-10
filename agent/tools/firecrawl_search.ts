@@ -1,4 +1,4 @@
-import { defineTool } from "eve/tools"
+import { defineDynamic, defineTool } from "eve/tools"
 import { z } from "zod"
 
 import {
@@ -7,15 +7,7 @@ import {
   firecrawlSearch,
 } from "../../lib/firecrawl-request"
 
-type FirecrawlWebResult = {
-  title?: string
-  description?: string
-  url: string
-  markdown?: string
-}
-
-// The model sees this tool as `firecrawl_search`, from the filename.
-export default defineTool({
+export const tool = defineTool({
   description:
     "Default general web search via Firecrawl — search and read in one step: it also scrapes each result's full page content (Markdown). Reach for it first for broad keyword queries. Supports query operators like `site:`, `filetype:pdf`, and `intitle:`.",
   inputSchema: z.object({
@@ -38,41 +30,31 @@ export default defineTool({
     if (!config.configured)
       return { query, error: FIRECRAWL_NOT_CONFIGURED, results: [] }
 
-    let res: Response
-    try {
-      res = await firecrawlSearch(
-        {
-          query,
-          limit,
-          scrapeOptions: { formats: ["markdown"], onlyMainContent: true },
-        },
-        config
-      )
-    } catch (err) {
-      return {
+    const outcome = await firecrawlSearch(
+      {
         query,
-        error: `Firecrawl request failed: ${(err as Error).message}`,
-        results: [],
-      }
-    }
-    if (!res.ok) {
-      return {
-        query,
-        error: `Firecrawl search failed (HTTP ${res.status}).`,
-        results: [],
-      }
-    }
-
-    const data = (await res.json()) as {
-      data?: { web?: FirecrawlWebResult[] }
-    }
-    const results = (data.data?.web ?? []).map((r) => ({
+        limit,
+        scrapeOptions: { formats: ["markdown"], onlyMainContent: true },
+      },
+      config
+    )
+    const results = outcome.results.slice(0, limit).map((r) => ({
       title: r.title ?? r.url,
       url: r.url,
       description: r.description,
       text:
         typeof r.markdown === "string" ? r.markdown.slice(0, 1500) : undefined,
     }))
-    return { query, results }
+    return {
+      query,
+      results,
+      ...(outcome.error ? { error: outcome.error } : {}),
+    }
+  },
+})
+
+export default defineDynamic({
+  events: {
+    "step.started": () => (firecrawlConfig().configured ? tool : null),
   },
 })

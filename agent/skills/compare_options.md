@@ -17,15 +17,16 @@ Follow this when the user wants a head-to-head comparison and a recommendation.
 
 ## 2. Research each option in parallel
 
-- **Delegate one `agent` subagent per option**, running them at once. Give each
+- **Delegate one `researcher` subagent per option**, running them at once. Give each
   the same brief: research this option against the agreed criteria, using
   multiple `firecrawl_search` queries and `firecrawl_scrape` on primary/official sources, and
   return the findings **with source URLs**.
-- Prefer official pages, docs, and pricing for hard facts (`exa_search` finds the
-  authoritative sources fastest); reputable reviews and recent (dated) comparisons
+- Use only available tools. Start with `firecrawl_search`, including for official
+  pages, docs, and pricing. Use `exa_search` for explicit semantic search or as a
+  fallback when Firecrawl is unavailable or fails. Prefer reputable reviews and dated comparisons
   for judgment calls. Use **`reddit_search`** for real user experiences with each
   option, and **`x_search`** for recent expert takes; they often surface
-  trade-offs the marketing pages won't.
+  trade-offs the marketing pages won't. Disclose unavailable sources.
 
 ## 3. Build the comparison
 

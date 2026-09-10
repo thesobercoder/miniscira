@@ -5,7 +5,11 @@ const originalEnv = { ...process.env }
 
 afterEach(() => {
   globalThis.fetch = originalFetch
-  for (const key of ["EXA_API_KEY", "FIRECRAWL_API_KEY", "FIRECRAWL_API_URL"] as const) {
+  for (const key of [
+    "EXA_API_KEY",
+    "FIRECRAWL_API_KEY",
+    "FIRECRAWL_API_URL",
+  ] as const) {
     if (originalEnv[key] === undefined) delete process.env[key]
     else process.env[key] = originalEnv[key]
   }
@@ -34,7 +38,7 @@ describe("exa_search fallback", () => {
     })
     globalThis.fetch = fetchMock as unknown as typeof fetch
 
-    const tool = (await import("../tools/exa_search")).default as unknown as {
+    const tool = (await import("../tools/exa_search")).tool as unknown as {
       execute: (input: unknown) => Promise<unknown>
     }
     const result = (await tool.execute({

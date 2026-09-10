@@ -1,10 +1,11 @@
-import { defineTool } from "eve/tools"
+import { defineDynamic, defineTool } from "eve/tools"
 import { z } from "zod"
+import { firecrawlConfig } from "../../lib/firecrawl-request"
 
 type MapLink = string | { url: string; title?: string; description?: string }
 
 // The model sees this tool as `firecrawl_map`, from the filename.
-export default defineTool({
+export const tool = defineTool({
   description:
     "Map a website via Firecrawl: quickly list the URLs under a site or section (docs, blog, sitemap-style discovery). Use it when the user shares a link and you need to enumerate what's there — e.g. every page in a docs section or all posts on a blog — before deciding which pages to read with firecrawl_scrape. Supports an optional search term to filter the returned links.",
   inputSchema: z.object({
@@ -78,5 +79,11 @@ export default defineTool({
           : { url: l.url, title: l.title || l.url }
       )
     return { url, search, count: results.length, results }
+  },
+})
+
+export default defineDynamic({
+  events: {
+    "step.started": () => (firecrawlConfig().configured ? tool : null),
   },
 })

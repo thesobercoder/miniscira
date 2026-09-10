@@ -25,7 +25,7 @@ Make Firecrawl the default web search provider. Each search tool turns itself on
 5. Keep `exa_search` available only when `EXA_API_KEY` is set. It is not the default.
 6. Keep `x_search` for X content. It turns on only when `XAI_API_KEY` is set.
 7. Update tool descriptions so the model prefers Firecrawl for broad queries.
-8. Treat search keys as optional at startup. A search turn without a provider key returns a clear message and the turn continues.
+8. Treat search keys as optional at startup. Expose only tools whose providers are configured at runtime, for both the root agent and the researcher. A turn without search tools explains that live search is unavailable and continues.
 
 ### Out of scope detail
 
@@ -44,12 +44,13 @@ Make Firecrawl the default web search provider. Each search tool turns itself on
 ## Functional requirements
 
 1. A general web search turn calls `firecrawl_search` when `FIRECRAWL_API_KEY` or `FIRECRAWL_API_URL` is set.
-2. A Reddit turn calls `reddit_search`, which runs on the same Firecrawl key. Without a Firecrawl key it returns a message that names the missing variable. The turn continues.
+2. A Reddit turn calls `reddit_search`, which runs on the same Firecrawl key or self-hosted URL. Without either variable, the tool is absent. The turn explains the limitation and continues.
 3. A turn with no Firecrawl key but with an Exa key can still use `exa_search`.
-4. An X turn uses `x_search` only when `XAI_API_KEY` is set. Without it the tool returns a not-configured message. The turn continues.
+4. An X turn uses `x_search` only when `XAI_API_KEY` is set. Without it the tool is absent. The turn explains the limitation and continues.
 5. Page reads keep working through `firecrawl_scrape` with no behavior change.
 6. Tool descriptions state the preference order. No two tools claim the same default role.
-7. Every search tool keeps the stable `{ query, results, error? }` output shape for missing configuration, network failure, and provider errors.
+7. Preserve each tool's output contract. General Firecrawl and Exa search use `{ query, results, error? }`. Reddit and X use `{ queries, results, error? }`. Page tools use `url` and their existing content fields. Direct calls still return a safe missing-configuration error.
+8. Firecrawl and Reddit report network, HTTP, provider, invalid JSON, and malformed-result failures through `error`. Preserve valid results from partial responses and successful Reddit queries. Never interpret a failed query as an empty successful search.
 
 ## Technical requirements
 
@@ -58,6 +59,9 @@ Make Firecrawl the default web search provider. Each search tool turns itself on
 - Rewrite `agent/tools/reddit_search.ts` to call the shared helper with `site:reddit.com` queries. Keep its input shape, its Reddit URL filter, and its per-query limits.
 - Add one startup log line that names the configured search providers (`firecrawl`, `exa`, `xai`) without printing keys or URLs with credentials.
 - Keep provider keys out of logs, responses, diffs, and docs. Log provider names only.
+- Use Eve's installed `defineDynamic` API in each tool file. Resolve at `step.started` and return the tool or `null`. Keep filename-derived names stable. Researcher re-exports use the same resolvers.
+- Read configuration at runtime, not during compilation. A Firecrawl key or URL enables search, scrape, map, and Reddit. Exa and X use their own keys. Whitespace-only values count as missing.
+- Root instructions, researcher instructions, `deep_research`, and `compare_options` start general research with Firecrawl. Exa is for explicit semantic searches or a fallback when Firecrawl is unavailable or fails.
 
 ### Test plan
 
@@ -65,29 +69,36 @@ Make Firecrawl the default web search provider. Each search tool turns itself on
 - `bun run lint` passes.
 - `bun test` passes, including the existing Firecrawl self-hosted tests, a new test that `exa_search` still runs when only `EXA_API_KEY` is set, and new tests that `reddit_search` calls the Firecrawl endpoint and returns the missing-key error without Firecrawl config.
 - `python3 scripts/check-task-docs.py` passes.
+- `bun run check` and `git diff --check` pass. Review formatter changes and remove unrelated churn.
+- The root and researcher provider matrix covers no providers, Firecrawl Cloud, URL-only Firecrawl, Exa-only, X, all providers, and removal after import.
+- Failure fixtures cover safe error text, malformed data, partial results, duplicate Reddit URLs, and non-Reddit URL filtering.
 - One research turn on the Railway deployment uses Firecrawl and returns sources.
 
 ### Eval plan
 
-- This changes tool routing through tool descriptions. Run four scripted checks against the deployed build and record which tool each turn calls.
+- This changes tool routing through descriptions, availability, and instructions. Run live-model fixtures with isolated provider outputs using `bun scripts/eval-search-routing.ts`. Set `AI_GATEWAY_BASE_URL`, `AI_GATEWAY_API_KEY`, and `EVAL_CHAT_MODEL` or `DEFAULT_CHAT_MODEL`. Never change production provider variables for fixtures.
 - Fixture 1: ask a broad factual question. Expected outcome: the turn calls `firecrawl_search`.
 - Fixture 2: ask for Reddit opinions on a topic. Expected outcome: the turn calls `reddit_search` and returns Reddit links.
 - Fixture 3: ask for the most authoritative paper on a narrow topic with only `EXA_API_KEY` set. Expected outcome: the turn can call `exa_search`.
-- Fixture 4: run a search turn with no provider key set. Expected outcome: the turn returns the missing-key message and continues.
-- Pass threshold: all four checks behave as stated. Record the tool calls and the user-visible answers as evidence.
+- Fixture 4: run a search turn with no provider key set. Expected outcome: no provider tools are available and the model explains that live search is unavailable.
+- Fixtures 5 through 7 use researcher instructions, the loaded deep-research skill, and the loaded comparison skill. Expected outcome: general research starts with `firecrawl_search`, even when Exa is configured.
+- Pass threshold: all seven fixtures pass. Each configured case starts with its expected tool and returns a source link. Record tool calls and answers. These isolated model fixtures do not prove skill loading, delegated execution, or deployed chat.
+- Run `eve eval --url <deployed-origin> --tag firecrawl-default --strict` against the approved deployment. `evals/firecrawl-default-search.eval.ts` checks general and Reddit chat routing and source links. Also verify one real delegated research turn.
 
 ## Acceptance criteria
 
-- [x] General search uses Firecrawl when `FIRECRAWL_API_KEY` or `FIRECRAWL_API_URL` is set.
+- [ ] General search uses Firecrawl when `FIRECRAWL_API_KEY` or `FIRECRAWL_API_URL` is set, including real model routing.
 - [x] Reddit search runs on the Firecrawl key and `SEARXNG_URL` is fully removed.
 - [x] Exa remains usable as a fallback when only `EXA_API_KEY` is set.
-- [x] X search works when `XAI_API_KEY` is set and reports clearly when it is not.
-- [x] Missing search keys produce a message that names the missing variable and the turn continues.
-- [x] `bun run typecheck`, `bun run lint`, and `bun test` pass, including the new Reddit and Exa tests.
+- [x] X search remains available with `XAI_API_KEY` and absent without it in both agents.
+- [ ] Only configured providers appear at runtime in both agents. No-provider model fixtures explain the limitation and continue.
+- [x] Provider failures return safe errors and preserve partial search results.
+- [x] `bun run typecheck`, `bun run lint`, `bun test`, `bun run check`, and `git diff --check` pass, including the provider matrix and failure tests.
 - [x] `python3 scripts/check-task-docs.py` passes.
 - [ ] One research turn on the Railway deployment uses Firecrawl and returns sources.
-- [x] No provider key appears in logs, responses, diffs, or docs.
-- [ ] The four eval fixtures behave as stated and the evidence is recorded.
+- [x] No provider key appears in new logs, error responses, diffs, or docs.
+- [ ] The seven isolated live-model fixtures pass and the evidence is recorded.
+- [ ] Deployed general, Reddit, and delegated research turns pass with recorded tool calls and sources.
 
 ## Deployment
 
@@ -100,8 +111,8 @@ Make Firecrawl the default web search provider. Each search tool turns itself on
 ## Observability
 
 - Log the configured search provider names once at startup without keys.
-- A failed search returns an `error` field that names the provider and the HTTP status. The turn continues.
-- Follow the existing `x_search` console error pattern for provider failures. No new endpoint.
+- A failed search returns an `error` field that names the provider and the HTTP status when present. Partial Reddit failures identify the query index. The turn continues.
+- Do not include raw exception messages or provider response bodies in errors. They can contain credentials. No new endpoint.
 
 ## Rollback
 

@@ -61,7 +61,7 @@ The app validates `REQUIRED` variables at startup in `lib/env-check.ts`. If one 
 | `IMAGE_MODEL` | Image model for the `generate_image` tool (default `gpt-image-2`). |
 | `LOCAL_STORAGE_DIR` | Where uploads land (`/data/uploads`; the compose mounts a named volume there). |
 | `RUN_DB_PUSH` | TRANSITIONAL: `"true"` runs `drizzle-kit push` at container start under a Postgres advisory lock. Default off — normal startup never mutates the schema. |
-| `EXA_API_KEY`, `FIRECRAWL_API_KEY`, `FIRECRAWL_API_URL`, `XAI_API_KEY` | Search providers — the agent's only web access. `firecrawl_search` is the default general search. `reddit_search` runs on the Firecrawl key with `site:reddit.com` queries. `exa_search` is the fallback. With none set, the agent cannot reach the web. |
+| `EXA_API_KEY`, `FIRECRAWL_API_KEY`, `FIRECRAWL_API_URL`, `XAI_API_KEY` | Provider tools appear automatically at runtime in the main agent and researcher. A Firecrawl key or URL enables general search, page reads, site mapping, and Reddit search. Exa and X require their own keys. Firecrawl is the default general search and Exa is the fallback. With none set, these tools are absent and the agent explains that live search is unavailable. |
 | `LOOKOUT_RUN_SECRET` | Secret for scheduled-research internal auth: `openssl rand -hex 32`. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `LOOKOUT_EMAIL_FROM` | Optional Fastmail SMTP delivery for Lookout results. Use an app password. Each digest is sent to its Lookout owner's signup email. |
 | `RATE_LIMIT_PER_MINUTE` | Per-user requests/minute on `/api/*` (in-memory, per process). |

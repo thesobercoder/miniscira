@@ -14,7 +14,7 @@ afterEach(() => {
 })
 
 async function executeTool(path: string, input: unknown) {
-  const tool = (await import(path)).default as {
+  const tool = (await import(path)).tool as {
     execute: (input: unknown) => Promise<unknown>
   }
   return tool.execute(input)
