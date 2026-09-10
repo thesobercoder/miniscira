@@ -255,6 +255,10 @@ export function providerOf(id: string): string {
   const head = rawHead.toLowerCase()
   if (VENDOR_SLUGS.has(head)) return head
   if (MODEL_VENDOR[head]) return MODEL_VENDOR[head]
+  // OpenRouter-style provider/model ids carry their vendor in the prefix.
+  // An unknown prefix is a vendor name, not the gateway itself. Bare ids
+  // without a prefix keep the legacy gateway fallback.
+  if (rawHead !== id) return head
   return MODEL_VENDOR[rawHead] ?? "cpa"
 }
 
