@@ -1,4 +1,4 @@
-import { defineTool } from "eve/tools"
+import { defineDynamic, defineTool } from "eve/tools"
 import { z } from "zod"
 
 type ExaResult = {
@@ -12,9 +12,9 @@ type ExaResult = {
 }
 
 // The model sees this tool as `exa_search`, from the filename.
-export default defineTool({
+export const tool = defineTool({
   description:
-    "Neural/semantic web search via Exa. Best for finding conceptually related, high-quality sources (research papers, in-depth articles, docs) where meaning matters more than keywords. Returns titles, URLs, dates, and text snippets. Use firecrawl_search for broad keyword queries; reach for this when you want the most relevant or authoritative sources.",
+    "Semantic search via Exa for conceptually related sources. Use firecrawl_search first for general web search, including official sources and papers. Use Exa for an explicit semantic search or as a fallback when Firecrawl is unavailable or fails. Returns titles, URLs, dates, and text snippets.",
   inputSchema: z.object({
     query: z.string().min(1).describe("The search query."),
     numResults: z
@@ -82,5 +82,11 @@ export default defineTool({
             : r.summary,
     }))
     return { query, results }
+  },
+})
+
+export default defineDynamic({
+  events: {
+    "step.started": () => (process.env.EXA_API_KEY?.trim() ? tool : null),
   },
 })

@@ -61,7 +61,7 @@ The app validates `REQUIRED` variables at startup in `lib/env-check.ts`. If one 
 | `IMAGE_MODEL` | Image model for the `generate_image` tool (default `gpt-image-2`). |
 | `LOCAL_STORAGE_DIR` | Where uploads land (`/data/uploads`; the compose mounts a named volume there). |
 | `RUN_DB_PUSH` | TRANSITIONAL: `"true"` runs `drizzle-kit push` at container start under a Postgres advisory lock. Default off — normal startup never mutates the schema. |
-| `EXA_API_KEY`, `FIRECRAWL_API_KEY`, `FIRECRAWL_API_URL`, `XAI_API_KEY`, `SEARXNG_URL` | Search providers — the agent's only web access. `reddit_search` uses `SEARXNG_URL` with `site:reddit.com` queries. With none set, the agent cannot reach the web. |
+| `EXA_API_KEY`, `FIRECRAWL_API_KEY`, `FIRECRAWL_API_URL`, `XAI_API_KEY` | Provider tools appear automatically at runtime in the main agent and researcher. A Firecrawl key or URL enables general search, page reads, site mapping, and Reddit search. Exa and X require their own keys. Firecrawl is the default general search and Exa is the fallback. With none set, these tools are absent and the agent explains that live search is unavailable. |
 | `LOOKOUT_RUN_SECRET` | Secret for scheduled-research internal auth: `openssl rand -hex 32`. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `LOOKOUT_EMAIL_FROM` | Optional Fastmail SMTP delivery for Lookout results. Use an app password. Each digest is sent to its Lookout owner's signup email. |
 | `RATE_LIMIT_PER_MINUTE` | Per-user requests/minute on `/api/*` (in-memory, per process). |
@@ -271,9 +271,12 @@ The app needs an OpenAI-compatible endpoint. It uses each feature separately, so
 
 ## Firecrawl and search without providers
 
-- The agent's only web access is the search tools: Exa, Firecrawl,
-  xAI (X search), You.com (Reddit). With none configured, the agent cannot
-  reach the web — chat still works.
+- The agent's only web access is the search tools: Firecrawl (default search,
+  page reads, site maps, Reddit), Exa (fallback), xAI (X search). With none
+  configured, the agent cannot reach the web — chat still works.
+- **Firecrawl is the default search.** Set `FIRECRAWL_API_KEY` for Firecrawl
+  Cloud. One key serves general search and Reddit search. Reddit needs no
+  separate service.
 - **Self-hosted Firecrawl**: point `FIRECRAWL_API_URL` at it (e.g.
   `http://firecrawl:3002` on the compose network, or a LAN host). When the
   Firecrawl API is unreachable or rate-limited, search/scrape tools report
@@ -314,7 +317,7 @@ For a household or LAN deployment, the app, Eve, and bundled Postgres usually ne
 | Picker shows no/odd models | Gateway `/v1/models` empty or unreachable — the catalog is authoritative; `AI_MODELS_JSON` cannot add models. |
 | Model 404s at turn time | `DEFAULT_CHAT_MODEL` or a user-chosen model is not served by the gateway — check the startup warning. |
 | Auth callbacks rejected | `BETTER_AUTH_URL` / `BETTER_AUTH_TRUSTED_ORIGINS` mismatch behind a proxy. |
-| Agent cannot search the web | No search provider keys configured (Exa/Firecrawl/xAI/You.com). |
+| Agent cannot search the web | No search provider keys configured (Firecrawl/Exa/xAI). |
 
 See also `AGENTS.md` for code-level invariants, and `SECURITY.md` for
 reporting vulnerabilities.

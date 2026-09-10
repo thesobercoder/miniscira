@@ -31,10 +31,11 @@ Follow this when the user wants a thorough answer rather than a quick lookup.
   focused queries from different angles (official source, critical analysis,
   recent news, primary data), then open the strongest hits with
   `firecrawl_scrape`.
-- Match the tool to the source: **`exa_search`** for the most relevant/authoritative
-  or semantic results, **`firecrawl_scrape`** when a page is messy or JS-rendered,
-  and **`x_search`** / **`reddit_search`** for real-time reactions and on-the-ground
-  community signal on contested or fast-moving sub-questions.
+- Use only available tools. Start with `firecrawl_search` for general research,
+  including authoritative sources and papers. Use `exa_search` for explicit
+  semantic search or as a fallback when Firecrawl is unavailable or fails.
+  Use `firecrawl_scrape` to read pages and `x_search` or `reddit_search` for
+  community reactions. Disclose unavailable sources.
 - If the user has uploaded files (look for `uploadedDocuments` in the context),
   search them with **`search_documents`** as a first-class source and attribute
   those findings to the document by filename.

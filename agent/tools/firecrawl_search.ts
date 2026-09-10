@@ -1,17 +1,15 @@
-import { defineTool } from "eve/tools"
+import { defineDynamic, defineTool } from "eve/tools"
 import { z } from "zod"
 
-type FirecrawlWebResult = {
-  title?: string
-  description?: string
-  url: string
-  markdown?: string
-}
+import {
+  FIRECRAWL_NOT_CONFIGURED,
+  firecrawlConfig,
+  firecrawlSearch,
+} from "../../lib/firecrawl-request"
 
-// The model sees this tool as `firecrawl_search`, from the filename.
-export default defineTool({
+export const tool = defineTool({
   description:
-    "Web search that also scrapes each result's full page content (Markdown) via Firecrawl — search and read in one step. Useful when you need the actual page text, not just snippets. Supports query operators like `site:`, `filetype:pdf`, and `intitle:`.",
+    "Default general web search via Firecrawl — search and read in one step: it also scrapes each result's full page content (Markdown). Reach for it first for broad keyword queries. Supports query operators like `site:`, `filetype:pdf`, and `intitle:`.",
   inputSchema: z.object({
     query: z
       .string()
@@ -28,60 +26,35 @@ export default defineTool({
       .describe("Max number of results to return (default 6)."),
   }),
   async execute({ query, limit = 6 }) {
-    const key = process.env.FIRECRAWL_API_KEY
-    const configuredBase = process.env.FIRECRAWL_API_URL?.trim()
-    if (!key && !configuredBase)
-      return {
-        query,
-        error:
-          "Firecrawl is not configured. Set FIRECRAWL_API_KEY for Firecrawl Cloud or FIRECRAWL_API_URL for a self-hosted server.",
-        results: [],
-      }
+    const config = firecrawlConfig()
+    if (!config.configured)
+      return { query, error: FIRECRAWL_NOT_CONFIGURED, results: [] }
 
-    let res: Response
-    try {
-      const base = (configuredBase ?? "https://api.firecrawl.dev").replace(
-        /\/+$/,
-        ""
-      )
-      const headers: Record<string, string> = {
-        "content-type": "application/json",
-      }
-      if (key) headers.authorization = `Bearer ${key}`
-      res = await fetch(`${base}/v2/search`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          query,
-          limit,
-          scrapeOptions: { formats: ["markdown"], onlyMainContent: true },
-        }),
-      })
-    } catch (err) {
-      return {
+    const outcome = await firecrawlSearch(
+      {
         query,
-        error: `Firecrawl request failed: ${(err as Error).message}`,
-        results: [],
-      }
-    }
-    if (!res.ok) {
-      return {
-        query,
-        error: `Firecrawl search failed (HTTP ${res.status}).`,
-        results: [],
-      }
-    }
-
-    const data = (await res.json()) as {
-      data?: { web?: FirecrawlWebResult[] }
-    }
-    const results = (data.data?.web ?? []).map((r) => ({
+        limit,
+        scrapeOptions: { formats: ["markdown"], onlyMainContent: true },
+      },
+      config
+    )
+    const results = outcome.results.slice(0, limit).map((r) => ({
       title: r.title ?? r.url,
       url: r.url,
       description: r.description,
       text:
         typeof r.markdown === "string" ? r.markdown.slice(0, 1500) : undefined,
     }))
-    return { query, results }
+    return {
+      query,
+      results,
+      ...(outcome.error ? { error: outcome.error } : {}),
+    }
+  },
+})
+
+export default defineDynamic({
+  events: {
+    "step.started": () => (firecrawlConfig().configured ? tool : null),
   },
 })

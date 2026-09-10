@@ -1,5 +1,6 @@
-import { defineTool } from "eve/tools"
+import { defineDynamic, defineTool } from "eve/tools"
 import { z } from "zod"
+import { firecrawlConfig } from "../../lib/firecrawl-request"
 
 type FirecrawlScrape = {
   markdown?: string
@@ -7,7 +8,7 @@ type FirecrawlScrape = {
 }
 
 // The model sees this tool as `firecrawl_scrape`, from the filename.
-export default defineTool({
+export const tool = defineTool({
   description:
     "Read a single URL as clean Markdown via Firecrawl. This is how you open a page: use it on the strongest search hits before relying on or citing them. Handles messy, empty, and JavaScript-rendered pages. Returns the page title and Markdown.",
   inputSchema: z.object({
@@ -65,5 +66,11 @@ export default defineTool({
       title: data.data?.metadata?.title,
       markdown: markdown.slice(0, 8000),
     }
+  },
+})
+
+export default defineDynamic({
+  events: {
+    "step.started": () => (firecrawlConfig().configured ? tool : null),
   },
 })

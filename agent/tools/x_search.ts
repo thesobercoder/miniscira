@@ -1,7 +1,7 @@
 import { APICallError } from "@ai-sdk/provider"
 import { xai } from "@ai-sdk/xai"
 import { generateText, stepCountIs } from "ai"
-import { defineTool } from "eve/tools"
+import { defineDynamic, defineTool } from "eve/tools"
 import { getTweet } from "react-tweet/api"
 import { z } from "zod"
 
@@ -16,10 +16,14 @@ export type XSearchDependencies = {
   generateText: (options: Parameters<typeof generateText>[0]) => Promise<{
     sources?: unknown
   }>
-  getTweet: (id: string) => Promise<{
-    text?: string | null
-    user?: { screen_name?: string | null } | null
-  } | null | undefined>
+  getTweet: (id: string) => Promise<
+    | {
+        text?: string | null
+        user?: { screen_name?: string | null } | null
+      }
+    | null
+    | undefined
+  >
 }
 
 const AUTHORIZATION_ERROR =
@@ -206,4 +210,10 @@ export function createXSearchTool(
   })
 }
 
-export default createXSearchTool()
+export const tool = createXSearchTool()
+
+export default defineDynamic({
+  events: {
+    "step.started": () => (process.env.XAI_API_KEY?.trim() ? tool : null),
+  },
+})
