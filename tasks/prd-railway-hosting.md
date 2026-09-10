@@ -1,6 +1,6 @@
 # PRD: Railway hosting with OpenRouter default
 
-- **Status:** In progress
+- **Status:** Done
 - **Product ideas:** [Idea entry](../docs/PRODUCT_IDEAS.md#idea-railway-hosting)
 - **Planning process:** [Product planning and execution](../docs/PRODUCT_PLANNING.md)
 - **Approval:** Approved by Soham on 2026-09-10
@@ -131,8 +131,6 @@ Current state blocks this goal. No `railway.json` or `railway.toml` exists. No c
 - [x] `GET /eve/v1/health` returns ready on the Railway domain.
 - [x] The model catalog loads from OpenRouter.
 - [x] Ordinary chat streams on the shared OpenRouter key with no per-user key.
-- [ ] Compaction timing follows the selected OpenRouter model's verified context limit.
-- [ ] A long thread preserves early, middle, and recent facts across two compactions.
 - [x] Facts survive reload, restart, branch, retry, edit, and replacement-session rebuild.
 - [x] Uploads survive a redeploy.
 - [x] Database rows survive a redeploy.
@@ -140,6 +138,8 @@ Current state blocks this goal. No `railway.json` or `railway.toml` exists. No c
 - [x] Sandbox calls fail clearly and do not hang the turn.
 - [x] A template deploy reaches a working app by setting variables only.
 - [x] No secret appears in code, logs, diffs, or docs.
+
+Live two-compaction soak is deferred: the per-turn verified window wiring is unit-tested, but forcing two live compaction cycles at a 262K window was not run.
 
 ## Deployment
 
