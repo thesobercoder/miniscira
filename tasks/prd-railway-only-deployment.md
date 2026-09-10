@@ -22,6 +22,9 @@ Make Railway the only deployment target. Remove Umbrel, Portainer, Docker-socket
 3. Keep the sandbox path that Railway supports. Remove the sibling-container assumptions that cannot run on Railway.
 4. Update `docs/DEPLOYMENT.md` so Railway is the primary path.
 5. Keep `LOCAL_STORAGE_DIR` volume semantics for Railway. Remove Umbrel volume names.
+6. Remove hardcoded model tables from `lib/models.ts`. The live gateway catalog is the only source for vendors, names, modalities, and context windows.
+7. Apply the slash rule everywhere: a `provider/model` id takes the vendor from the part before the slash and the display tail from the part after it. Bare ids without a slash resolve through catalog `owned_by` and fall back to the id itself.
+8. Group the model picker automatically by the derived vendor. No maintained vendor list and no pinned provider order.
 
 ## Non-goals
 
@@ -35,6 +38,9 @@ Make Railway the only deployment target. Remove Umbrel, Portainer, Docker-socket
 2. Every deployment document names Railway first. Umbrel notes are gone or marked removed.
 3. The app builds, migrates, and serves from the root `Dockerfile` on Railway with no removed component in the chain.
 4. Local development keeps working through the documented Compose path where it remains.
+5. No model id, vendor name, capability, or context window is maintained by hand in code. Every value resolves from the live catalog or the id itself.
+6. The picker shows every catalog chat model grouped under its derived vendor with no missing or gateway-labeled vendors.
+7. The default chat model resolves from `DEFAULT_CHAT_MODEL` and validates against the live catalog. A hardcoded id is only the last-resort fallback when the catalog is unreachable.
 
 ## Technical requirements
 
@@ -42,6 +48,11 @@ Make Railway the only deployment target. Remove Umbrel, Portainer, Docker-socket
 - Remove Portainer-only environment variables and middleware wiring that the Railway entrypoint never reads.
 - Keep `scripts/entrypoint.mjs`, `scripts/migrate.mjs`, and the Railway health checks untouched in behavior.
 - Prove no remaining code import references a deleted module.
+- Delete `MODEL_VENDOR`, `VENDOR_SLUGS`, `CHAT_MODELS` as an availability list, `PROVIDER_ORDER`, and the `cpa` gateway fallback from `lib/models.ts`.
+- Rewrite `providerOf` as the slash rule with catalog `owned_by` precedence and the raw id as the last resort. No table lookup remains.
+- Filter non-chat models by catalog modalities and endpoint capability, not by id lists. Delete `NON_CHAT_MODELS` and suffix regexes in `lib/gateway-models.ts`.
+- Build picker groups at render time from derived vendors sorted alphabetically. Keep brand icons only as an optional display map with a generic glyph fallback.
+- Resolve the default from environment first and warn when the live catalog does not serve it. Keep one last-resort builtin id for catalog-outage boot only.
 
 ### Test plan
 
@@ -60,6 +71,8 @@ Make Railway the only deployment target. Remove Umbrel, Portainer, Docker-socket
 
 - [ ] No Umbrel production path remains in code or docs.
 - [ ] Railway is the single documented deployment target.
+- [ ] No hardcoded model, vendor, capability, or context table remains in code.
+- [ ] The picker groups derived vendors automatically with no maintained list.
 - [ ] Typecheck, lint, unit, build, and docs checks pass.
 - [ ] The Railway deployment still passes health, chat, and migration checks.
 - [ ] A grep for removed component names finds only historical notes.
@@ -85,3 +98,4 @@ Make Railway the only deployment target. Remove Umbrel, Portainer, Docker-socket
 
 - Should Compose stay for local development, or should local runs use the same Railway image directly?
 - Should the Umbrel runbook move to an archive folder or leave the repository fully?
+- Should brand icons stay as an optional display map, or should the picker use generic glyphs only?
