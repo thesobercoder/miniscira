@@ -86,8 +86,9 @@ Approval is a gate, not a lifecycle status. Record approval in the PRD. An appro
 - List every required check. Include unit, integration, browser/end-to-end, authorization/security, migration/rollback, deployment, and production acceptance checks.
 - For changes to agent behavior, prompts, tools, retrieval, memory, or model routing, define eval cases, fixtures or datasets, expected outcomes, and pass thresholds.
 - If model evals do not apply, explain why.
-- A written PRD is not approved unless the user says so. Ask the user to review it.
+- A written PRD is not approved unless the user says so. Push the branch that holds the PRD so the user can read it on GitHub, then ask the user to review it.
 - Record approval only after the user explicitly approves the PRD.
+- Never execute a PRD before explicit approval and before the TODO, test, and eval plan exists.
 - After explicit approval, record the approval in the PRD. Keep the lifecycle status `To do` until implementation or required completion verification starts.
 
 ## 3. TODO tasks

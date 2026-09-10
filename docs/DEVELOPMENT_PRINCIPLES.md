@@ -23,6 +23,7 @@ Read this document before you change code or repository structure.
 6. Run focused tests first. Then run all quality gates that apply.
 7. Exercise the real user-visible flow. Health checks alone do not prove that it works.
 8. Review the diff for secrets, generated files, schema changes, stale documents, and unrelated formatting.
+9. Ship through a pull request. Never push directly to `main`. Open a PR, pass checks, then merge.
 
 Choose clear code over clever code. Use small named functions, explicit error states, one source of truth, narrow types, and comments that explain why a rule exists. Avoid abstractions for possible future needs. Avoid duplicate state. Do not start a promise without handling its errors. Keep provider-specific behavior out of normal UI components.
 
@@ -74,8 +75,8 @@ For Next.js routing, let the App Router own navigation, URL state, mounted route
 
 After a successful production deployment:
 
-1. Commit every intended repository change.
-2. Push `main` to `origin`.
+1. Commit every intended repository change on a branch.
+2. Open a pull request into `main` and merge it after checks pass.
 3. Verify that the working tree is clean.
 4. Fetch `origin`.
 5. Verify that local `HEAD` equals `origin/main`.
