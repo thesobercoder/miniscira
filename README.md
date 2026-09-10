@@ -31,8 +31,9 @@ upstream ideas where they fit its Docker-first architecture.
   no Vercel platform dependency is required.
 - **Durable research:** live, reconnectable Eve sessions with persisted events,
   delegated research, citations, projects, memory, and scheduled lookouts.
-- **Secure code execution:** optional sibling-container sandboxes behind a
-  private, default-deny Docker middleware and egress allowlist.
+- **Secure code execution:** optional local Docker sandboxes with a
+  default-deny network policy and egress allowlist (local Compose only;
+  unavailable on Railway).
 - **Simple product UX:** search, memory, tools, and model routing should be
   automatic for ordinary users; infrastructure controls stay with operators.
 
@@ -59,10 +60,19 @@ Browser ──────▶ Next.js :3000 ──────▶ Postgres + pgv
 | `app/api/` | UI-facing API routes |
 | `components/timeline/` | Live research and tool timeline |
 | `lib/` | Database, auth, retrieval, storage, model catalog, event parsing |
-| `docs/DEPLOYMENT.md` | Portable Docker operations, backup, restore, upgrades, and troubleshooting |
-| `docs/UMBREL_SANDBOX_OPERATIONS.md` | Installation-specific Umbrel/Portainer operations |
+| `docs/DEPLOYMENT.md` | Railway production path plus local Docker operations, backup, restore, upgrades, and troubleshooting |
 
-## Docker Compose quickstart
+## Deploy on Railway
+
+Railway is the production target: the root `Dockerfile` builds the combined
+Next.js + Eve image, Postgres comes from `pgvector/pgvector:pg16`, and uploads
+persist on a volume mounted at `LOCAL_STORAGE_DIR` (`/data/uploads`). Set the
+variables in [docs/RAILWAY_TEMPLATE.md](docs/RAILWAY_TEMPLATE.md), deploy, then
+verify `/api/health`, `/eve/v1/health`, one chat turn, and migration
+idempotency. Code execution has no Docker backend on Railway and returns a
+clear unavailable message instead of hanging the turn.
+
+## Docker Compose quickstart (local development)
 
 ### Prerequisites
 
@@ -158,8 +168,9 @@ git diff --check
 ```
 
 Agent, retrieval, prompt, model-routing, or tool changes should also run the
-relevant `evals/*.eval.ts`. Docker/Eve/sandbox changes require the full sandbox
-acceptance suite documented in `docs/UMBREL_SANDBOX_OPERATIONS.md`.
+relevant `evals/*.eval.ts`. Docker/Eve/sandbox changes require a real
+file-write-and-execute proof on the local Compose stack — not merely a
+successful container spawn. See `docs/DEPLOYMENT.md`.
 
 Read [AGENTS.md](AGENTS.md) before changing the repository. It records the
 architectural and operational invariants that are easy to miss from source code

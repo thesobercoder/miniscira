@@ -69,9 +69,9 @@ Agent, prompt, retrieval, model-routing, and tool changes should run the related
 `evals/*.eval.ts`. These use real model tokens, so run the focused evaluations
 that exercise your change.
 
-Docker, Eve, middleware, egress, or sandbox changes require the acceptance suite
-in `docs/UMBREL_SANDBOX_OPERATIONS.md`, including a real file-write-and-execute
-proof—not merely a successful container spawn.
+Docker, Eve, egress, or sandbox changes require a real
+file-write-and-execute proof on the local Compose stack — not merely a
+successful container spawn. See `docs/DEPLOYMENT.md`.
 
 ## Upstream changes
 
@@ -88,7 +88,7 @@ security architecture.
 - Long-running root and subagent streams share `lib/eve-stream-policy.ts`.
 - Normal startup does not mutate the database schema; use committed migrations.
 - Uploads and generated artifacts are local-storage-first.
-- The MiniScira app never receives the Docker socket or Portainer credentials.
+- The MiniScira app never mounts the raw Docker socket.
 - The two-process Next.js + Eve lifecycle must remain intact.
 
 `AGENTS.md` contains the complete list.

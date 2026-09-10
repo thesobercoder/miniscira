@@ -44,7 +44,7 @@ This standard is required. It is not an optional style choice. Review every new 
 
 ## Toolchain
 
-- Use Bun. On Soham's Umbrel deployment, the durable binary is `/opt/data/bin/bun`.
+- Use Bun.
 - Run focused tests before broad tests.
 - Put unit tests in `*.test.ts` files beside the code they cover.
 - Put model-level evals in `evals/*.eval.ts`.
@@ -54,10 +54,10 @@ This standard is required. It is not an optional style choice. Review every new 
 Run these standard quality gates:
 
 ```bash
-/opt/data/bin/bun run typecheck
-/opt/data/bin/bun run lint
-/opt/data/bin/bun test
-/opt/data/bin/bun run check
+bun run typecheck
+bun run lint
+bun test
+bun run check
 git diff --check
 ```
 

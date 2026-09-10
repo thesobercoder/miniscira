@@ -23,9 +23,9 @@ name: miniscira
 
 services:
   docker-socket-proxy:
-    # Private default-deny middleware for Portainer's own Docker Engine. It
-    # mounts Portainer's real socket directly, so Docker exec streams remain
-    # standard and MiniScira needs no Portainer credential.
+    # Private default-deny Docker API proxy for local development. It mounts
+    # the host socket selected by DOCKER_SOCKET, so Docker exec streams stay
+    # standard and MiniScira itself never mounts the raw socket.
     image: miniscira-docker-api-proxy:local
     restart: unless-stopped
     environment:
@@ -33,7 +33,7 @@ services:
       SANDBOX_DOCKER_NETWORK: miniscira_sandbox-egress
       SANDBOX_DOCKER_IMAGES: ${SANDBOX_DOCKER_IMAGE:-miniscira:local}
     volumes:
-      - /data/docker.sock:/var/run/docker.sock
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
     networks:
       - docker-control
     healthcheck:

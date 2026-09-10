@@ -22,6 +22,5 @@
 | [Product ideas](docs/PRODUCT_IDEAS.md) | When you capture, review, prioritize, or promote product ideas. |
 | [Engineering invariants](docs/ENGINEERING_INVARIANTS.md) | Before you change auth, Eve events, Lookouts, models, streams, attachments, global styles, or motion. |
 | [Deployment guide](docs/DEPLOYMENT.md) | Before generic self-hosting, configuration, migration, backup, restore, health, or proxy work. |
-| [Umbrel Sandbox operations](docs/UMBREL_SANDBOX_OPERATIONS.md) | Before any Soham-specific Umbrel, Portainer, Docker Sandbox, middleware, network, egress, image, or production deployment work. |
 | [Fork foundations plan](docs/plans/2026-08-22-fork-foundations.md) | When you need the historical rationale and implementation record for the independent fork foundations. |
 | [README](README.md) | When you need the product overview, architecture, local setup, or public project guidance. |

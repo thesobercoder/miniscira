@@ -97,18 +97,20 @@ The gateway's live `/v1/models` response determines availability.
 invent models. `DEFAULT_CHAT_MODEL` is optional and is forwarded to the Docker
 build and runtime; rebuild after changing it.
 
-## Docker sandbox
+## Docker sandbox (local Compose only)
 
 `run_code` uses Eve's Docker backend through the private
-`docker-socket-proxy` service. On Umbrel this is a Docker-compatible adapter
-over Portainer's endpoint proxy because app stacks cannot bind the host socket.
-MiniScira receives a Docker API endpoint but neither the raw socket nor the
-Portainer token. Each session runs in a sibling container with networking
-limited to a dedicated internal egress network that cannot reach the Docker API
-adapter. Outbound HTTP(S) must pass through the
+`docker-socket-proxy` sidecar, which mounts the host Docker socket selected by
+`DOCKER_SOCKET` (default `/var/run/docker.sock`). MiniScira receives a Docker
+API endpoint over the internal control network but never the raw socket. Each
+session runs in a sibling container with networking limited to a dedicated
+internal egress network. Outbound HTTP(S) must pass through the
 `sandbox-egress-proxy`, which allows common npm, PyPI, Go, Rust, GitHub, Node,
 Bun, Deno/JSR, and GitLab hosts and rejects other destinations. This is not
 Docker-in-Docker and no proxy port is published.
+
+There is no Docker backend on Railway: code tool calls return a clear
+unavailable message and the turn continues without code output.
 
 ## Platform support
 

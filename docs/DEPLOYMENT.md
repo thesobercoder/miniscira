@@ -1,12 +1,26 @@
 # MiniScira deployment and operations runbook
 
-This runbook expands on the README quickstart. It covers self-hosted Docker Compose deployments of this repository. The Compose file includes the app image, Postgres with pgvector, a one-time migration service, named volumes, and health checks. Use the `docker-compose.external-db.yml` override for an external or managed Postgres database.
-
-For Soham's Umbrel/Portainer Stack 30 deployment, use [`docs/UMBREL_SANDBOX_OPERATIONS.md`](./UMBREL_SANDBOX_OPERATIONS.md). That runbook is the source of truth for the direct Docker-socket middleware, Squid egress policy, image IDs, scratch and production acceptance tests, upstream sync, UI stall diagnosis, and rollback.
+Railway is the production deployment target. The app builds from the root
+`Dockerfile` (see [`docs/RAILWAY_TEMPLATE.md`](./RAILWAY_TEMPLATE.md) for
+services, volumes, variables, and verification) with Postgres and a volume
+mounted at `LOCAL_STORAGE_DIR`. The sections below cover the Railway path
+first; local Docker Compose remains for development only.
 
 > **Rule:** Environment variables control deployment. Every model call uses the required `AI_GATEWAY_BASE_URL`. There is no built-in gateway fallback. The table below lists the other required settings.
 
-## Quickstart
+## Railway (production)
+
+Deploy the root `Dockerfile` on Railway per
+[`docs/RAILWAY_TEMPLATE.md`](./RAILWAY_TEMPLATE.md): one `app` service from
+this repository plus Postgres from `pgvector/pgvector:pg16`, a volume mounted
+at `LOCAL_STORAGE_DIR` (`/data/uploads`), and `DATABASE_URL` referenced over
+the private network. The entrypoint waits for the database, applies committed
+migrations idempotently, then supervises Eve and Next. Redeploy from `main`
+after merge and verify both health endpoints, one chat turn, and migration
+idempotency. There is no Docker backend on Railway: code tool calls return a
+clear unavailable message and the turn continues.
+
+## Quickstart (local Compose development)
 
 ```bash
 git clone https://github.com/thesobercoder/miniscira.git && cd miniscira
@@ -268,27 +282,19 @@ The app needs an OpenAI-compatible endpoint. It uses each feature separately, so
 
 ## Sandbox and platform notes
 
-- **The sandbox uses Eve's Docker backend** through a private Docker-API
-  middleware sidecar. On the validated Umbrel deployment, only that middleware
-  mounts Portainer's Engine socket (`/data/docker.sock` on the host,
-  `/var/run/docker.sock` inside the middleware). MiniScira receives only
-  `DOCKER_HOST`; it gets neither the raw socket nor a Portainer token. The
-  Portainer endpoint proxy is intentionally not in the attached-exec data path:
-  it did not preserve Docker's required upgraded bidirectional stream. Each
-  session runs as a sibling container attached only to `sandbox-egress`,
-  separate from `docker-control`; HTTP(S) is injected through the
-  internal `sandbox-egress-proxy`. Its Squid domain ACL permits npm, PyPI, Go,
-  Rust, GitHub, Node, Bun, Deno/JSR, and GitLab distribution hosts and denies
-  everything else. This is not DinD and neither private proxy publishes a LAN
-  port. The middleware is default deny and validates Sandbox labels, images,
-  networks, container options, resource ownership, Exec, archive, Template
-  commit, and cleanup operations.
-- **Critical stream invariant**: Sandbox file writes use an attached Docker Exec
-  upload. The middleware must forward both directions concurrently and send EOF
-  toward Docker when the client upload finishes. A regression leaves the Agent
-  UI busy and a Sandbox process stuck at `cat > /workspace/main.py`. Every
-  middleware release must test `writeTextFile` followed by code execution; a
-  spawn-only smoke test is insufficient.
+- **Railway has no Docker backend.** `run_code` and the Bash tool return a
+  clear unavailable message and the turn continues without code output. Do
+  not mount a Docker socket or add sandbox sidecars on Railway.
+- **Local Compose provides the Docker backend through sidecars**
+  (`docker-socket-proxy` and `sandbox-egress-proxy`). Only the socket proxy
+  mounts the host Docker socket selected by `DOCKER_SOCKET` (default
+  `/var/run/docker.sock`); MiniScira receives only `DOCKER_HOST` over the
+  internal control network. Each session runs as a sibling container
+  attached only to `sandbox-egress`, separate from `docker-control`;
+  HTTP(S) passes through the internal egress proxy, whose domain allowlist
+  permits npm, PyPI, Go, Rust, GitHub, Node, Bun, Deno/JSR, and GitLab
+  distribution hosts and denies everything else. This is not DinD and
+  neither proxy publishes a LAN port.
 - **Platform**: the image builds `linux/amd64` — the only natively supported
   arch, because `@firecrawl/pdf-inspector` ships no Linux ARM64 NAPI binding.
   ARM64 hosts build and run under emulation (`IMAGE_PLATFORM` keeps build and
