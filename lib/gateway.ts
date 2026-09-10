@@ -168,11 +168,26 @@ export function withOneRetry<T extends { readonly modelId: string }>(
   })
 }
 
+export function gatewayAttributionHeaders(): Record<string, string> {
+  const referer =
+    process.env.OPENROUTER_HTTP_REFERER?.trim() ||
+    process.env.OPENROUTER_REFERER?.trim() ||
+    process.env.APP_URL?.trim()
+  const title =
+    process.env.OPENROUTER_X_TITLE?.trim() ||
+    process.env.OPENROUTER_TITLE?.trim()
+  return {
+    ...(referer ? { "HTTP-Referer": referer } : {}),
+    ...(title ? { "X-Title": title } : {}),
+  }
+}
+
 export function chatModel(modelId: string, apiKey?: string) {
   return withOneRetry(
     createOpenAI({
       baseURL: gatewayBaseUrl(),
       apiKey: apiKey ?? process.env.AI_GATEWAY_API_KEY ?? "",
+      headers: gatewayAttributionHeaders(),
     }).chat(modelId)
   )
 }
@@ -181,5 +196,6 @@ export function imageModel(modelId: string) {
   return createOpenAI({
     baseURL: gatewayBaseUrl(),
     apiKey: process.env.AI_GATEWAY_API_KEY ?? "",
+    headers: gatewayAttributionHeaders(),
   }).image(modelId)
 }

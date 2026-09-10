@@ -251,9 +251,11 @@ export const PROVIDER_ORDER = [
 /** Provider slug of a model id: `openai/gpt-5` → `openai`, `gpt-5.6-sol` → `openai`. */
 export function providerOf(id: string): string {
   if (MODEL_VENDOR[id]) return MODEL_VENDOR[id]
-  const head = id.split("/")[0]
+  const rawHead = id.split("/")[0] ?? id
+  const head = rawHead.toLowerCase()
   if (VENDOR_SLUGS.has(head)) return head
-  return MODEL_VENDOR[head] ?? "cpa"
+  if (MODEL_VENDOR[head]) return MODEL_VENDOR[head]
+  return MODEL_VENDOR[rawHead] ?? "cpa"
 }
 
 export function providerLabel(provider: string): string {

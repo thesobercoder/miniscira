@@ -13,6 +13,12 @@ import {
   type SupportedDocumentMediaType,
 } from "@/lib/document-files"
 import { put } from "@/lib/local-blob"
+import { resolveRuntimePort } from "@/lib/runtime-port"
+import { isDockerBackendConfigured } from "@/lib/sandbox-config"
+import {
+  isSandboxUnavailableError,
+  sandboxUnavailableResult,
+} from "@/lib/sandbox-unavailable"
 
 // The model sees this tool as `run_code`. It runs a Python script in the
 // deployment's sibling Docker sandbox and publishes supported generated files.
@@ -64,8 +70,61 @@ export default defineTool({
     missingFiles: z.array(z.string()).optional(),
   }),
   async execute({ code, title, files }, ctx) {
+    // No Docker daemon on this host (Railway): the sandbox backend is a
+    // simulated fallback that cannot run Python. Fail fast with the clear
+    // message instead of producing misleading output.
+    if (!isDockerBackendConfigured()) {
+      return { title, code, ...sandboxUnavailableResult() }
+    }
+    try {
+      return await executeWithSandbox({ code, title, files }, ctx)
+    } catch (err) {
+      if (isSandboxUnavailableError(err)) {
+        return { title, code, ...sandboxUnavailableResult() }
+      }
+      throw err
+    }
+  },
+})
+
+type SandboxCtx = {
+  session: {
+    auth: {
+      current: { principalType?: string; principalId?: string } | null
+    }
+  }
+  getSandbox: () => Promise<{
+    run: (args: { command: string }) => PromiseLike<{
+      stdout: string
+      stderr: string
+      exitCode: number
+    }>
+    writeTextFile: (args: {
+      path: string
+      content: string
+    }) => PromiseLike<unknown>
+    writeBinaryFile: (args: {
+      path: string
+      content: Uint8Array
+    }) => PromiseLike<unknown>
+    readBinaryFile: (args: { path: string }) => PromiseLike<Uint8Array | null>
+  }>
+}
+
+async function executeWithSandbox(
+  { code, title, files }: { code: string; title?: string; files?: string[] },
+  ctx: SandboxCtx
+) {
     const auth = ctx.session.auth.current
-    const sandbox = await ctx.getSandbox()
+    let sandbox: Awaited<ReturnType<typeof ctx.getSandbox>>
+    try {
+      sandbox = await ctx.getSandbox()
+    } catch (err) {
+      if (isSandboxUnavailableError(err)) {
+        return { title, code, ...sandboxUnavailableResult() }
+      }
+      throw err
+    }
 
     const listWorkspaceFiles = async (): Promise<string[]> => {
       try {
@@ -122,9 +181,10 @@ export default defineTool({
           try {
             // Local-blob URLs carry the public origin; fetch over loopback
             // instead — the hostname doesn't resolve inside this container.
+            // Uses the runtime port (Railway injects PORT) via shared helper.
             const localUrl = url.replace(
               /^https?:\/\/[^/]+/,
-              "http://127.0.0.1:3000"
+              `http://127.0.0.1:${resolveRuntimePort()}`
             )
             const res = await fetch(localUrl)
             if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -141,11 +201,23 @@ export default defineTool({
     }
 
     // Snapshot existing outputs so we only return ones this run creates.
-    const before = new Set(await listImages())
-    const documentsBefore = await listDocuments()
+    // Sandbox ops after acquisition can still fail when the Docker backend is
+    // absent (Railway): surface the clear unavailable result, never hang.
+    let before: Set<string>
+    let documentsBefore: DocumentFileState[]
+    let run: { stdout: string; stderr: string; exitCode: number }
+    try {
+      before = new Set(await listImages())
+      documentsBefore = await listDocuments()
 
-    await sandbox.writeTextFile({ path: "main.py", content: code })
-    const run = await sandbox.run({ command: "python3 main.py" })
+      await sandbox.writeTextFile({ path: "main.py", content: code })
+      run = await sandbox.run({ command: "python3 main.py" })
+    } catch (err) {
+      if (isSandboxUnavailableError(err)) {
+        return { title, code, ...sandboxUnavailableResult() }
+      }
+      throw err
+    }
 
     // Upload any newly-created charts so the UI can show them inline.
     const images: { name: string; url: string }[] = []
@@ -217,5 +289,4 @@ export default defineTool({
       ...(loadedFiles.length ? { loadedFiles } : {}),
       ...(missingFiles.length ? { missingFiles } : {}),
     }
-  },
-})
+}

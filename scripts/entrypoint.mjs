@@ -10,15 +10,17 @@
  *   3. Transitional schema gate: only when RUN_DB_PUSH=true, run
  *      `drizzle-kit push` under a Postgres advisory lock (one instance wins;
  *      others skip with a warning). Default false — normal startup never
- *      mutates the schema. The committed-migration path (one-shot `migrate`
- *      compose service, `scripts/migrate.mjs`) is the target; this gate
- *      exists for stack-30 continuity only.
+ *      mutates the schema via push. The routine path is step 3b below.
+ *   3b. Committed migrations: always run `scripts/migrate.mjs` against
+ *      lib/db/migrations/ (idempotent — repeat runs change nothing).
  *   4. Start eve + next under two-process supervision (scripts/supervise.mjs):
  *      either half dying takes the container down with the right exit code,
- *      and signals are forwarded to both halves.
+ *      and signals are forwarded to both halves. Next listens on PORT
+ *      (default 3000; Railway injects it).
  *
  * Env:
  *   DATABASE_URL                 required
+ *   PORT                        Next.js port (default 3000; Railway injects it)
  *   RUN_DB_PUSH                   "true" to enable the transitional gate (default off)
  *   DB_WAIT_TIMEOUT_MS            how long to wait for the DB (default 90000)
  *   RUN_DB_PUSH_LOCK_TIMEOUT_MS   how long to wait for the advisory lock (default 60000)
@@ -221,6 +223,23 @@ if (
   process.exit(1)
 }
 
+// Runtime HTTP port: Railway injects PORT; local default is 3000.
+const rawPort = process.env.PORT?.trim() || "3000"
+const port = Number.parseInt(rawPort, 10)
+if (String(port) !== rawPort || port < 1 || port > 65_535) {
+  console.error("[entrypoint] PORT must be an integer between 1 and 65535.")
+  process.exit(1)
+}
+
+function runMigrations() {
+  return new Promise((resolve) => {
+    const child = spawn("node", ["scripts/migrate.mjs"], {
+      stdio: "inherit",
+    })
+    child.once("exit", (exitCode) => resolve(exitCode ?? 1))
+  })
+}
+
 try {
   await waitForDatabase(url)
   log("database reachable")
@@ -242,9 +261,21 @@ if (process.env.RUN_DB_PUSH === "true") {
   )
 }
 
-log(`starting eve (port ${evePort}) and next (port 3000) under supervision`)
+// Committed-migration boot step (Railway + any orchestrator): applies
+// lib/db/migrations/ idempotently via scripts/migrate.mjs. Repeat runs
+// change nothing. This is the routine path; RUN_DB_PUSH stays gated only.
+const migrateCode = await runMigrations()
+if (migrateCode !== 0) {
+  console.error(
+    `[entrypoint] migration step failed with exit code ${migrateCode} — refusing to start`
+  )
+  process.exit(migrateCode)
+}
+log("migrations applied (idempotent)")
+
+log(`starting eve (port ${evePort}) and next (port ${port}) under supervision`)
 const code = await supervise([
   ["node", "node_modules/eve/bin/eve.js", "start", "--port", evePort],
-  ["node", "node_modules/next/dist/bin/next", "start"],
+  ["node", "node_modules/next/dist/bin/next", "start", "-p", String(port)],
 ])
 process.exit(code)
