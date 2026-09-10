@@ -7,7 +7,6 @@ import { mcpServer } from "@/lib/db/schema"
 import { publicServer } from "@/lib/mcp"
 import { sanitizeMcpHeaders, validateMcpHeaders } from "@/lib/mcp-headers"
 import { sealMcpHeaders, sealMcpJson } from "@/lib/mcp-secrets"
-import { validateMcpServerUrl } from "@/lib/mcp-url"
 
 // GET /api/mcp — the signed-in user's MCP servers.
 export const GET = authed(async (_request, { userId }) => {
@@ -46,9 +45,22 @@ export const POST = authed(async (request, { userId }) => {
       { error: "name and url are required" },
       { status: 400 }
     )
-  const parsed = validateMcpServerUrl(url)
-  if (!parsed.ok)
-    return NextResponse.json({ error: parsed.error }, { status: 400 })
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return NextResponse.json({ error: "url is not a valid URL" }, { status: 400 })
+  }
+  if (
+    parsed.protocol !== "https:" &&
+    parsed.hostname !== "localhost" &&
+    parsed.hostname !== "127.0.0.1"
+  ) {
+    return NextResponse.json(
+      { error: "Only https:// URLs are allowed (or localhost for dev)." },
+      { status: 400 }
+    )
+  }
   const headerError = validateMcpHeaders(headers, {
     required: authType === "header",
   })
